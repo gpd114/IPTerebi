@@ -10,8 +10,9 @@ with, which is yours to supply.
 
 ## Status
 
-Early. Live television works end to end — sign in, categories, channel list,
-search, playback. Not there yet:
+Early. The live-television path is written end to end — sign in, categories,
+channel list, search, playback — and it builds, but it has not yet been run
+against a real panel, so treat "works" as unproven. Not there yet:
 
 - Video on demand and series, which use the same API with different actions
 - The EPG (`get_short_epg` / `xmltv.php`)

@@ -98,8 +98,9 @@ Measure before concluding. The panel quirks above are guesswork made concrete;
 each one is pinned by a test in `core/src/test`, and when a provider turns up
 that behaves differently the test is where the new truth goes.
 
-**The Android half has never been compiled.** It was written in an environment
-with no Android SDK — `dl.google.com` was unreachable, which is where both the
-SDK and Gradle's `google()` repository live. `core/` is tested and passing;
-`app/` is unverified, and the first real `gradle assembleDebug` should be
-treated as the first review of it.
+**`app/` compiles but has never been run.** CI builds it green and produces an
+installable APK, and `core/`'s tests pass — but nothing here has ever been
+pointed at a real panel or run on a phone. Everything the UI does is inference
+from the API shapes, so the first session on an actual line is where the real
+answers are. Expect the surprises to be in what panels return, not in whether
+the code builds.
