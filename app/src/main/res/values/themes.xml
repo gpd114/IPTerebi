@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Deliberately a platform theme rather than a Material Components one: the
+      UI is entirely Compose, so this exists only to set the window background
+      before the first frame. Pulling in com.google.android.material just to
+      parent this style would add a dependency nothing else uses.
+    -->
+    <style name="Theme.IPTerebi" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#101418</item>
+    </style>
+</resources>
