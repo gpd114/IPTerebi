@@ -150,3 +150,29 @@ data class UserInfo(
 data class AuthResponse(
     @SerialName("user_info") val userInfo: UserInfo = UserInfo(),
 )
+
+/**
+ * Drops channels the app could not play and would crash on trying to list.
+ *
+ * `stream_id` is optional like everything else here, and [FlexibleIntSerializer]
+ * answers 0 for one that is missing or unreadable. Zero is not a channel: the
+ * stream URL built from it is `/live/u/p/0.ts`, which 404s against a panel that
+ * is working perfectly well. Worse, a screenful of them share an id, and a
+ * LazyColumn keyed on that id throws `Key "0" was already used` — the list is
+ * gone rather than one row of it.
+ *
+ * Duplicate ids get the same treatment for the same reason. A panel repeating a
+ * channel inside one category is a fork bug, but it is our crash.
+ */
+fun List<LiveStream>.playableChannels(): List<LiveStream> =
+    filter { it.streamId > 0 }.distinctBy { it.streamId }
+
+/**
+ * Drops categories that cannot be asked for or listed.
+ *
+ * A blank `category_id` cannot be passed to `get_live_streams` as a filter, so
+ * the category could only ever open empty; and blanks and duplicates collide as
+ * LazyRow keys exactly as channel ids do.
+ */
+fun List<LiveCategory>.usableCategories(): List<LiveCategory> =
+    filter { it.id.isNotBlank() }.distinctBy { it.id }

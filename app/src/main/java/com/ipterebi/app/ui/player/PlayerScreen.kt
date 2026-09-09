@@ -194,14 +194,28 @@ private fun PlayerContent(
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, player) {
+        // Only true once the app has actually been away. The player above is
+        // built already prepared, and addObserver replays the owner's current
+        // state into a new observer — so ON_START arrives here immediately,
+        // before anything has happened. Re-preparing on that first one tears
+        // down the request that was just opened and dials the panel a second
+        // time within milliseconds, which on a one-connection line is precisely
+        // the refusal this app spends most of its error messages explaining.
+        var wasStopped = false
+
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_STOP -> player.pause()
+                Lifecycle.Event.ON_STOP -> {
+                    wasStopped = true
+                    player.pause()
+                }
+
                 // Re-prepared rather than resumed. This is live television: the
                 // buffer held across a trip to the home screen is stale by
                 // however long the app was away, and resuming plays that back
                 // minutes behind the broadcast.
-                Lifecycle.Event.ON_START -> {
+                Lifecycle.Event.ON_START -> if (wasStopped) {
+                    wasStopped = false
                     player.prepare()
                     player.play()
                 }
