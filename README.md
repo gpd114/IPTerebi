@@ -15,8 +15,13 @@ channel list, search, playback — and it builds, but it has not yet been run
 against a real panel, so treat "works" as unproven. Not there yet:
 
 - Video on demand and series, which use the same API with different actions
-- Favourites, recently watched, and resuming the last channel
 - Android TV and D-pad navigation — this is a phone and tablet build
+
+Starring a channel keeps it on a Favourites shelf, watching one puts it on a
+Recent shelf, and the last thing watched is offered back as a "carry on
+watching" row. Both shelves are stored per line and cost no request. Resuming is
+one tap rather than automatic: opening straight into playback would spend the
+line's single connection before the user had said what they wanted.
 
 The guide is in, as far as `get_short_epg` goes: what is on now and next appears
 over the player, with a progress bar through the current programme. There is no

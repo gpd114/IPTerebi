@@ -165,7 +165,7 @@ data class AuthResponse(
  * channel inside one category is a fork bug, but it is our crash.
  */
 fun List<LiveStream>.playableChannels(): List<LiveStream> =
-    filter { it.streamId > 0 }.distinctBy { it.streamId }
+    filter { it.isPlayable }.distinctBy { it.streamId }
 
 /**
  * Drops categories that cannot be asked for or listed.

@@ -10,20 +10,41 @@ import com.ipterebi.core.LiveCategory
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.XtreamException
+import com.ipterebi.core.holds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * Which list the screen is showing.
+ *
+ * Favourites and recents sit alongside the panel's own categories rather than
+ * inside them: they are drawn from storage, cost no request, and a channel in
+ * either can have come from any category on the line.
+ */
+sealed interface Shelf {
+    data object Favourites : Shelf
+    data object Recent : Shelf
+
+    /** One of the panel's categories. A null [categoryId] means all of them at once. */
+    data class Panel(val categoryId: String?) : Shelf
+}
+
 data class ChannelsUiState(
     val categories: List<LiveCategory> = emptyList(),
-    /** Null means every category at once. */
-    val selectedCategoryId: String? = null,
+    val shelf: Shelf = Shelf.Panel(null),
+    /** What the panel last returned. Not what is necessarily on screen — see [listed]. */
     val channels: List<LiveStream> = emptyList(),
+    val favourites: List<LiveStream> = emptyList(),
+    val recents: List<LiveStream> = emptyList(),
     val query: String = "",
     val busy: Boolean = false,
     val error: String? = null,
@@ -33,14 +54,33 @@ data class ChannelsUiState(
      */
     val offerFullLoad: Boolean = false,
 ) {
+    /** The list the chosen shelf is showing, before the search box narrows it. */
+    val listed: List<LiveStream>
+        get() = when (shelf) {
+            Shelf.Favourites -> favourites
+            Shelf.Recent -> recents
+            is Shelf.Panel -> channels
+        }
+
     val visibleChannels: List<LiveStream>
         get() = if (query.isBlank()) {
-            channels
+            listed
         } else {
-            channels.filter { it.name.contains(query, ignoreCase = true) }
+            listed.filter { it.name.contains(query, ignoreCase = true) }
         }
+
+    /** The channel to offer as "carry on watching". Null before anything has been played. */
+    val lastWatched: LiveStream? get() = recents.firstOrNull()
+
+    fun isFavourite(streamId: Int): Boolean = favourites.holds(streamId)
 }
 
+// flatMapLatest is still marked experimental in coroutines 1.8.1 and has been
+// for years. Opted into deliberately rather than left as a warning: the
+// alternative is collecting the account and the two stored lists in one
+// combine, which loses the "cancel the old line's flow" behaviour that is the
+// whole reason for using it.
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _state = MutableStateFlow(ChannelsUiState())
@@ -57,29 +97,54 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
     private var loadJob: Job? = null
 
     init {
+        val signedIn = container.credentials.state.filterIsInstance<AccountState.SignedIn>()
+
         viewModelScope.launch {
-            container.credentials.state
-                .filterIsInstance<AccountState.SignedIn>()
-                .collect { signedIn ->
-                    val previous = account
-                    account = signedIn.account
-                    // Reloaded only when the line itself changed. Switching the
-                    // stream format or the user agent in settings emits here
-                    // too, and re-fetching thousands of channels because
-                    // somebody flipped a chip would be absurd.
-                    val sameLine = previous != null &&
-                        previous.base == signedIn.account.base &&
-                        previous.username == signedIn.account.username
-                    if (!sameLine) startLoad { loadCategories() }
-                }
+            signedIn.collect { current ->
+                val previous = account
+                account = current.account
+                // Reloaded only when the line itself changed. Switching the
+                // stream format or the user agent in settings emits here too,
+                // and re-fetching thousands of channels because somebody
+                // flipped a chip would be absurd.
+                val sameLine = previous != null &&
+                    previous.base == current.account.base &&
+                    previous.username == current.account.username
+                if (!sameLine) startLoad { loadCategories() }
+            }
+        }
+
+        // flatMapLatest so that signing into a different line swaps to that
+        // line's lists rather than merging the two.
+        viewModelScope.launch {
+            signedIn.flatMapLatest { container.channelLists.favourites(it.account) }
+                .collect { favourites -> _state.update { it.copy(favourites = favourites) } }
+        }
+        viewModelScope.launch {
+            signedIn.flatMapLatest { container.channelLists.recents(it.account) }
+                .collect { recents -> _state.update { it.copy(recents = recents) } }
+        }
+
+        // The repository is "the channel list currently on screen", which the
+        // player reads to put a name on what it is playing. Keeping it fed from
+        // here means a favourite opened from a different category still has a
+        // title, which it would not if only panel responses were published.
+        viewModelScope.launch {
+            _state.map { it.listed }.distinctUntilChanged().collect(container.channels::publish)
         }
     }
 
     fun onQueryChange(value: String) = _state.update { it.copy(query = value) }
 
-    fun selectCategory(categoryId: String?) {
-        _state.update { it.copy(selectedCategoryId = categoryId, query = "") }
-        startLoad { loadChannels(categoryId) }
+    /** Favourites and recents come from storage, so neither costs a request. */
+    fun selectShelf(shelf: Shelf) {
+        _state.update { it.copy(shelf = shelf, query = "", error = null, offerFullLoad = false) }
+        if (shelf is Shelf.Panel) startLoad { loadChannels(shelf.categoryId) }
+    }
+
+    fun toggleFavourite(channel: LiveStream) {
+        val account = account ?: return
+        viewModelScope.launch { container.channelLists.toggleFavourite(account, channel) }
     }
 
     fun retry() {
@@ -87,7 +152,7 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
             if (_state.value.categories.isEmpty()) {
                 loadCategories()
             } else {
-                loadChannels(_state.value.selectedCategoryId)
+                loadChannels((_state.value.shelf as? Shelf.Panel)?.categoryId)
             }
         }
     }
@@ -144,14 +209,11 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
                 busy = true,
                 error = null,
                 offerFullLoad = false,
-                selectedCategoryId = categoryId,
+                shelf = Shelf.Panel(categoryId),
             )
         }
         try {
             val channels = container.xtream.liveStreams(account, categoryId)
-            // Published so the player can resolve a stream id without the list
-            // travelling through navigation arguments.
-            container.channels.publish(channels)
             _state.update { it.copy(channels = channels, busy = false) }
         } catch (e: XtreamException) {
             _state.update { it.copy(busy = false, error = e.message) }

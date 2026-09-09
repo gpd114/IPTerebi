@@ -24,6 +24,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,7 @@ import com.ipterebi.app.data.AccountState
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.describeStreamHttpError
+import kotlinx.coroutines.launch
 
 @Composable
 fun PlayerScreen(container: AppContainer, streamId: Int, onBack: () -> Unit) {
@@ -90,6 +92,8 @@ private fun PlayerContent(
     val context = LocalContext.current
     val channel = remember(streamId) { container.channels.find(streamId) }
     val guide = rememberProgrammeGuide(container, account, streamId)
+    val scope = rememberCoroutineScope()
+    var recorded by remember(streamId) { mutableStateOf(false) }
     val url = remember(streamId, account) { container.xtream.liveStreamUrl(account, streamId) }
     var error by remember(url) { mutableStateOf<String?>(null) }
 
@@ -152,6 +156,17 @@ private fun PlayerContent(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG_PLAY, "stream $streamId ${playbackStateName(playbackState)}")
+                }
+
+                // Recorded when the channel actually plays, not when it is
+                // tapped: a list of things that were opened and then refused by
+                // the connection limit is not a list of things watched. Skipped
+                // when the channel record is not to hand — after a process death
+                // the list it came from is gone, and storing an entry with no
+                // name would put an unreadable row in the recents shelf.
+                if (playbackState == Player.STATE_READY && !recorded && channel != null) {
+                    recorded = true
+                    scope.launch { container.channelLists.recordWatched(account, channel) }
                 }
             }
 

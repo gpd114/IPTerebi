@@ -2,6 +2,7 @@ package com.ipterebi.app
 
 import android.content.Context
 import android.util.Log
+import com.ipterebi.app.data.ChannelListStore
 import com.ipterebi.app.data.ChannelRepository
 import com.ipterebi.app.data.CredentialStore
 import com.ipterebi.core.XtreamClient
@@ -23,6 +24,9 @@ class AppContainer(context: Context) {
     )
 
     val channels = ChannelRepository()
+
+    /** Starred and recently watched channels, per line. */
+    val channelLists = ChannelListStore(context.applicationContext)
 }
 
 /** Every panel request and its result, credentials stripped. Debug only. */

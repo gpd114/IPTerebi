@@ -103,7 +103,13 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun signOut() {
+        val account = _state.value.account
         viewModelScope.launch {
+            // Before the credentials go: the favourites and recents for a line
+            // are keyed on it, and without the account there is no way to name
+            // the keys to remove. Leaving them would hand the next line to sign
+            // in a shelf of stream ids from somebody else's panel.
+            account?.let { container.channelLists.clear(it) }
             container.credentials.clear()
             container.channels.publish(emptyList())
             _state.update { it.copy(signedOut = true) }

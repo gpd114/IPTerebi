@@ -152,6 +152,15 @@ is at fault — a panel that does not list `m3u8` will not serve it.
 - **A missing guide is the normal case, not an error.** Lines carry no EPG,
   channels are missing from guides that exist, and some forks answer `false`.
   All of it arrives as an empty list.
+- **A stream id means nothing off its own panel.** It is the provider's private
+  numbering, so id 4271 on one line and 4271 on another are unrelated channels.
+  Anything stored against an id — favourites, recents — is therefore keyed on
+  the line, via `lineKey`, and dropped when that line is signed out of. A shared
+  list would show a favourite that plays something else entirely.
+- **Providers rename channels constantly.** "BBC One" becomes "UK: BBC ONE HD"
+  overnight. Stored lists match on `streamId` alone for that reason; matching a
+  whole record would quietly empty someone's favourites the next time their
+  provider tidied up.
 - **A whole channel list can be tens of thousands of entries.** Asking
   `get_live_streams` with no category is several megabytes on a large line, so
   the UI loads one category at a time and the player is navigated to with a
