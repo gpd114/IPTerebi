@@ -36,12 +36,43 @@ compiler plugin is versioned with Kotlin rather than with Compose.
 Debug builds log under two tags, both wrapped in `BuildConfig.DEBUG` and free in
 release:
 
-- `IPTerebiApi` — one line per panel request with the credentials stripped, and
-  the status and body size that came back
-- `IPTerebiPlay` — playback failures with the Media3 error code
+- `IPTerebiApi` — one line per panel request with the credentials stripped, what
+  the response contained (category and channel counts, the first channel's name
+  and id), the line's status and connection count on sign-in, and the opening of
+  any body that failed to parse
+- `IPTerebiPlay` — the format and user agent a stream was opened with, the URL's
+  *shape* with the credentials starred out, every playback state transition, the
+  video size once frames arrive, and the mapped failure on an error
 
-Neither ever writes a stream URL. The credentials sit in the *path* of a stream
-URL, not in a header, so a logged URL is a logged password.
+```
+adb logcat -G 16M
+adb logcat -s IPTerebiApi:D IPTerebiPlay:D
+```
+
+**Two things must never reach the log.**
+
+A stream URL: the credentials sit in its *path*, not in a header, so a logged
+URL is a logged password. Only its shape is printed.
+
+A raw sign-in response body: panels echo the username **and the password in
+clear** back inside `user_info`. `String.withoutCredentialValues()` strips both
+and is what the unparseable-body log goes through. There is a test pinning it;
+if you add a new place that logs a body, route it through the same function.
+
+## Changing settings without reinstalling
+
+The settings screen (cog on the channel list) changes the two things most likely
+to be wrong, live:
+
+- **Stream format** — MPEG-TS or HLS, saved immediately. The player keys its
+  ExoPlayer instance on the account, so reopening a channel picks up the change.
+- **User agent** — presets for VLC, ffmpeg, ExoPlayer and an honest one, or type
+  your own.
+
+There is also a "check the line" button that re-runs the sign-in call and shows
+what the panel says: status, expiry, connections in use, and which output
+formats it admits to. That last one is worth reading before concluding the app
+is at fault — a panel that does not list `m3u8` will not serve it.
 
 ## Things that are true about Xtream panels
 

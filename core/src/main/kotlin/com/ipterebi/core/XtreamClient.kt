@@ -60,6 +60,10 @@ class XtreamClient(
                     "\"${info.status}\"."
             )
         }
+        log(
+            "  line ok: status=${info.status}, connections=${info.activeConnections}/" +
+                "${info.maxConnections}, formats=${info.allowedOutputFormats}"
+        )
         return info
     }
 
@@ -67,7 +71,7 @@ class XtreamClient(
         body = get(account, action = "get_live_categories"),
         deserializer = ListSerializer(LiveCategory.serializer()),
         what = "the category list",
-    )
+    ).also { log("  parsed ${it.size} categories") }
 
     /**
      * Channels, optionally in one category. Asking for everything at once is a
@@ -85,7 +89,12 @@ class XtreamClient(
         ),
         deserializer = ListSerializer(LiveStream.serializer()),
         what = "the channel list",
-    )
+    ).also { channels ->
+        log(
+            "  parsed ${channels.size} channels in category ${categoryId ?: "(all)"}" +
+                (channels.firstOrNull()?.let { ", first: ${it.name} (id ${it.streamId})" } ?: "")
+        )
+    }
 
     /**
      * Where the video actually is. The credentials sit in the path, not in a
@@ -162,6 +171,7 @@ class XtreamClient(
             if (body.trim() == "false") {
                 throw XtreamException("The panel does not support $what.", e)
             }
+            log("  unparseable $what, body starts: ${body.take(200).withoutCredentialValues()}")
             throw XtreamException("Could not make sense of $what from this panel.", e)
         }
     }
@@ -170,6 +180,17 @@ class XtreamClient(
         account.base.toHttpUrlOrNull()
             ?: throw XtreamException("\"${account.base}\" is not a usable server address.")
 }
+
+/**
+ * Strips credential values out of a JSON body so it can be logged.
+ *
+ * This is not optional for the sign-in response: Xtream panels echo the
+ * username *and the password in clear* back inside `user_info`, so logging a
+ * raw response body writes the user's password to logcat, where any app holding
+ * READ_LOGS on an older device can read it.
+ */
+fun String.withoutCredentialValues(): String =
+    replace(Regex("\"(password|username)\"\\s*:\\s*\"[^\"]*\""), "\"$1\":\"***\"")
 
 /** The same URL with the credentials replaced, safe to write to a log. */
 fun HttpUrl.withoutCredentials(): String = newBuilder()

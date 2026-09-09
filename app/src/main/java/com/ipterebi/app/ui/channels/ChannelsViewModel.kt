@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -27,7 +26,6 @@ data class ChannelsUiState(
     val query: String = "",
     val busy: Boolean = false,
     val error: String? = null,
-    val signedOut: Boolean = false,
 ) {
     val visibleChannels: List<LiveStream>
         get() = if (query.isBlank()) {
@@ -46,11 +44,20 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
 
     init {
         viewModelScope.launch {
-            account = container.credentials.state
+            container.credentials.state
                 .filterIsInstance<AccountState.SignedIn>()
-                .first()
-                .account
-            loadCategories()
+                .collect { signedIn ->
+                    val previous = account
+                    account = signedIn.account
+                    // Reloaded only when the line itself changed. Switching the
+                    // stream format or the user agent in settings emits here
+                    // too, and re-fetching thousands of channels because
+                    // somebody flipped a chip would be absurd.
+                    val sameLine = previous != null &&
+                        previous.base == signedIn.account.base &&
+                        previous.username == signedIn.account.username
+                    if (!sameLine) loadCategories()
+                }
         }
     }
 
@@ -68,14 +75,6 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
             } else {
                 loadChannels(_state.value.selectedCategoryId)
             }
-        }
-    }
-
-    fun signOut() {
-        viewModelScope.launch {
-            container.credentials.clear()
-            container.channels.publish(emptyList())
-            _state.update { it.copy(signedOut = true) }
         }
     }
 

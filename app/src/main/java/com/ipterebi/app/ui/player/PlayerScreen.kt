@@ -42,6 +42,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
@@ -132,7 +133,40 @@ private fun PlayerContent(
     }
 
     DisposableEffect(player) {
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                TAG_PLAY,
+                "open stream $streamId as ${account.format.label}, ua=${account.userAgent}",
+            )
+            // The real URL carries the credentials in its path, so only its
+            // shape is logged. If the panel is serving from somewhere other
+            // than /live, this is where that becomes visible.
+            Log.d(
+                TAG_PLAY,
+                "  ${account.base}/live/***/***/$streamId.${account.format.extension}",
+            )
+        }
+
         val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG_PLAY, "stream $streamId ${playbackStateName(playbackState)}")
+                }
+            }
+
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG_PLAY, "stream $streamId ${if (isPlaying) "playing" else "stopped"}")
+                }
+            }
+
+            /** First proof that video is actually arriving, and at what size. */
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG_PLAY, "stream $streamId video ${videoSize.width}x${videoSize.height}")
+                }
+            }
+
             override fun onPlayerError(e: PlaybackException) {
                 error = when (val cause = e.cause) {
                     is HttpDataSource.InvalidResponseCodeException ->
@@ -270,6 +304,19 @@ private fun PlayerContent(
             }
         }
     }
+}
+
+/**
+ * `ended` deserves a note: a live stream should never reach it. When it does,
+ * the panel closed the connection — usually the line's connection limit being
+ * enforced a few seconds late, rather than anything about this channel.
+ */
+private fun playbackStateName(state: Int): String = when (state) {
+    Player.STATE_IDLE -> "idle"
+    Player.STATE_BUFFERING -> "buffering"
+    Player.STATE_READY -> "ready"
+    Player.STATE_ENDED -> "ended (source closed the connection)"
+    else -> "state $state"
 }
 
 private fun Context.findActivity(): Activity? {

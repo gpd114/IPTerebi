@@ -20,11 +20,13 @@ import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.app.ui.channels.ChannelsScreen
 import com.ipterebi.app.ui.login.LoginScreen
+import com.ipterebi.app.ui.settings.SettingsScreen
 import com.ipterebi.app.ui.player.PlayerScreen
 
 object Route {
     const val LOGIN = "login"
     const val CHANNELS = "channels"
+    const val SETTINGS = "settings"
     const val PLAYER = "player/{streamId}"
 
     fun player(streamId: Int) = "player/$streamId"
@@ -67,6 +69,14 @@ fun AppNav(container: AppContainer) {
                         ChannelsScreen(
                             container = container,
                             onChannel = { streamId -> nav.navigate(Route.player(streamId)) },
+                            onSettings = { nav.navigate(Route.SETTINGS) },
+                        )
+                    }
+
+                    composable(Route.SETTINGS) {
+                        SettingsScreen(
+                            container = container,
+                            onBack = { nav.popBackStack() },
                             onSignedOut = {
                                 nav.navigate(Route.LOGIN) { popUpTo(0) { inclusive = true } }
                             },

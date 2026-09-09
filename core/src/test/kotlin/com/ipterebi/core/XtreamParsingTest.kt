@@ -89,4 +89,31 @@ class XtreamParsingTest {
         val info = LenientJson.decodeFromString(AuthResponse.serializer(), json).userInfo
         assertEquals("2", info.maxConnections)
     }
+
+    @Test
+    fun `logging a sign-in body strips the password the panel echoes back`() {
+        // Panels return the password in clear inside user_info. If this ever
+        // stops holding, a raw body reaches logcat and takes the user's
+        // password with it.
+        val body = """{"user_info":{"username":"alice","password":"s3cret","auth":1}}"""
+        val safe = body.withoutCredentialValues()
+
+        assertFalse(safe.contains("s3cret"), "password survived: $safe")
+        assertFalse(safe.contains("alice"), "username survived: $safe")
+        assertTrue(safe.contains("\"auth\":1"), "scrubbing ate the rest of the body: $safe")
+    }
+
+    @Test
+    fun `scrubbing copes with the spacing panels actually emit`() {
+        val body = """{"password" : "s3cret", "username":  "alice"}"""
+        val safe = body.withoutCredentialValues()
+        assertFalse(safe.contains("s3cret"), "got: $safe")
+        assertFalse(safe.contains("alice"), "got: $safe")
+    }
+
+    @Test
+    fun `a body with no credentials in it is left alone`() {
+        val body = """[{"stream_id":1,"name":"BBC One HD"}]"""
+        assertEquals(body, body.withoutCredentialValues())
+    }
 }

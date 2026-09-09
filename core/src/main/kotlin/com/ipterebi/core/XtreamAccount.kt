@@ -24,7 +24,7 @@ data class XtreamAccount(
          * succeed reads as "wrong password" when it is nothing of the kind.
          * Overridable per account for the provider that wants something else.
          */
-        const val DEFAULT_USER_AGENT: String = "VLC/3.0.20 LibVLC/3.0.20"
+        const val DEFAULT_USER_AGENT: String = UserAgents.VLC
     }
 }
 

@@ -18,7 +18,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,7 +33,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,22 +50,18 @@ import com.ipterebi.core.LiveStream
 fun ChannelsScreen(
     container: AppContainer,
     onChannel: (Int) -> Unit,
-    onSignedOut: () -> Unit,
+    onSettings: () -> Unit,
     viewModel: ChannelsViewModel = viewModel(factory = ChannelsViewModel.factory(container)),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-
-    LaunchedEffect(state.signedOut) {
-        if (state.signedOut) onSignedOut()
-    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Live TV") },
                 actions = {
-                    IconButton(onClick = viewModel::signOut) {
-                        Icon(Icons.Filled.Logout, contentDescription = "Sign out")
+                    IconButton(onClick = onSettings) {
+                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
                 },
             )
