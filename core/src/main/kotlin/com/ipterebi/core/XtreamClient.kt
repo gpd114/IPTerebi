@@ -67,9 +67,9 @@ class XtreamClient(
         return info
     }
 
-    suspend fun liveCategories(account: XtreamAccount): List<LiveCategory> = decode(
+    suspend fun liveCategories(account: XtreamAccount): List<XtreamCategory> = decode(
         body = get(account, action = "get_live_categories"),
-        deserializer = ListSerializer(LiveCategory.serializer()),
+        deserializer = ListSerializer(XtreamCategory.serializer()),
         what = "the category list",
     ).usableCategories().also { log("  parsed ${it.size} usable categories") }
 

@@ -65,8 +65,15 @@ object FlexibleIntSerializer : KSerializer<Int> {
     override fun serialize(encoder: Encoder, value: Int) = encoder.encodeInt(value)
 }
 
+/**
+ * A category, whatever it is a category of.
+ *
+ * `get_live_categories`, `get_vod_categories` and `get_series_categories` all
+ * answer with the same two fields, so one type serves all three rather than
+ * three identical ones differing only in their name.
+ */
 @Serializable
-data class LiveCategory(
+data class XtreamCategory(
     @SerialName("category_id")
     @Serializable(with = FlexibleStringSerializer::class)
     val id: String = "",
@@ -174,5 +181,5 @@ fun List<LiveStream>.playableChannels(): List<LiveStream> =
  * the category could only ever open empty; and blanks and duplicates collide as
  * LazyRow keys exactly as channel ids do.
  */
-fun List<LiveCategory>.usableCategories(): List<LiveCategory> =
+fun List<XtreamCategory>.usableCategories(): List<XtreamCategory> =
     filter { it.id.isNotBlank() }.distinctBy { it.id }
