@@ -133,6 +133,25 @@ is at fault — a panel that does not list `m3u8` will not serve it.
 - **Live has no duration.** The seek bar stays empty and the position never
   moves. That is correct, not a bug, and the transport buttons are hidden
   because they could only ever be inert.
+- **EPG titles and descriptions are base64.** Documented, not a fork quirk — but
+  forks that send plain text exist, and `News` is itself valid base64 that
+  decodes to three bytes of noise, so "did it decode" does not answer the
+  question. `decodeEpgText` decodes and then *reads* the result, keeping it only
+  if it is valid UTF-8 without control characters.
+- **A programme's `start` and `end` are in no stated timezone.** They are the
+  panel's local wall clock, which is not the viewer's and is written down
+  nowhere. Rendering them puts a programme an arbitrary number of hours out.
+  `start_timestamp`/`stop_timestamp` are unix seconds and are what everything
+  here reads; the strings are kept for logs only. Note these want a Long, not an
+  Int — a guide is the one thing routinely asked about the future, and unix
+  seconds stop fitting in an Int in 2038.
+- **There is no guide call for a list.** `get_short_epg` takes one `stream_id`,
+  and the only alternative is `xmltv.php`, which is the whole schedule for every
+  channel on the line as XML. So the guide is a per-channel request made when a
+  channel is opened, and the channel list deliberately has none.
+- **A missing guide is the normal case, not an error.** Lines carry no EPG,
+  channels are missing from guides that exist, and some forks answer `false`.
+  All of it arrives as an empty list.
 - **A whole channel list can be tens of thousands of entries.** Asking
   `get_live_streams` with no category is several megabytes on a large line, so
   the UI loads one category at a time and the player is navigated to with a

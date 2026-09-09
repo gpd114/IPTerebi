@@ -102,6 +102,54 @@ class XtreamClient(
     }
 
     /**
+     * The next few programmes on one channel.
+     *
+     * Per channel, not per list: there is no call that returns the guide for
+     * everything at once short of `xmltv.php`, which hands back the entire
+     * schedule for every channel on the line as XML and is measured in tens of
+     * megabytes. So this is asked once when a channel is opened, and the channel
+     * list stays guide-less rather than firing several hundred requests to fill
+     * in rows nobody is looking at.
+     *
+     * An absent guide is normal and not an error. Plenty of providers carry no
+     * EPG at all, plenty of channels are missing from one that exists, and some
+     * forks answer the literal `false` — all of which arrive here as an empty
+     * list, because a screen with no programme on it is a better answer than an
+     * error about a feature the user never asked for.
+     */
+    suspend fun shortEpg(
+        account: XtreamAccount,
+        streamId: Int,
+        limit: Int = 4,
+    ): List<EpgListing> {
+        val body = try {
+            get(
+                account = account,
+                action = "get_short_epg",
+                params = mapOf("stream_id" to "$streamId", "limit" to "$limit"),
+            )
+        } catch (e: XtreamException) {
+            log("  no guide for stream $streamId: ${e.message}")
+            return emptyList()
+        }
+
+        // Same reasoning as above: every one of these is "this panel has no
+        // guide", which is a fact about the provider rather than a fault.
+        if (body.isBlank() || body.trim() == "false" || body.trimStart().startsWith("<")) {
+            log("  no guide for stream $streamId: panel sent nothing usable")
+            return emptyList()
+        }
+
+        return try {
+            json.decodeFromString(ShortEpgResponse.serializer(), body).listings
+                .also { log("  parsed ${it.size} programmes for stream $streamId") }
+        } catch (e: SerializationException) {
+            log("  unreadable guide for stream $streamId, body starts: ${body.take(120)}")
+            emptyList()
+        }
+    }
+
+    /**
      * Where the video actually is. The credentials sit in the path, not in a
      * header, so this string is as sensitive as the password itself — never log
      * it, and be careful about putting it anywhere a crash reporter can see.
