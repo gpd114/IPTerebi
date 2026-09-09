@@ -15,10 +15,14 @@ channel list, search, playback — and it builds, but it has not yet been run
 against a real panel, so treat "works" as unproven. Not there yet:
 
 - Video on demand and series, which use the same API with different actions
-- The EPG (`get_short_epg` / `xmltv.php`)
 - Favourites, recently watched, and resuming the last channel
-- Settings beyond what the login screen asks for
 - Android TV and D-pad navigation — this is a phone and tablet build
+
+The guide is in, as far as `get_short_epg` goes: what is on now and next appears
+over the player, with a progress bar through the current programme. There is no
+guide on the channel list and there is not meant to be — the only call that
+would fill one is `xmltv.php`, which returns the entire schedule for every
+channel on the line. A line with no EPG shows the channel name alone.
 
 ## Building
 

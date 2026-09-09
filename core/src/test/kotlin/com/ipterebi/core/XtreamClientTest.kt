@@ -118,6 +118,64 @@ class XtreamClientTest {
     }
 
     @Test
+    fun `the guide is asked for by stream id with a limit`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """{"epg_listings":[{"title":"TW9ybmluZyBOZXdz","start_timestamp":1735675200,"stop_timestamp":1735678800}]}"""
+            )
+        )
+
+        val listings = client.shortEpg(account, streamId = 12345, limit = 6)
+
+        val asked = server.takeRequest().requestUrl!!
+        assertEquals("get_short_epg", asked.queryParameter("action"))
+        assertEquals("12345", asked.queryParameter("stream_id"))
+        assertEquals("6", asked.queryParameter("limit"))
+        assertEquals("Morning News", listings.single().titleText)
+    }
+
+    // The four below are all "this provider has no guide", which is a fact about
+    // the line rather than a fault. Every one of them used to be an exception,
+    // and an error about a feature the user never asked for is a worse screen
+    // than one with no programme name on it.
+
+    @Test
+    fun `a panel answering false to the guide is not an error`() = runBlocking {
+        server.enqueue(MockResponse().setBody("false"))
+        assertTrue(client.shortEpg(account, streamId = 1).isEmpty())
+    }
+
+    @Test
+    fun `a channel with no guide entries is not an error`() = runBlocking {
+        server.enqueue(MockResponse().setBody("""{"epg_listings":[]}"""))
+        assertTrue(client.shortEpg(account, streamId = 1).isEmpty())
+    }
+
+    @Test
+    fun `a panel that does not implement the guide at all is not an error`() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(404).setBody("Not Found"))
+        assertTrue(client.shortEpg(account, streamId = 1).isEmpty())
+    }
+
+    @Test
+    fun `a challenge page where the guide should be is not an error`() = runBlocking {
+        server.enqueue(MockResponse().setBody("<html><body>blocked</body></html>"))
+        assertTrue(client.shortEpg(account, streamId = 1).isEmpty())
+    }
+
+    @Test
+    fun `guide logging never carries the credentials`() = runBlocking {
+        val lines = mutableListOf<String>()
+        val logging = XtreamClient(log = { lines += it })
+        server.enqueue(MockResponse().setBody("""{"epg_listings":[]}"""))
+
+        logging.shortEpg(account, streamId = 1)
+
+        assertTrue(lines.isNotEmpty())
+        assertTrue(lines.none { it.contains("s3cret") }, "credentials leaked into the log: $lines")
+    }
+
+    @Test
     fun `logging never carries the credentials`() = runBlocking {
         val lines = mutableListOf<String>()
         val logging = XtreamClient(log = { lines += it })

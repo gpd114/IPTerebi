@@ -89,6 +89,7 @@ private fun PlayerContent(
 ) {
     val context = LocalContext.current
     val channel = remember(streamId) { container.channels.find(streamId) }
+    val guide = rememberProgrammeGuide(container, account, streamId)
     val url = remember(streamId, account) { container.xtream.liveStreamUrl(account, streamId) }
     var error by remember(url) { mutableStateOf<String?>(null) }
 
@@ -282,16 +283,18 @@ private fun PlayerContent(
             )
         }
 
-        if (channel != null) {
-            Text(
-                text = channel.name,
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 16.dp),
-            )
-        }
+        ChannelInfoOverlay(
+            channelName = channel?.name,
+            guide = guide,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp),
+        )
+
+        ProgrammeProgress(
+            guide = guide,
+            modifier = Modifier.align(Alignment.TopCenter),
+        )
 
         error?.let { message ->
             Column(
