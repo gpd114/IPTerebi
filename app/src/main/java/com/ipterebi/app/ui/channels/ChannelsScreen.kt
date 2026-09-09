@@ -31,12 +31,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -107,6 +109,13 @@ fun ChannelsScreen(
                 state.error != null -> ErrorPanel(
                     message = state.error.orEmpty(),
                     onRetry = viewModel::retry,
+                    // Only when the panel named no categories. Asking for every
+                    // channel at once is slow and large enough that it has to be
+                    // the user's decision, but on a line with no categories it is
+                    // the only way in, so it cannot simply be unavailable.
+                    onLoadEverything = if (state.offerFullLoad) {
+                        { viewModel.selectCategory(null) }
+                    } else null,
                 )
 
                 state.busy && state.channels.isEmpty() ->
@@ -183,7 +192,11 @@ private fun ChannelRow(channel: LiveStream, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ErrorPanel(message: String, onRetry: () -> Unit) {
+private fun ErrorPanel(
+    message: String,
+    onRetry: () -> Unit,
+    onLoadEverything: (() -> Unit)? = null,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -198,5 +211,17 @@ private fun ErrorPanel(message: String, onRetry: () -> Unit) {
         )
         Spacer(Modifier.height(16.dp))
         Button(onClick = onRetry) { Text("Try again") }
+
+        if (onLoadEverything != null) {
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = onLoadEverything) { Text("Load every channel") }
+            Text(
+                "One request for the whole line. On a large one this is several " +
+                    "megabytes and takes a while.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }

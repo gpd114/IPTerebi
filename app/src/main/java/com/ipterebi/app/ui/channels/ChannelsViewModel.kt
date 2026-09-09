@@ -11,6 +11,7 @@ import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.XtreamException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +27,11 @@ data class ChannelsUiState(
     val query: String = "",
     val busy: Boolean = false,
     val error: String? = null,
+    /**
+     * Set when the panel named no categories, so the error can offer the
+     * unfiltered load rather than leaving a line with no way in.
+     */
+    val offerFullLoad: Boolean = false,
 ) {
     val visibleChannels: List<LiveStream>
         get() = if (query.isBlank()) {
@@ -42,6 +48,14 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
 
     private var account: XtreamAccount? = null
 
+    /**
+     * The load in flight. Categories are tapped faster than a panel on cheap
+     * hosting answers, and without this the responses race: whichever lands
+     * last wins, so tapping A then B can leave B's chip selected above A's
+     * channels, and publish A's list for the player to resolve titles against.
+     */
+    private var loadJob: Job? = null
+
     init {
         viewModelScope.launch {
             container.credentials.state
@@ -56,7 +70,7 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
                     val sameLine = previous != null &&
                         previous.base == signedIn.account.base &&
                         previous.username == signedIn.account.username
-                    if (!sameLine) loadCategories()
+                    if (!sameLine) startLoad { loadCategories() }
                 }
         }
     }
@@ -65,11 +79,11 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
 
     fun selectCategory(categoryId: String?) {
         _state.update { it.copy(selectedCategoryId = categoryId, query = "") }
-        viewModelScope.launch { loadChannels(categoryId) }
+        startLoad { loadChannels(categoryId) }
     }
 
     fun retry() {
-        viewModelScope.launch {
+        startLoad {
             if (_state.value.categories.isEmpty()) {
                 loadCategories()
             } else {
@@ -78,17 +92,42 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    /** Replaces whatever was loading. See [loadJob]. */
+    private fun startLoad(block: suspend () -> Unit) {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch { block() }
+    }
+
     private suspend fun loadCategories() {
         val account = account ?: return
-        _state.update { it.copy(busy = true, error = null) }
+        _state.update { it.copy(busy = true, error = null, offerFullLoad = false) }
         try {
             val categories = container.xtream.liveCategories(account)
             _state.update { it.copy(categories = categories, busy = false) }
+
+            // A panel that names no categories used to fall through to
+            // loadChannels(null), and null means *every* category at once —
+            // the several-megabyte, tens-of-thousands-of-entries request this
+            // whole screen is arranged to avoid. Firing it by accident, on the
+            // panel least likely to cope with it, is the wrong default. Say so
+            // instead and let the user ask for it deliberately.
+            if (categories.isEmpty()) {
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        offerFullLoad = true,
+                        error = "This panel listed no live categories. It may have none, " +
+                            "or it may not answer get_live_categories at all.",
+                    )
+                }
+                return
+            }
+
             // Opening on the first category rather than on everything: a large
             // line answers get_live_streams with no category filter in several
             // megabytes and tens of thousands of entries, which is a long wait
             // and a lot of memory for a list nobody scrolls to the end of.
-            loadChannels(categories.firstOrNull()?.id)
+            loadChannels(categories.first().id)
         } catch (e: XtreamException) {
             _state.update { it.copy(busy = false, error = e.message) }
         } catch (e: CancellationException) {
@@ -100,7 +139,14 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
 
     private suspend fun loadChannels(categoryId: String?) {
         val account = account ?: return
-        _state.update { it.copy(busy = true, error = null, selectedCategoryId = categoryId) }
+        _state.update {
+            it.copy(
+                busy = true,
+                error = null,
+                offerFullLoad = false,
+                selectedCategoryId = categoryId,
+            )
+        }
         try {
             val channels = container.xtream.liveStreams(account, categoryId)
             // Published so the player can resolve a stream id without the list

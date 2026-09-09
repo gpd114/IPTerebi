@@ -116,4 +116,38 @@ class XtreamParsingTest {
         val body = """[{"stream_id":1,"name":"BBC One HD"}]"""
         assertEquals(body, body.withoutCredentialValues())
     }
+
+    @Test
+    fun `an unquoted password is stripped like a quoted one`() {
+        // Lines are very often all digits, and the rule in this file is that
+        // every type is negotiable. A fork emitting the password as a bare
+        // number would walk a scrubber that insisted on quotes, and the leak
+        // would be silent and in clear.
+        val body = """{"user_info":{"username":807155,"password":4471963,"auth":1}}"""
+        val safe = body.withoutCredentialValues()
+
+        assertFalse(safe.contains("4471963"), "password survived: $safe")
+        assertFalse(safe.contains("807155"), "username survived: $safe")
+        assertTrue(safe.contains("\"auth\":1"), "scrubbing ate the rest of the body: $safe")
+    }
+
+    @Test
+    fun `an unquoted credential at the end of an object is stripped`() {
+        // The value runs to the closing brace rather than to a comma, which is
+        // the case a naive "everything up to the next comma" rule gets wrong.
+        val body = """{"username":807155,"password":4471963}"""
+        val safe = body.withoutCredentialValues()
+
+        assertFalse(safe.contains("4471963"), "password survived: $safe")
+        assertTrue(safe.endsWith("}"), "scrubbing ate the closing brace: $safe")
+    }
+
+    @Test
+    fun `a null password is not mistaken for a value worth keeping`() {
+        val body = """{"username":null,"password":null,"auth":0}"""
+        val safe = body.withoutCredentialValues()
+
+        assertFalse(safe.contains("null,\"password\""), "got: $safe")
+        assertTrue(safe.contains("\"auth\":0"), "scrubbing ate the rest of the body: $safe")
+    }
 }

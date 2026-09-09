@@ -71,7 +71,7 @@ class XtreamClient(
         body = get(account, action = "get_live_categories"),
         deserializer = ListSerializer(LiveCategory.serializer()),
         what = "the category list",
-    ).also { log("  parsed ${it.size} categories") }
+    ).usableCategories().also { log("  parsed ${it.size} usable categories") }
 
     /**
      * Channels, optionally in one category. Asking for everything at once is a
@@ -89,11 +89,16 @@ class XtreamClient(
         ),
         deserializer = ListSerializer(LiveStream.serializer()),
         what = "the channel list",
-    ).also { channels ->
+    ).let { parsed ->
+        val channels = parsed.playableChannels()
         log(
-            "  parsed ${channels.size} channels in category ${categoryId ?: "(all)"}" +
+            "  parsed ${parsed.size} channels in category ${categoryId ?: "(all)"}" +
+                (if (channels.size != parsed.size) {
+                    ", ${parsed.size - channels.size} dropped as unplayable"
+                } else "") +
                 (channels.firstOrNull()?.let { ", first: ${it.name} (id ${it.streamId})" } ?: "")
         )
+        channels
     }
 
     /**
@@ -188,9 +193,16 @@ class XtreamClient(
  * username *and the password in clear* back inside `user_info`, so logging a
  * raw response body writes the user's password to logcat, where any app holding
  * READ_LOGS on an older device can read it.
+ *
+ * The value is matched quoted *or* bare. Lines on these panels are very often
+ * all digits, and this file's own rule is that every type here is negotiable —
+ * a fork that emits `"password":12345` unquoted would walk a scrubber that
+ * insisted on quotes, and the failure would be silent and in clear.
  */
-fun String.withoutCredentialValues(): String =
-    replace(Regex("\"(password|username)\"\\s*:\\s*\"[^\"]*\""), "\"$1\":\"***\"")
+fun String.withoutCredentialValues(): String = replace(
+    Regex("\"(password|username)\"\\s*:\\s*(\"[^\"]*\"|[^,}\\]\\s]+)"),
+    "\"$1\":\"***\"",
+)
 
 /** The same URL with the credentials replaced, safe to write to a log. */
 fun HttpUrl.withoutCredentials(): String = newBuilder()

@@ -92,6 +92,13 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   "Unexpected JSON token at offset 0" and no idea what to do about it.
 - **Some forks answer `false` to an action they do not implement.** Not `[]`,
   not an error — the literal `false`.
+- **An id is not guaranteed and not guaranteed unique.** `stream_id` can be
+  missing, and the flexible serialisers answer `0` when it is; `category_id` can
+  be blank. Both are used as Compose list keys, and a repeated key is not a
+  missing row — it is `Key "0" was already used` and the whole list is gone.
+  `playableChannels()` and `usableCategories()` in `core/` are what make that
+  invariant true before a list reaches a screen; nothing in `app/` should be
+  keyed on a panel-supplied id that has not been through them.
 - **Nobody pastes a base URL.** They paste `host:port`, or a `player_api.php`
   link, or a `get.php?...&type=m3u_plus` playlist link with the username and
   password sitting in the query string. `XtreamUrl.parse` takes all of those and
@@ -111,6 +118,14 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   previous connection has gone — so leaving a channel and immediately opening
   another can refuse. Some forks report it as HTTP 456, which is not a real
   status code. `describeStreamHttpError` exists to turn these into sentences.
+
+  This makes a redundant `prepare()` expensive in a way it would not be
+  elsewhere: each one drops the request in flight and dials the panel again, and
+  the panel counts the old connection for a few seconds yet. Note that
+  `Lifecycle.addObserver` replays the current state into a new observer, so an
+  `ON_START` handler that re-prepares fires once at registration before the app
+  has been anywhere — which is why `PlayerScreen` re-prepares only after a real
+  `ON_STOP`.
 - **`.ts` and `.m3u8` are both offered and only one may work.** Which one is a
   property of the panel, not the channel, and `allowed_output_formats` is
   aspirational — panels advertise `m3u8` and then serve a playlist that 404s.
