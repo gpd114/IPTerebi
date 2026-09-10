@@ -138,6 +138,18 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   closing the window stops the activity and the same `ON_STOP` lets the
   connection go. Do not "pause the player on `ON_PAUSE`" — it would freeze the
   window, and still hold the line.
+
+  The one `ON_STOP` that does not stop is the screen going off mid-stream
+  (`PowerManager.isInteractive` is already false by then): that is the phone
+  going into a pocket, and it plays on as sound. What keeps the process alive
+  is `PlaybackService`, a Media3 `MediaSessionService` the player screen lends
+  its session to — Media3 puts it in the foreground while the session plays
+  and takes it out when it stops. The player stays in the screen; the service
+  only holds the session. Something paused while away (lock screen, a
+  headphone button, headphones pulled out) keeps the line for 30 seconds and
+  is then stopped, which also ends the notification. A play key after that
+  still works: Android lets a media key start a foreground service from the
+  background, and the session's `LivePlayer` rejoins at the live edge.
 - **`prepare()` does nothing unless the player is idle.** `ExoPlayerImpl`
   returns early for any other state, and the first `prepare()` leaves the
   player buffering synchronously — so a second call, or a `prepare()` after

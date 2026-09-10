@@ -5,6 +5,14 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- So the stream survives the screen timing out mid-programme. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!--
+      Playing on with the screen off. Without a foreground service Android
+      freezes an app with nothing on screen within seconds, stream and all.
+      The media notification needs no POST_NOTIFICATIONS: media sessions are
+      exempt from it.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!--
       Television. Both are required="false", so the same APK installs on phones,
@@ -47,5 +55,19 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+          Exported because the lock screen, headphones and watches find the
+          session through it. What they may do with it is limited in
+          BackgroundPlayback.kt: play, pause and, for a film, seek.
+        -->
+        <service
+            android:name=".playback.PlaybackService"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>
