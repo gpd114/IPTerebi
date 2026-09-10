@@ -2,6 +2,8 @@ package com.ipterebi.app.ui
 
 import android.net.Uri
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +17,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavType
@@ -70,7 +75,7 @@ object Route {
         "player/episode/${Uri.encode(id)}/${Uri.encode(extension)}"
 }
 
-/** The sections the bottom bar switches between. */
+/** The sections the bottom bar, or on a wide screen the rail, switches between. */
 private enum class Section(val route: String, val label: String, val icon: ImageVector) {
     LIVE(Route.CHANNELS, "Live TV", Icons.Filled.LiveTv),
     FILMS(Route.FILMS, "Films", Icons.Filled.Movie),
@@ -102,14 +107,24 @@ fun AppNav(container: AppContainer) {
                 val route = backStack?.destination?.route
                 val section = Section.entries.firstOrNull { it.route == route }
 
+                // Sections go down the left edge on a wide window and along the
+                // bottom on a narrow one. On a television this is not a matter
+                // of taste: a bottom bar is reached with a remote by pressing
+                // down past the end of the list, and a category of eight
+                // hundred channels puts Films and Series eight hundred presses
+                // away. A rail is one press of left from anywhere. 600dp is
+                // Material's own line between compact and medium, so a tablet,
+                // or a phone turned sideways, gets the rail too.
+                val wide = LocalConfiguration.current.screenWidthDp >= 600
+
                 Scaffold(
-                    // The bar is shown on the two list screens only. The screens
+                    // The bar is shown on the section screens only. The screens
                     // inside draw their own top bars and handle their own top
                     // insets, so this Scaffold claims none of them — see the
                     // consumeWindowInsets below for the bottom.
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
                     bottomBar = {
-                        if (section != null) {
+                        if (section != null && !wide) {
                             NavigationBar {
                                 Section.entries.forEach { item ->
                                     NavigationBarItem(
@@ -123,123 +138,143 @@ fun AppNav(container: AppContainer) {
                         }
                     },
                 ) { padding ->
-                    NavHost(
-                        navController = nav,
-                        startDestination = start,
-                        // Consumed as well as applied: the bar already sits above
-                        // the system navigation inset, and without this each
-                        // screen's own Scaffold adds that inset a second time and
-                        // leaves a band of empty space above the bar.
-                        modifier = Modifier.padding(padding).consumeWindowInsets(padding),
-                    ) {
-                        composable(Route.LOGIN) {
-                            LoginScreen(
-                                container = container,
-                                onSignedIn = {
-                                    nav.navigate(Route.CHANNELS) {
-                                        popUpTo(Route.LOGIN) { inclusive = true }
-                                    }
-                                },
-                            )
-                        }
-
-                        composable(Route.CHANNELS) {
-                            ChannelsScreen(
-                                container = container,
-                                onChannel = { id -> nav.navigate(Route.playChannel(id)) },
-                                onSettings = { nav.navigate(Route.SETTINGS) },
-                            )
-                        }
-
-                        composable(Route.FILMS) {
-                            FilmsScreen(
-                                container = container,
-                                onFilm = { film ->
-                                    nav.navigate(Route.playFilm(film.streamId, film.playbackExtension))
-                                },
-                                onSettings = { nav.navigate(Route.SETTINGS) },
-                            )
-                        }
-
-                        composable(Route.SERIES) {
-                            SeriesScreen(
-                                container = container,
-                                onSeries = { series -> nav.navigate(Route.seriesDetail(series.seriesId)) },
-                                onSettings = { nav.navigate(Route.SETTINGS) },
-                            )
-                        }
-
-                        composable(
-                            route = Route.SERIES_DETAIL,
-                            arguments = listOf(navArgument("id") { type = NavType.IntType }),
-                        ) { entry ->
-                            SeriesDetailScreen(
-                                container = container,
-                                seriesId = entry.arguments?.getInt("id") ?: 0,
-                                onEpisode = { episode ->
-                                    nav.navigate(
-                                        Route.playEpisode(episode.episode.id, episode.episode.playbackExtension)
+                    // Consumed as well as applied: the bar already sits above the
+                    // system navigation inset, and without this each screen's own
+                    // Scaffold adds that inset a second time and leaves a band of
+                    // empty space above the bar.
+                    Row(Modifier.padding(padding).consumeWindowInsets(padding)) {
+                        if (section != null && wide) {
+                            NavigationRail {
+                                Spacer(Modifier.weight(1f))
+                                Section.entries.forEach { item ->
+                                    NavigationRailItem(
+                                        selected = item == section,
+                                        onClick = { nav.switchSection(item.route) },
+                                        icon = { Icon(item.icon, contentDescription = null) },
+                                        label = { Text(item.label) },
+                                        modifier = Modifier.focusRing(),
                                     )
-                                },
-                                onBack = { nav.popBackStack() },
-                            )
+                                }
+                                Spacer(Modifier.weight(1f))
+                            }
                         }
+                        // Always the same call in the same place, whichever bar is
+                        // showing: a NavHost that moved in the composition would be
+                        // a new NavHost, and every screen's state would go with it.
+                        NavHost(
+                            navController = nav,
+                            startDestination = start,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            composable(Route.LOGIN) {
+                                LoginScreen(
+                                    container = container,
+                                    onSignedIn = {
+                                        nav.navigate(Route.CHANNELS) {
+                                            popUpTo(Route.LOGIN) { inclusive = true }
+                                        }
+                                    },
+                                )
+                            }
 
-                        composable(Route.SETTINGS) {
-                            SettingsScreen(
-                                container = container,
-                                onBack = { nav.popBackStack() },
-                                onSignedOut = {
-                                    nav.navigate(Route.LOGIN) { popUpTo(0) { inclusive = true } }
-                                },
-                            )
-                        }
+                            composable(Route.CHANNELS) {
+                                ChannelsScreen(
+                                    container = container,
+                                    onChannel = { id -> nav.navigate(Route.playChannel(id)) },
+                                    onSettings = { nav.navigate(Route.SETTINGS) },
+                                )
+                            }
 
-                        composable(
-                            route = Route.PLAY_CHANNEL,
-                            arguments = listOf(navArgument("id") { type = NavType.IntType }),
-                        ) { entry ->
-                            PlayerScreen(
-                                container = container,
-                                playable = Playable.Channel(entry.arguments?.getInt("id") ?: 0),
-                                onBack = { nav.popBackStack() },
-                            )
-                        }
+                            composable(Route.FILMS) {
+                                FilmsScreen(
+                                    container = container,
+                                    onFilm = { film ->
+                                        nav.navigate(Route.playFilm(film.streamId, film.playbackExtension))
+                                    },
+                                    onSettings = { nav.navigate(Route.SETTINGS) },
+                                )
+                            }
 
-                        composable(
-                            route = Route.PLAY_FILM,
-                            arguments = listOf(
-                                navArgument("id") { type = NavType.IntType },
-                                navArgument("ext") { type = NavType.StringType },
-                            ),
-                        ) { entry ->
-                            PlayerScreen(
-                                container = container,
-                                playable = Playable.Film(
-                                    id = entry.arguments?.getInt("id") ?: 0,
-                                    extension = entry.arguments?.getString("ext").orEmpty()
-                                        .ifBlank { com.ipterebi.core.VodStream.DEFAULT_VOD_EXTENSION },
+                            composable(Route.SERIES) {
+                                SeriesScreen(
+                                    container = container,
+                                    onSeries = { series -> nav.navigate(Route.seriesDetail(series.seriesId)) },
+                                    onSettings = { nav.navigate(Route.SETTINGS) },
+                                )
+                            }
+
+                            composable(
+                                route = Route.SERIES_DETAIL,
+                                arguments = listOf(navArgument("id") { type = NavType.IntType }),
+                            ) { entry ->
+                                SeriesDetailScreen(
+                                    container = container,
+                                    seriesId = entry.arguments?.getInt("id") ?: 0,
+                                    onEpisode = { episode ->
+                                        nav.navigate(
+                                            Route.playEpisode(episode.episode.id, episode.episode.playbackExtension)
+                                        )
+                                    },
+                                    onBack = { nav.popBackStack() },
+                                )
+                            }
+
+                            composable(Route.SETTINGS) {
+                                SettingsScreen(
+                                    container = container,
+                                    onBack = { nav.popBackStack() },
+                                    onSignedOut = {
+                                        nav.navigate(Route.LOGIN) { popUpTo(0) { inclusive = true } }
+                                    },
+                                )
+                            }
+
+                            composable(
+                                route = Route.PLAY_CHANNEL,
+                                arguments = listOf(navArgument("id") { type = NavType.IntType }),
+                            ) { entry ->
+                                PlayerScreen(
+                                    container = container,
+                                    playable = Playable.Channel(entry.arguments?.getInt("id") ?: 0),
+                                    onBack = { nav.popBackStack() },
+                                )
+                            }
+
+                            composable(
+                                route = Route.PLAY_FILM,
+                                arguments = listOf(
+                                    navArgument("id") { type = NavType.IntType },
+                                    navArgument("ext") { type = NavType.StringType },
                                 ),
-                                onBack = { nav.popBackStack() },
-                            )
-                        }
+                            ) { entry ->
+                                PlayerScreen(
+                                    container = container,
+                                    playable = Playable.Film(
+                                        id = entry.arguments?.getInt("id") ?: 0,
+                                        extension = entry.arguments?.getString("ext").orEmpty()
+                                            .ifBlank { com.ipterebi.core.VodStream.DEFAULT_VOD_EXTENSION },
+                                    ),
+                                    onBack = { nav.popBackStack() },
+                                )
+                            }
 
-                        composable(
-                            route = Route.PLAY_EPISODE,
-                            arguments = listOf(
-                                navArgument("id") { type = NavType.StringType },
-                                navArgument("ext") { type = NavType.StringType },
-                            ),
-                        ) { entry ->
-                            PlayerScreen(
-                                container = container,
-                                playable = Playable.Episode(
-                                    id = entry.arguments?.getString("id").orEmpty(),
-                                    extension = entry.arguments?.getString("ext").orEmpty()
-                                        .ifBlank { com.ipterebi.core.VodStream.DEFAULT_VOD_EXTENSION },
+                            composable(
+                                route = Route.PLAY_EPISODE,
+                                arguments = listOf(
+                                    navArgument("id") { type = NavType.StringType },
+                                    navArgument("ext") { type = NavType.StringType },
                                 ),
-                                onBack = { nav.popBackStack() },
-                            )
+                            ) { entry ->
+                                PlayerScreen(
+                                    container = container,
+                                    playable = Playable.Episode(
+                                        id = entry.arguments?.getString("id").orEmpty(),
+                                        extension = entry.arguments?.getString("ext").orEmpty()
+                                            .ifBlank { com.ipterebi.core.VodStream.DEFAULT_VOD_EXTENSION },
+                                    ),
+                                    onBack = { nav.popBackStack() },
+                                )
+                            }
                         }
                     }
                 }

@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ipterebi.app.AppContainer
+import com.ipterebi.app.ui.DpadTextField
+import com.ipterebi.app.ui.focusRing
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.UserAgents
 import com.ipterebi.core.connectionsLabel
@@ -105,6 +108,7 @@ fun SettingsScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 StreamFormat.entries.forEach { format ->
                     FilterChip(
+                        modifier = Modifier.focusRing(FilterChipDefaults.shape),
                         selected = account?.format == format,
                         onClick = { viewModel.setFormat(format) },
                         label = { Text(format.label) },
@@ -127,6 +131,7 @@ fun SettingsScreen(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 UserAgents.presets.forEach { (label, value) ->
                     FilterChip(
+                        modifier = Modifier.focusRing(FilterChipDefaults.shape),
                         selected = state.userAgentDraft.trim() == value,
                         onClick = { viewModel.onUserAgentChange(value) },
                         label = { Text(label) },
@@ -134,13 +139,15 @@ fun SettingsScreen(
                 }
             }
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(
-                value = state.userAgentDraft,
-                onValueChange = viewModel::onUserAgentChange,
-                label = { Text("Sent as User-Agent") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            DpadTextField(Modifier.fillMaxWidth()) { fieldModifier ->
+                OutlinedTextField(
+                    value = state.userAgentDraft,
+                    onValueChange = viewModel::onUserAgentChange,
+                    label = { Text("Sent as User-Agent") },
+                    singleLine = true,
+                    modifier = fieldModifier.fillMaxWidth(),
+                )
+            }
             Spacer(Modifier.height(8.dp))
             TextButton(
                 onClick = viewModel::applyUserAgent,

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.ipterebi.app.AppContainer
+import com.ipterebi.app.ui.focusRing
 import com.ipterebi.app.ui.library.ErrorPanel
 import com.ipterebi.core.EpisodeEntry
 import com.ipterebi.core.SeriesDetail
@@ -123,6 +125,7 @@ private fun SeriesContent(
                 ) {
                     itemsIndexed(detail.seasons, key = { _, it -> it.number }) { index, entry ->
                         FilterChip(
+                            modifier = Modifier.focusRing(FilterChipDefaults.shape),
                             selected = index == selectedSeason,
                             onClick = { onSeason(index) },
                             label = { Text(entry.name) },
@@ -198,6 +201,7 @@ private fun EpisodeRow(entry: EpisodeEntry, seriesName: String, onClick: () -> U
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .focusRing()
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

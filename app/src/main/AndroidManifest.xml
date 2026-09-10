@@ -6,8 +6,18 @@
     <!-- So the stream survives the screen timing out mid-programme. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
+    <!--
+      Television. Both are required="false", so the same APK installs on phones,
+      tablets and TVs. Without the touchscreen line a TV is treated as unable to
+      run the app, because declaring nothing implies a touchscreen is required —
+      and televisions do not have one.
+    -->
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
     <application
         android:name=".IPTerebiApp"
+        android:banner="@drawable/tv_banner"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -32,6 +42,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <!-- What puts the app on a TV home screen, using the banner above. -->
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
     </application>

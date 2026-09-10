@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.ipterebi.app.ui.DpadTextField
+import com.ipterebi.app.ui.focusRing
 import java.util.Locale
 
 /**
@@ -79,16 +82,18 @@ fun <T : Any> LibraryScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
 
-            OutlinedTextField(
-                value = state.query,
-                onValueChange = viewModel::onQueryChange,
-                placeholder = { Text("Search this category") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+            // Click-to-edit under a remote, for the same reason as the channel
+            // list's search box. See DpadTextField.
+            DpadTextField(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { fieldModifier ->
+                OutlinedTextField(
+                    value = state.query,
+                    onValueChange = viewModel::onQueryChange,
+                    placeholder = { Text("Search this category") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    singleLine = true,
+                    modifier = fieldModifier.fillMaxWidth(),
+                )
+            }
 
             if (state.categories.isNotEmpty()) {
                 LazyRow(
@@ -97,6 +102,7 @@ fun <T : Any> LibraryScreen(
                 ) {
                     item {
                         FilterChip(
+                            modifier = Modifier.focusRing(FilterChipDefaults.shape),
                             selected = state.selectedCategoryId == null,
                             onClick = { viewModel.selectCategory(null) },
                             label = { Text("All") },
@@ -104,6 +110,7 @@ fun <T : Any> LibraryScreen(
                     }
                     items(state.categories, key = { it.id }) { category ->
                         FilterChip(
+                            modifier = Modifier.focusRing(FilterChipDefaults.shape),
                             selected = state.selectedCategoryId == category.id,
                             onClick = { viewModel.selectCategory(category.id) },
                             label = { Text(category.name) },
@@ -170,7 +177,7 @@ fun PosterTile(
     ratingOutOfTen: Double?,
     onClick: () -> Unit,
 ) {
-    Column(modifier = Modifier.clickable(onClick = onClick)) {
+    Column(modifier = Modifier.focusRing().clickable(onClick = onClick)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()

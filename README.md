@@ -13,9 +13,13 @@ with, which is yours to supply.
 Early. Live television, films and series are written end to end, and have been
 run on an Android emulator against a fake panel built to misbehave the way real
 ones do — but not yet against a real provider, so treat "works" as unproven
-there. Not there yet:
+there.
 
-- Android TV and D-pad navigation — this is a phone and tablet build
+Android TV and remotes work: the same APK installs on a TV, every screen can be
+driven with a D-pad, and on a wide screen the sections move to a rail down the
+left edge. Text fields are click-to-edit under a remote, so moving around never
+throws a keyboard over the screen. The TV home-screen banner is declared but has
+not yet been seen on a real Android TV.
 
 Series are in: a Series tab, a poster grid of programmes, and each one opening
 onto its seasons and episodes. Specials are listed after the numbered seasons

@@ -1,8 +1,9 @@
 # IPTerebi
 
 Android IPTV player. A line on an Xtream Codes panel supplies the channels; the
-app supplies nothing. Phone and tablet, portrait for browsing and landscape for
-playback.
+app supplies nothing. Phone, tablet and Android TV from one APK: portrait for
+browsing on a phone, landscape for playback everywhere, and fully usable with a
+D-pad remote.
 
 ## Layout
 
@@ -190,6 +191,47 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   `get_live_streams` with no category is several megabytes on a large line, so
   the UI loads one category at a time and the player is navigated to with a
   stream id alone — never the list, which would end up in a Bundle.
+
+## Things that are true about a D-pad
+
+Every one of these was found by driving the app on an emulator with key events,
+not by reading code. None of them shows up under touch, which is why they
+survived until something was pressed.
+
+- **A text field traps the arrow keys**, keyboard open or not — focus goes in
+  and never comes out. **And focus arriving is enough to summon the keyboard**,
+  so a search box above a list throws a keyboard over the screen on every trip
+  up the list. `DpadTextField` fixes both with click-to-edit: under a remote the
+  field is passed over, centre starts editing, and up or down always leave.
+  Every text field in the app goes through it; a new one must too.
+- **Decide input mode when focus is decided, never at composition.** The mode
+  flips on the input itself, before recomposition, so a captured value is one
+  input stale exactly when it matters. Capturing it broke a tablet with a
+  keyboard: tap a field, type, and the first key made the field unfocusable.
+  Read `LocalInputModeManager` inside `focusProperties`.
+- **Material's focus indication is invisible from a sofa.** Anything selectable
+  gets `focusRing()`, placed before `clickable` so it sees that element's focus.
+- **Anything focusable over the video steals OK.** The overlay back button was
+  the first focusable a remote reached, so the first press of OK — the one
+  everyone uses to pause — left the film. It is `canFocus = false`; the remote
+  has a Back key.
+- **Media3's controls only hear the remote while `PlayerView` holds focus**, and
+  lose it every time they auto-hide: the play/pause button that had focus goes
+  with them and focus falls to Compose, where nothing takes keys. The screen
+  hands focus back to the player whenever the controls hide.
+- **On an error Media3 raises its controls, and they take focus** — OK went to
+  the settings gear, not Try again. The controls are switched off while an
+  error is up, and back on with the retry.
+- **A bottom bar is unreachable on a TV.** It sits past the end of the list, so
+  800 channels puts it 800 presses away. At 600dp and wider the sections are a
+  `NavigationRail`, one press of left from anywhere. The `NavHost` must stay the
+  same call in the same place whichever bar is showing, or it is recreated and
+  every screen's state goes with it.
+- **A TV needs `android.hardware.touchscreen` required="false"**, or it counts
+  as unable to run the app, plus `LEANBACK_LAUNCHER` and a banner to appear on
+  its home screen. Those three are in the manifest but have not been checked on
+  a real Android TV image — the emulator used is a TV-shaped phone image, which
+  tests the D-pad and the layout but not the TV launcher.
 
 ## Working notes
 
