@@ -196,6 +196,35 @@ class VodTest {
         )
     }
 
+    // Error wording
+
+    @Test
+    fun `a missing film is not blamed on the stream format`() {
+        // The live 404 advice is "try the other format". That setting does
+        // nothing for a film, so repeating it would send someone to flip a
+        // switch that changes nothing and then conclude the app is broken.
+        val message = describeFilmHttpError(404)
+
+        assertFalse(message.contains("HLS"), "got: $message")
+        assertFalse(message.contains("MPEG-TS"), "got: $message")
+        assertTrue(message.contains("film"), "got: $message")
+    }
+
+    @Test
+    fun `the connection limit is explained for films exactly as for channels`() {
+        // The limit is per line, not per kind of thing being watched.
+        assertTrue(describeFilmHttpError(403).contains("connection limit"))
+        assertTrue(describeFilmHttpError(456).contains("connection limit"))
+    }
+
+    @Test
+    fun `no film error talks about a channel`() {
+        listOf(401, 403, 404, 456, 500, 503, 418).forEach { code ->
+            val message = describeFilmHttpError(code)
+            assertFalse(message.contains("channel", ignoreCase = true), "$code said: $message")
+        }
+    }
+
     @Test
     fun `film logging never carries the credentials`() = runBlocking {
         val lines = mutableListOf<String>()

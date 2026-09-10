@@ -14,8 +14,13 @@ Early. The live-television path is written end to end — sign in, categories,
 channel list, search, playback — and it builds, but it has not yet been run
 against a real panel, so treat "works" as unproven. Not there yet:
 
-- Video on demand and series, which use the same API with different actions
+- Series, which use the same API with different actions
 - Android TV and D-pad navigation — this is a phone and tablet build
+
+Films are in: a Films tab beside Live TV, browsed one category at a time as a
+poster grid, played with a seek bar and skip buttons, and paused rather than
+restarted when you come back to the app. Nothing is fetched until the tab is
+first opened, so a line with no films costs nothing.
 
 Starring a channel keeps it on a Favourites shelf, watching one puts it on a
 Recent shelf, and the last thing watched is offered back as a "carry on

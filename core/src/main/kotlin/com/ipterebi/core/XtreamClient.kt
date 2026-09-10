@@ -23,9 +23,9 @@ fun defaultXtreamHttpClient(): OkHttpClient = OkHttpClient.Builder()
     .build()
 
 /**
- * Everything this app asks an Xtream panel for. Live television only: VOD and
- * series use the same `player_api.php` with different actions and are not
- * wired up yet.
+ * Everything this app asks an Xtream panel for: live television, its guide,
+ * and films. Series use the same `player_api.php` with different actions and
+ * are not wired up yet.
  *
  * [log] receives one line per request with the credentials stripped. Wire it to
  * something that only fires in debug builds — see IPTerebiApi in :app.

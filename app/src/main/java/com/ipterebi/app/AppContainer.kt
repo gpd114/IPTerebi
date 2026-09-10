@@ -3,8 +3,10 @@ package com.ipterebi.app
 import android.content.Context
 import android.util.Log
 import com.ipterebi.app.data.ChannelListStore
-import com.ipterebi.app.data.ChannelRepository
+import com.ipterebi.app.data.MediaRepository
 import com.ipterebi.app.data.CredentialStore
+import com.ipterebi.core.LiveStream
+import com.ipterebi.core.VodStream
 import com.ipterebi.core.XtreamClient
 import com.ipterebi.core.defaultXtreamHttpClient
 
@@ -23,7 +25,9 @@ class AppContainer(context: Context) {
         log = { line -> if (BuildConfig.DEBUG) Log.d(TAG_API, line) },
     )
 
-    val channels = ChannelRepository()
+    val channels = MediaRepository<LiveStream> { it.streamId }
+
+    val films = MediaRepository<VodStream> { it.streamId }
 
     /** Starred and recently watched channels, per line. */
     val channelLists = ChannelListStore(context.applicationContext)

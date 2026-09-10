@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.util.Log
+import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,12 +56,14 @@ import com.ipterebi.app.BuildConfig
 import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.core.StreamFormat
+import com.ipterebi.core.VodStream
 import com.ipterebi.core.XtreamAccount
+import com.ipterebi.core.describeFilmHttpError
 import com.ipterebi.core.describeStreamHttpError
 import kotlinx.coroutines.launch
 
 @Composable
-fun PlayerScreen(container: AppContainer, streamId: Int, onBack: () -> Unit) {
+fun PlayerScreen(container: AppContainer, playable: Playable, onBack: () -> Unit) {
     val state by container.credentials.state.collectAsStateWithLifecycle(AccountState.Loading)
 
     when (val current = state) {
@@ -68,7 +71,7 @@ fun PlayerScreen(container: AppContainer, streamId: Int, onBack: () -> Unit) {
             PlayerContent(
                 container = container,
                 account = current.account,
-                streamId = streamId,
+                playable = playable,
                 onBack = onBack,
             )
 
@@ -86,15 +89,46 @@ fun PlayerScreen(container: AppContainer, streamId: Int, onBack: () -> Unit) {
 private fun PlayerContent(
     container: AppContainer,
     account: XtreamAccount,
-    streamId: Int,
+    playable: Playable,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    val channel = remember(streamId) { container.channels.find(streamId) }
-    val guide = rememberProgrammeGuide(container, account, streamId)
+    val isFilm = playable is Playable.Film
+
+    // Looked up from whichever list was on screen, because the id is all that
+    // travels through navigation. Null after a process death, when that list is
+    // gone — the overlay then shows no title rather than a wrong one.
+    val channel = remember(playable) {
+        (playable as? Playable.Channel)?.let { container.channels.find(it.id) }
+    }
+    val title = remember(playable) {
+        when (playable) {
+            is Playable.Channel -> channel?.name
+            is Playable.Film -> container.films.find(playable.id)?.name
+        }
+    }
+
+    // A film has no guide, and asking the panel for one by a film's id would
+    // spend a request on an answer that cannot exist.
+    val guide = if (playable is Playable.Channel) {
+        rememberProgrammeGuide(container, account, playable.id)
+    } else {
+        ProgrammeGuide()
+    }
+
     val scope = rememberCoroutineScope()
-    var recorded by remember(streamId) { mutableStateOf(false) }
-    val url = remember(streamId, account) { container.xtream.liveStreamUrl(account, streamId) }
+    var recorded by remember(playable) { mutableStateOf(false) }
+    var controlsVisible by remember { mutableStateOf(true) }
+
+    val url = remember(playable, account) {
+        when (playable) {
+            is Playable.Channel -> container.xtream.liveStreamUrl(account, playable.id)
+            is Playable.Film -> container.xtream.vodStreamUrl(
+                account,
+                VodStream(streamId = playable.id, containerExtension = playable.extension),
+            )
+        }
+    }
     var error by remember(url) { mutableStateOf<String?>(null) }
 
     val player = remember(url) {
@@ -120,14 +154,21 @@ private fun PlayerContent(
                 setMediaItem(
                     MediaItem.Builder()
                         .setUri(url)
-                        // Stated rather than sniffed. Panels serve the stream
-                        // from a path that does not always end in a usable
-                        // extension, and guessing wrong picks the wrong
-                        // extractor and fails with nothing useful in the log.
                         .setMimeType(
-                            when (account.format) {
-                                StreamFormat.HLS -> MimeTypes.APPLICATION_M3U8
-                                StreamFormat.TS -> MimeTypes.VIDEO_MP2T
+                            when (playable) {
+                                // Stated rather than sniffed. Live paths do not
+                                // always end in a usable extension, and guessing
+                                // wrong picks the wrong extractor and fails with
+                                // nothing useful in the log.
+                                is Playable.Channel -> when (account.format) {
+                                    StreamFormat.HLS -> MimeTypes.APPLICATION_M3U8
+                                    StreamFormat.TS -> MimeTypes.VIDEO_MP2T
+                                }
+                                // Left to ExoPlayer. A film URL does end in its
+                                // real extension, mp4 and mkv need different
+                                // extractors, and sniffing the container is
+                                // exactly what the progressive extractors do.
+                                is Playable.Film -> null
                             }
                         )
                         .build()
@@ -141,21 +182,31 @@ private fun PlayerContent(
         if (BuildConfig.DEBUG) {
             Log.d(
                 TAG_PLAY,
-                "open stream $streamId as ${account.format.label}, ua=${account.userAgent}",
+                when (playable) {
+                    is Playable.Channel ->
+                        "open channel ${playable.id} as ${account.format.label}, ua=${account.userAgent}"
+                    is Playable.Film ->
+                        "open film ${playable.id} as .${playable.extension}, ua=${account.userAgent}"
+                },
             )
             // The real URL carries the credentials in its path, so only its
             // shape is logged. If the panel is serving from somewhere other
-            // than /live, this is where that becomes visible.
+            // than /live or /movie, this is where that becomes visible.
             Log.d(
                 TAG_PLAY,
-                "  ${account.base}/live/***/***/$streamId.${account.format.extension}",
+                when (playable) {
+                    is Playable.Channel ->
+                        "  ${account.base}/live/***/***/${playable.id}.${account.format.extension}"
+                    is Playable.Film ->
+                        "  ${account.base}/movie/***/***/${playable.id}.${playable.extension}"
+                },
             )
         }
 
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (BuildConfig.DEBUG) {
-                    Log.d(TAG_PLAY, "stream $streamId ${playbackStateName(playbackState)}")
+                    Log.d(TAG_PLAY, "${playable.logName()} ${playbackStateName(playbackState, playable)}")
                 }
 
                 // Recorded when the channel actually plays, not when it is
@@ -163,7 +214,8 @@ private fun PlayerContent(
                 // the connection limit is not a list of things watched. Skipped
                 // when the channel record is not to hand — after a process death
                 // the list it came from is gone, and storing an entry with no
-                // name would put an unreadable row in the recents shelf.
+                // name would put an unreadable row in the recents shelf. Films
+                // are not recorded: the recents shelf is a list of channels.
                 if (playbackState == Player.STATE_READY && !recorded && channel != null) {
                     recorded = true
                     scope.launch { container.channelLists.recordWatched(account, channel) }
@@ -172,21 +224,23 @@ private fun PlayerContent(
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (BuildConfig.DEBUG) {
-                    Log.d(TAG_PLAY, "stream $streamId ${if (isPlaying) "playing" else "stopped"}")
+                    Log.d(TAG_PLAY, "${playable.logName()} ${if (isPlaying) "playing" else "stopped"}")
                 }
             }
 
             /** First proof that video is actually arriving, and at what size. */
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 if (BuildConfig.DEBUG) {
-                    Log.d(TAG_PLAY, "stream $streamId video ${videoSize.width}x${videoSize.height}")
+                    Log.d(TAG_PLAY, "${playable.logName()} video ${videoSize.width}x${videoSize.height}")
                 }
             }
 
             override fun onPlayerError(e: PlaybackException) {
                 error = when (val cause = e.cause) {
-                    is HttpDataSource.InvalidResponseCodeException ->
-                        describeStreamHttpError(cause.responseCode)
+                    is HttpDataSource.InvalidResponseCodeException -> when (playable) {
+                        is Playable.Channel -> describeStreamHttpError(cause.responseCode)
+                        is Playable.Film -> describeFilmHttpError(cause.responseCode)
+                    }
 
                     is HttpDataSource.HttpDataSourceException ->
                         "Could not reach the stream. The panel may be down, or " +
@@ -195,9 +249,9 @@ private fun PlayerContent(
                     else -> e.localizedMessage ?: "Playback failed (${e.errorCodeName})."
                 }
                 // The URL carries the credentials in its path, so it is never
-                // logged — only the channel and the failure.
+                // logged — only what was playing and how it failed.
                 if (BuildConfig.DEBUG) {
-                    Log.w(TAG_PLAY, "stream $streamId failed: ${e.errorCodeName}", e)
+                    Log.w(TAG_PLAY, "${playable.logName()} failed: ${e.errorCodeName}", e)
                 }
             }
         }
@@ -218,30 +272,43 @@ private fun PlayerContent(
 
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                // Stopped rather than paused, for two reasons.
+                // Stopped rather than paused, for both kinds, for two reasons.
                 //
                 // pause() keeps the player prepared, and prepare() is a no-op on
                 // a player that is not idle — so pausing here and "re-preparing"
-                // on return does nothing at all, and live television resumes from
-                // a buffer that is stale by however long the app was away.
-                // stop() is what makes the later prepare() real.
+                // on return does nothing at all. stop() is what makes the later
+                // prepare() real.
                 //
                 // It also lets go of the stream. A paused player keeps its
                 // connection open, and on a line that allows one stream that is
-                // the whole line held by an app in the background.
+                // the whole line held by an app in the background — a film no
+                // less than a channel.
+                //
+                // A film is paused first so that it comes back paused. Nobody
+                // who pressed home in the middle of a film wants it to start
+                // again the instant they return; they want it where they left it.
                 Lifecycle.Event.ON_STOP -> {
                     wasStopped = true
+                    if (isFilm) player.pause()
                     player.stop()
                 }
 
-                // Rejoined at the live edge rather than resumed. stop() keeps the
-                // playback position, and for HLS that position has usually slid
-                // out of the live window while the app was away.
                 Lifecycle.Event.ON_START -> if (wasStopped) {
                     wasStopped = false
-                    player.seekToDefaultPosition()
-                    player.prepare()
-                    player.play()
+                    when (playable) {
+                        // Rejoined at the live edge rather than resumed. stop()
+                        // keeps the playback position, and for HLS that position
+                        // has usually slid out of the live window while the app
+                        // was away.
+                        is Playable.Channel -> {
+                            player.seekToDefaultPosition()
+                            player.prepare()
+                            player.play()
+                        }
+                        // Reconnected at the position stop() kept, and left
+                        // paused for the user to resume.
+                        is Playable.Film -> player.prepare()
+                    }
                 }
 
                 else -> Unit
@@ -281,43 +348,56 @@ private fun PlayerContent(
                     useController = true
                     keepScreenOn = true
                     setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
-                    // A live stream has no duration and no seekable window, so
-                    // these controls can only ever be inert.
-                    setShowFastForwardButton(false)
-                    setShowRewindButton(false)
+                    // One item at a time, so there is never a next or previous.
                     setShowNextButton(false)
                     setShowPreviousButton(false)
+                    // A live stream has no duration and no seekable window, so
+                    // skipping could only ever be inert. A film is the opposite:
+                    // skipping is most of what its controls are for.
+                    setShowFastForwardButton(isFilm)
+                    setShowRewindButton(isFilm)
+                    // Everything this screen draws over the picture follows the
+                    // player's own controls in and out. A title and a guide sat
+                    // permanently across the top of a film would be the first
+                    // thing anyone asked to have removed.
+                    setControllerVisibilityListener(
+                        PlayerView.ControllerVisibilityListener { visibility ->
+                            controlsVisible = visibility == View.VISIBLE
+                        }
+                    )
                 }
             },
             update = { view -> view.player = player },
             modifier = Modifier.fillMaxSize(),
         )
 
-        IconButton(
-            onClick = onBack,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(8.dp),
-        ) {
-            Icon(
-                Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back to channels",
-                tint = Color.White,
+        if (controlsVisible) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(8.dp),
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = if (isFilm) "Back to films" else "Back to channels",
+                    tint = Color.White,
+                )
+            }
+
+            ChannelInfoOverlay(
+                channelName = title,
+                guide = guide,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 16.dp),
+            )
+
+            ProgrammeProgress(
+                guide = guide,
+                modifier = Modifier.align(Alignment.TopCenter),
             )
         }
-
-        ChannelInfoOverlay(
-            channelName = channel?.name,
-            guide = guide,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 16.dp),
-        )
-
-        ProgrammeProgress(
-            guide = guide,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
 
         error?.let { message ->
             Column(
@@ -337,10 +417,10 @@ private fun PlayerContent(
                     onClick = {
                         error = null
                         // An error leaves the player idle, so this prepare() is
-                        // real. The seek is for the same reason as on return
-                        // from the background: rejoin the broadcast, not the
-                        // point it failed at.
-                        player.seekToDefaultPosition()
+                        // real. A channel rejoins the broadcast rather than the
+                        // point it failed at; a film carries on from where it
+                        // stopped, which is the point of it having a position.
+                        if (!isFilm) player.seekToDefaultPosition()
                         player.prepare()
                         player.play()
                     },
@@ -351,16 +431,25 @@ private fun PlayerContent(
     }
 }
 
+private fun Playable.logName(): String = when (this) {
+    is Playable.Channel -> "channel $id"
+    is Playable.Film -> "film $id"
+}
+
 /**
- * `ended` deserves a note: a live stream should never reach it. When it does,
- * the panel closed the connection — usually the line's connection limit being
- * enforced a few seconds late, rather than anything about this channel.
+ * `ended` means opposite things for the two kinds. A film ends; that is the
+ * credits. A live stream never should — when it does, the panel closed the
+ * connection, usually the line's connection limit being enforced a few seconds
+ * late rather than anything about the channel.
  */
-private fun playbackStateName(state: Int): String = when (state) {
+private fun playbackStateName(state: Int, playable: Playable): String = when (state) {
     Player.STATE_IDLE -> "idle"
     Player.STATE_BUFFERING -> "buffering"
     Player.STATE_READY -> "ready"
-    Player.STATE_ENDED -> "ended (source closed the connection)"
+    Player.STATE_ENDED -> when (playable) {
+        is Playable.Channel -> "ended (source closed the connection)"
+        is Playable.Film -> "ended"
+    }
     else -> "state $state"
 }
 
