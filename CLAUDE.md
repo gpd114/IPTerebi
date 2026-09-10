@@ -1,9 +1,10 @@
 # IPTerebi
 
 Android IPTV player. A line on an Xtream Codes panel supplies the channels; the
-app supplies nothing. Phone, tablet and Android TV from one APK: portrait for
-browsing on a phone, landscape for playback everywhere, and fully usable with a
-D-pad remote.
+app supplies nothing. **Phone and tablet first** — portrait for browsing and
+landscape for playback. The same APK also runs on Android TV and works with a
+D-pad remote, but TV is secondary: put phone and tablet first, and flag any
+change that alters the tablet layout.
 
 ## Layout
 
@@ -240,8 +241,9 @@ each one is pinned by a test in `core/src/test`, and when a provider turns up
 that behaves differently the test is where the new truth goes.
 
 **`app/` has run on an emulator, never against a real panel.** It has been
-driven end to end on an API 34 emulator against a fake panel — a small local
-server serving generated test media and deliberately malformed responses —
+driven end to end on an API 34 emulator against the fake panel in
+`tools/fakepanel` — one Java file serving generated test media and deliberately
+malformed responses; its README says how to run it and what each fault tests —
 covering sign-in, live playback with the guide, the background/return
 behaviour, the 403 refusal, films in mp4 and mkv with seeking, and series in
 each `episodes` shape. That proves the app does what the code says. It does not
