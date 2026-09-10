@@ -119,13 +119,17 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   another can refuse. Some forks report it as HTTP 456, which is not a real
   status code. `describeStreamHttpError` exists to turn these into sentences.
 
-  This makes a redundant `prepare()` expensive in a way it would not be
-  elsewhere: each one drops the request in flight and dials the panel again, and
-  the panel counts the old connection for a few seconds yet. Note that
-  `Lifecycle.addObserver` replays the current state into a new observer, so an
-  `ON_START` handler that re-prepares fires once at registration before the app
-  has been anywhere — which is why `PlayerScreen` re-prepares only after a real
-  `ON_STOP`.
+  So a player the user is not watching should not be holding the line. A
+  *paused* ExoPlayer keeps its connection open; a *stopped* one releases it.
+  `PlayerScreen` stops on `ON_STOP` for that reason.
+- **`prepare()` does nothing unless the player is idle.** `ExoPlayerImpl`
+  returns early for any other state, and the first `prepare()` leaves the
+  player buffering synchronously — so a second call, or a `prepare()` after
+  `pause()`, is a silent no-op. Anything meant to reconnect has to `stop()`
+  first. This was got wrong once already: an earlier version paused on the way
+  into the background and "re-prepared" on the way back, which did nothing, and
+  live television resumed from a buffer minutes behind the broadcast. Read the
+  Media3 source before reasoning about what a player call does.
 - **`.ts` and `.m3u8` are both offered and only one may work.** Which one is a
   property of the panel, not the channel, and `allowed_output_formats` is
   aspirational — panels advertise `m3u8` and then serve a playlist that 404s.
