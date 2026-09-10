@@ -93,6 +93,7 @@ public class FakePanel {
                 log("FILM " + file + "  range=" + ex.getRequestHeaders().getFirst("Range"));
                 if (file.equals("501.mp4")) serveFile(ex, "film.mp4", "video/mp4");
                 else if (file.equals("502.mkv")) serveFile(ex, "film.mkv", "video/x-matroska");
+                else if (file.equals("503.mp4")) serveFileDropping(ex, "film.mp4", "video/mp4");
                 else status(ex, 404);
             } else if (path.startsWith("/series/")) {
                 String file = fileName(path);
@@ -182,7 +183,10 @@ public class FakePanel {
                     "\"container_extension\":\"mp4\",\"rating\":\"7.5\",\"custom_sid\":null}," +
                     "{\"num\":\"2\",\"name\":\"Colour Bars (MKV)\",\"stream_id\":\"502\"," +
                     "\"stream_icon\":\"" + base + "/poster/502.jpg\",\"category_id\":10," +
-                    "\"container_extension\":\"mkv\",\"rating\":0}]";
+                    "\"container_extension\":\"mkv\",\"rating\":0}," +
+                    "{\"num\":3,\"name\":\"Drops mid-film (MP4)\",\"stream_id\":503," +
+                    "\"stream_icon\":\"" + base + "/poster/501.jpg\",\"category_id\":\"10\"," +
+                    "\"container_extension\":\"mp4\"}]";
             case "get_series_categories":
                 return "[{\"category_id\":\"20\",\"category_name\":\"Drama\"}]";
             case "get_series":
@@ -321,7 +325,33 @@ public class FakePanel {
     }
 
     /** Serves a media file with Range support, which seeking in a film depends on. */
+    static volatile long filmDroppedAt = 0;
+
+    /**
+     * A film whose connection dies 40% of the way through, as a phone leaving
+     * Wi-Fi does — then, for 35 s, answers 458, as a real line did while it
+     * still counted the connection that had gone. That line refused for about
+     * 15 s after a drop it saw at once; this drop goes silent instead, and the
+     * player takes its 20 s read timeout to notice, so the window is longer by
+     * that, to leave the same 15 s of refusals after it does. Sent at the pace it
+     * plays, so the drop comes mid-film rather than into a buffer. Drops once
+     * every two minutes at most, so a reconnect gets through.
+     */
+    static void serveFileDropping(HttpExchange ex, String name, String type) throws IOException {
+        long now = System.currentTimeMillis();
+        if (now - filmDroppedAt < 35_000) {
+            log("   (503 refused: old connection still counted)");
+            status(ex, 458);
+            return;
+        }
+        serveFile(ex, name, type, now - filmDroppedAt > 120_000);
+    }
+
     static void serveFile(HttpExchange ex, String name, String type) throws IOException {
+        serveFile(ex, name, type, false);
+    }
+
+    static void serveFile(HttpExchange ex, String name, String type, boolean dropping) throws IOException {
         Path file = media.resolve(name);
         if (!Files.exists(file)) {
             missing(ex, file);
@@ -351,15 +381,37 @@ public class FakePanel {
         ex.getResponseHeaders().set("Accept-Ranges", "bytes");
         if (partial) ex.getResponseHeaders().set("Content-Range", "bytes " + from + "-" + to + "/" + size);
         ex.sendResponseHeaders(partial ? 206 : 200, length);
+        // Only for a dropping film: where it dies, and the pace (the mp4 is 90 s).
+        long cutAt = dropping ? size * 2 / 5 : Long.MAX_VALUE;
+        long perSecond = size / 90;
+        long start = System.currentTimeMillis();
         try (RandomAccessFile raf = new RandomAccessFile(file.toFile(), "r"); OutputStream out = ex.getResponseBody()) {
             raf.seek(from);
-            byte[] buf = new byte[64 * 1024];
+            byte[] buf = new byte[dropping ? 16 * 1024 : 64 * 1024];
             long left = length;
+            long at = from;
             while (left > 0) {
-                int n = raf.read(buf, 0, (int) Math.min(buf.length, left));
+                if (at >= cutAt) {
+                    filmDroppedAt = System.currentTimeMillis();
+                    log("   (" + name + " connection dropped at " + at * 100 / size + "%, as planned)");
+                    // Mid-body, with the length promised: the client sees the
+                    // connection die, not the file end.
+                    throw new IOException("dropped on purpose");
+                }
+                int n = raf.read(buf, 0, (int) Math.min(buf.length, Math.min(left, cutAt - at)));
                 if (n < 0) break;
                 out.write(buf, 0, n);
                 left -= n;
+                at += n;
+                if (dropping) {
+                    out.flush();
+                    // Three seconds up front for the player to start on, then real time.
+                    long due = start + (at - from - 3 * perSecond) * 1000 / perSecond;
+                    long wait = due - System.currentTimeMillis();
+                    if (wait > 0) {
+                        try { Thread.sleep(wait); } catch (InterruptedException e) { return; }
+                    }
+                }
             }
         }
     }

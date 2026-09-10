@@ -72,7 +72,7 @@ import com.ipterebi.app.BuildConfig
 import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.app.ui.focusRing
-import com.ipterebi.core.LiveReconnect
+import com.ipterebi.core.StreamReconnect
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.VodStream
 import com.ipterebi.core.XtreamAccount
@@ -198,9 +198,9 @@ private fun PlayerContent(
     }
     var error by remember(url) { mutableStateOf<String?>(null) }
 
-    // A channel that drops is reconnected; see LiveReconnect for when and how
-    // often. The delay is read by the loading thread, hence atomic.
-    val reconnect = remember(url) { LiveReconnect() }
+    // Anything that drops after playing is reconnected; see StreamReconnect for
+    // when and how often. The delay is read by the loading thread, hence atomic.
+    val reconnect = remember(url) { StreamReconnect() }
     val reconnectDelay = remember(url) { AtomicLong(0) }
     var reconnecting by remember(url) { mutableStateOf(false) }
 
@@ -217,12 +217,15 @@ private fun PlayerContent(
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(20_000)
 
-        val sources = when (playable) {
-            is Playable.Channel ->
-                DefaultMediaSourceFactory(DelayedOpenFactory(httpFactory, reconnectDelay)).apply {
-                    if (account.format == StreamFormat.TS) setLoadErrorHandlingPolicy(LiveFailsFast())
-                }
-            is Playable.Film, is Playable.Episode -> DefaultMediaSourceFactory(httpFactory)
+        val sources = DefaultMediaSourceFactory(DelayedOpenFactory(httpFactory, reconnectDelay)).apply {
+            when (playable) {
+                // HLS is left to ExoPlayer: its segments are separate requests
+                // with nothing to range over, and it has never met a real line.
+                is Playable.Channel ->
+                    if (account.format == StreamFormat.TS) setLoadErrorHandlingPolicy(StreamRetryPolicy(live = true))
+                is Playable.Film, is Playable.Episode ->
+                    setLoadErrorHandlingPolicy(StreamRetryPolicy(live = false))
+            }
         }
 
         ExoPlayer.Builder(context)
@@ -308,8 +311,13 @@ private fun PlayerContent(
         }
 
         /**
-         * A channel stopped by itself — the panel hung up, or the connection
+         * Playback stopped by itself — the panel hung up, or the connection
          * failed. Reconnects, or gives up and shows [why].
+         *
+         * A channel rejoins at the live edge. A film or an episode carries on
+         * from where it was: stop() keeps the position, so preparing again
+         * picks up at the same second, and nobody sits through the last ten
+         * minutes twice.
          *
          * Stop, seek and prepare all happen here, inside the listener, so the
          * stopped state never outlives this call: the media session only sees
@@ -317,7 +325,7 @@ private fun PlayerContent(
          * out while buffering, in [DelayedOpenFactory]. Both are for the screen
          * being off — see there.
          *
-         * Not while paused: a paused channel that drops has nobody waiting on
+         * Not while paused: something paused that drops has nobody waiting on
          * it, and reconnecting would hold the line for them.
          */
         fun dropped(why: String) {
@@ -328,11 +336,14 @@ private fun PlayerContent(
                 if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} not reconnecting")
                 return
             }
-            if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} dropped; reconnecting in $wait ms")
+            if (BuildConfig.DEBUG) {
+                val at = if (onDemand) " at ${player.currentPosition / 1000} s" else ""
+                Log.d(TAG_PLAY, "${playable.logName()} dropped$at; reconnecting in $wait ms")
+            }
             reconnecting = true
             reconnectDelay.set(wait)
             player.stop()
-            player.seekToDefaultPosition()
+            if (!onDemand) player.seekToDefaultPosition()
             player.prepare()
         }
 
@@ -402,12 +413,9 @@ private fun PlayerContent(
                 if (BuildConfig.DEBUG) {
                     Log.w(TAG_PLAY, "${playable.logName()} failed: ${e.errorCodeName}", e)
                 }
-                // A channel that was playing is reconnected, and only says why
-                // if that fails; one that never started says why at once.
-                when (playable) {
-                    is Playable.Channel -> dropped(message)
-                    is Playable.Film, is Playable.Episode -> error = message
-                }
+                // Anything that was playing is reconnected, and only says why
+                // if that fails; anything that never started says why at once.
+                dropped(message)
             }
         }
         player.addListener(listener)
@@ -515,8 +523,14 @@ private fun PlayerContent(
                         // Reconnected at the position stop() kept, and left
                         // paused for the user to resume. One paused from the lock
                         // screen and not yet let go is still connected, and fine.
+                        // A reconnect given up on while away is not current
+                        // either, as for a channel.
                         is Playable.Film, is Playable.Episode ->
-                            if (player.playbackState == Player.STATE_IDLE) player.prepare()
+                            if (player.playbackState == Player.STATE_IDLE) {
+                                error = null
+                                reconnect.reset()
+                                player.prepare()
+                            }
                     }
                 }
 

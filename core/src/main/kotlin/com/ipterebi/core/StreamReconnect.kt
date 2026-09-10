@@ -1,17 +1,20 @@
 package com.ipterebi.core
 
 /**
- * When to reconnect a live channel that stopped by itself, and when to give up
- * and say so.
+ * When to reconnect a stream that stopped by itself, and when to give up and
+ * say so. A channel and a film alike: the player decides *how* — a channel
+ * rejoins at the live edge, a film carries on where it was — and this decides
+ * whether, and after how long.
  *
- * Live streams drop. The panel restarts a channel, a phone walks out of Wi-Fi
+ * Streams drop. The panel restarts a channel, a phone walks out of Wi-Fi
  * range, the provider's source hiccups — and without this the picture freezes
- * on its last frame with nothing said. A television reconnects, so this does.
+ * on its last frame, or a film stops on an error card halfway through. A
+ * television reconnects, so this does.
  *
- * Only a channel that has *played* is reconnected. One that never started was
- * refused — wrong format, the connection limit, a dead channel — and the
- * reason for that is worth showing at once rather than papering over with
- * half a minute of retrying.
+ * Only something that has *played* is reconnected. One that never started was
+ * refused — wrong format, the connection limit, a dead channel, a missing file
+ * — and the reason for that is worth showing at once rather than papering over
+ * with half a minute of retrying.
  *
  * Retries back off, because the panel is the likely reason for the drop and
  * the connection limit makes haste expensive: a line allowing one stream
@@ -23,7 +26,7 @@ package com.ipterebi.core
  * channel that drops once an hour reconnects every time, while one that drops
  * every few seconds runs out of attempts.
  */
-class LiveReconnect(
+class StreamReconnect(
     private val delaysMs: List<Long> = DEFAULT_DELAYS_MS,
     private val steadyMs: Long = STEADY_MS,
 ) {
@@ -58,7 +61,7 @@ class LiveReconnect(
         return delaysMs[attempts++]
     }
 
-    /** Try again, by hand: a fresh start, as if the channel had just been opened. */
+    /** Try again, by hand: a fresh start, as if it had just been opened. */
     fun reset() {
         attempts = 0
         played = false
