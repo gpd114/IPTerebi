@@ -157,9 +157,10 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   do with films and must not follow them: `12345.ts` 404s against a panel
   holding `12345.mkv`. Error wording is separate for the same reason —
   `describeFilmHttpError` never suggests changing the format.
-- **Live has no duration.** The seek bar stays empty and the position never
-  moves. That is correct, not a bug, and the transport buttons are hidden
-  because they could only ever be inert.
+- **Live has no duration.** Media3 still draws a clock and a seek bar for it —
+  "00:16 · 00:00" over an empty bar, which reads as a fault — so for a channel
+  the player hides `exo_time` and `exo_progress`, along with the skip buttons,
+  which could only ever be inert. Films and episodes keep all of them.
 - **EPG titles and descriptions are base64.** Documented, not a fork quirk — but
   forks that send plain text exist, and `News` is itself valid base64 that
   decodes to three bytes of noise, so "did it decode" does not answer the
