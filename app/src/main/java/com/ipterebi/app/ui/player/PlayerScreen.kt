@@ -378,6 +378,15 @@ private fun PlayerContent(
                     // skipping is most of what its controls are for.
                     setShowFastForwardButton(onDemand)
                     setShowRewindButton(onDemand)
+                    // The same goes for the clock and the progress bar. For a
+                    // channel they read "00:16 · 00:00" over an empty bar — a
+                    // position with nothing to be a position in — which looks
+                    // like a fault. Media3 animates both but never sets their
+                    // visibility, so hiding them here stays hidden.
+                    if (!onDemand) {
+                        findViewById<View>(androidx.media3.ui.R.id.exo_time)?.visibility = View.GONE
+                        findViewById<View>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
+                    }
                     // Everything this screen draws over the picture follows the
                     // player's own controls in and out. A title and a guide sat
                     // permanently across the top of a film would be the first

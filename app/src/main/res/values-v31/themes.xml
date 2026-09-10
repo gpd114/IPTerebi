@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12 and later draw their own splash screen before the app's window,
+      and it does not use windowBackground: without its own colour it follows the
+      system's light or dark setting, so on a phone in light mode a dark app
+      opened on a white flash. It needs saying separately here.
+
+      The whole style is repeated rather than inherited, because a style in a
+      qualified folder replaces the one in values/ rather than adding to it.
+    -->
+    <style name="Theme.IPTerebi" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#101418</item>
+        <item name="android:windowSplashScreenBackground">#101418</item>
+    </style>
+</resources>
