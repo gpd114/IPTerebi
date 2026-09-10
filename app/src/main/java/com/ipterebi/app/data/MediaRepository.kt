@@ -15,12 +15,13 @@ import kotlinx.coroutines.flow.asStateFlow
  * death that is impossible to reproduce on the machine it was written on. An
  * integer is always safe.
  *
- * Generic because channels and films are looked up identically and differ only
- * in the type that comes back. [idOf] names the id field, since the two model
+ * Generic because channels, films and episodes are looked up identically and
+ * differ only in the type that comes back and the type of their id — an
+ * episode id is a string. [idOf] names the id field, since the model
  * classes share no interface — they are shaped by what the panel sends, not by
  * this app.
  */
-class MediaRepository<T : Any>(private val idOf: (T) -> Int) {
+class MediaRepository<K : Any, T : Any>(private val idOf: (T) -> K) {
 
     private val _items = MutableStateFlow<List<T>>(emptyList())
     val items: StateFlow<List<T>> = _items.asStateFlow()
@@ -29,5 +30,5 @@ class MediaRepository<T : Any>(private val idOf: (T) -> Int) {
         _items.value = items
     }
 
-    fun find(id: Int): T? = _items.value.firstOrNull { idOf(it) == id }
+    fun find(id: K): T? = _items.value.firstOrNull { idOf(it) == id }
 }

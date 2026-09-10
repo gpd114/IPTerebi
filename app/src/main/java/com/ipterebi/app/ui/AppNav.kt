@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,15 +39,20 @@ import com.ipterebi.app.ui.films.FilmsScreen
 import com.ipterebi.app.ui.login.LoginScreen
 import com.ipterebi.app.ui.player.Playable
 import com.ipterebi.app.ui.player.PlayerScreen
+import com.ipterebi.app.ui.series.SeriesDetailScreen
+import com.ipterebi.app.ui.series.SeriesScreen
 import com.ipterebi.app.ui.settings.SettingsScreen
 
 object Route {
     const val LOGIN = "login"
     const val CHANNELS = "channels"
     const val FILMS = "films"
+    const val SERIES = "series"
+    const val SERIES_DETAIL = "series/{id}"
     const val SETTINGS = "settings"
     const val PLAY_CHANNEL = "player/channel/{id}"
     const val PLAY_FILM = "player/film/{id}/{ext}"
+    const val PLAY_EPISODE = "player/episode/{id}/{ext}"
 
     fun playChannel(id: Int) = "player/channel/$id"
 
@@ -56,12 +62,19 @@ object Route {
      * promised — would otherwise invent a segment and match no destination.
      */
     fun playFilm(id: Int, extension: String) = "player/film/$id/${Uri.encode(extension)}"
+
+    fun seriesDetail(id: Int) = "series/$id"
+
+    /** Both encoded: an episode id is a string from the panel, not a number. */
+    fun playEpisode(id: String, extension: String) =
+        "player/episode/${Uri.encode(id)}/${Uri.encode(extension)}"
 }
 
 /** The sections the bottom bar switches between. */
 private enum class Section(val route: String, val label: String, val icon: ImageVector) {
     LIVE(Route.CHANNELS, "Live TV", Icons.Filled.LiveTv),
     FILMS(Route.FILMS, "Films", Icons.Filled.Movie),
+    SERIES(Route.SERIES, "Series", Icons.Filled.VideoLibrary),
 }
 
 @Composable
@@ -148,6 +161,30 @@ fun AppNav(container: AppContainer) {
                             )
                         }
 
+                        composable(Route.SERIES) {
+                            SeriesScreen(
+                                container = container,
+                                onSeries = { series -> nav.navigate(Route.seriesDetail(series.seriesId)) },
+                                onSettings = { nav.navigate(Route.SETTINGS) },
+                            )
+                        }
+
+                        composable(
+                            route = Route.SERIES_DETAIL,
+                            arguments = listOf(navArgument("id") { type = NavType.IntType }),
+                        ) { entry ->
+                            SeriesDetailScreen(
+                                container = container,
+                                seriesId = entry.arguments?.getInt("id") ?: 0,
+                                onEpisode = { episode ->
+                                    nav.navigate(
+                                        Route.playEpisode(episode.episode.id, episode.episode.playbackExtension)
+                                    )
+                                },
+                                onBack = { nav.popBackStack() },
+                            )
+                        }
+
                         composable(Route.SETTINGS) {
                             SettingsScreen(
                                 container = container,
@@ -180,6 +217,24 @@ fun AppNav(container: AppContainer) {
                                 container = container,
                                 playable = Playable.Film(
                                     id = entry.arguments?.getInt("id") ?: 0,
+                                    extension = entry.arguments?.getString("ext").orEmpty()
+                                        .ifBlank { com.ipterebi.core.VodStream.DEFAULT_VOD_EXTENSION },
+                                ),
+                                onBack = { nav.popBackStack() },
+                            )
+                        }
+
+                        composable(
+                            route = Route.PLAY_EPISODE,
+                            arguments = listOf(
+                                navArgument("id") { type = NavType.StringType },
+                                navArgument("ext") { type = NavType.StringType },
+                            ),
+                        ) { entry ->
+                            PlayerScreen(
+                                container = container,
+                                playable = Playable.Episode(
+                                    id = entry.arguments?.getString("id").orEmpty(),
                                     extension = entry.arguments?.getString("ext").orEmpty()
                                         .ifBlank { com.ipterebi.core.VodStream.DEFAULT_VOD_EXTENSION },
                                 ),

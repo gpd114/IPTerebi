@@ -23,9 +23,8 @@ fun defaultXtreamHttpClient(): OkHttpClient = OkHttpClient.Builder()
     .build()
 
 /**
- * Everything this app asks an Xtream panel for: live television, its guide,
- * and films. Series use the same `player_api.php` with different actions and
- * are not wired up yet.
+ * Everything this app asks an Xtream panel for: live television and its guide,
+ * films, and series.
  *
  * [log] receives one line per request with the credentials stripped. Wire it to
  * something that only fires in debug builds — see IPTerebiApi in :app.
@@ -136,6 +135,60 @@ class XtreamClient(
         films
     }
 
+    suspend fun seriesCategories(account: XtreamAccount): List<XtreamCategory> = decode(
+        body = get(account, action = "get_series_categories"),
+        deserializer = ListSerializer(XtreamCategory.serializer()),
+        what = "the series categories",
+    ).usableCategories().also { log("  parsed ${it.size} usable series categories") }
+
+    suspend fun series(
+        account: XtreamAccount,
+        categoryId: String? = null,
+    ): List<Series> = decode(
+        body = get(
+            account = account,
+            action = "get_series",
+            params = categoryId?.let { mapOf("category_id" to it) }.orEmpty(),
+        ),
+        deserializer = ListSerializer(Series.serializer()),
+        what = "the series list",
+    ).let { parsed ->
+        val listable = parsed.listableSeries()
+        log(
+            "  parsed ${parsed.size} series in category ${categoryId ?: "(all)"}" +
+                (if (listable.size != parsed.size) {
+                    ", ${parsed.size - listable.size} dropped as unlistable"
+                } else "")
+        )
+        listable
+    }
+
+    /**
+     * Seasons and episodes for one series. See [parseSeriesDetail] for what
+     * this response gets wrong and how each case is read.
+     */
+    suspend fun seriesDetail(
+        account: XtreamAccount,
+        seriesId: Int,
+        fallbackName: String = "",
+    ): SeriesDetail {
+        val root = decode(
+            body = get(
+                account = account,
+                action = "get_series_info",
+                params = mapOf("series_id" to "$seriesId"),
+            ),
+            deserializer = kotlinx.serialization.json.JsonElement.serializer(),
+            what = "the episode list",
+        )
+        return parseSeriesDetail(json, root, fallbackName).also { detail ->
+            log(
+                "  parsed ${detail.seasons.size} seasons, ${detail.episodeCount} episodes " +
+                    "for series $seriesId"
+            )
+        }
+    }
+
     /**
      * The next few programmes on one channel.
      *
@@ -190,7 +243,7 @@ class XtreamClient(
      * it, and be careful about putting it anywhere a crash reporter can see.
      */
     fun liveStreamUrl(account: XtreamAccount, streamId: Int): String =
-        mediaUrl(account, "live", streamId, account.format.extension)
+        mediaUrl(account, "live", "$streamId", account.format.extension)
 
     /**
      * Where a film is.
@@ -202,18 +255,27 @@ class XtreamClient(
      * holding the film quite happily — so the extension comes from the film.
      */
     fun vodStreamUrl(account: XtreamAccount, film: VodStream): String =
-        mediaUrl(account, "movie", film.streamId, film.playbackExtension)
+        mediaUrl(account, "movie", "${film.streamId}", film.playbackExtension)
+
+    /**
+     * Where an episode is: `/series/`, the episode's own id — not the
+     * series' — and the episode's own extension, for the same reason as a film.
+     * The id stays the string the panel sent; see [Episode.id].
+     */
+    fun episodeStreamUrl(account: XtreamAccount, episode: Episode): String =
+        mediaUrl(account, "series", episode.id.trim(), episode.playbackExtension)
 
     /**
      * Live, films and series differ only in the first path segment and the
      * extension, so they share this. The credentials are added as path segments
      * rather than interpolated, so a password containing `/` or a space is
-     * encoded instead of inventing a path.
+     * encoded instead of inventing a path — and the same goes for the id, which
+     * for an episode is a string from the panel.
      */
     private fun mediaUrl(
         account: XtreamAccount,
         section: String,
-        id: Int,
+        id: String,
         extension: String,
     ): String =
         requireBase(account).newBuilder()

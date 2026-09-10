@@ -58,6 +58,7 @@ import com.ipterebi.app.data.AccountState
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.VodStream
 import com.ipterebi.core.XtreamAccount
+import com.ipterebi.core.describeEpisodeHttpError
 import com.ipterebi.core.describeFilmHttpError
 import com.ipterebi.core.describeStreamHttpError
 import kotlinx.coroutines.launch
@@ -93,7 +94,7 @@ private fun PlayerContent(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    val isFilm = playable is Playable.Film
+    val onDemand = playable.isOnDemand
 
     // Looked up from whichever list was on screen, because the id is all that
     // travels through navigation. Null after a process death, when that list is
@@ -105,6 +106,7 @@ private fun PlayerContent(
         when (playable) {
             is Playable.Channel -> channel?.name
             is Playable.Film -> container.films.find(playable.id)?.name
+            is Playable.Episode -> container.episodes.find(playable.id)?.title
         }
     }
 
@@ -126,6 +128,11 @@ private fun PlayerContent(
             is Playable.Film -> container.xtream.vodStreamUrl(
                 account,
                 VodStream(streamId = playable.id, containerExtension = playable.extension),
+            )
+            // Qualified: core's Episode, not Playable.Episode, which shares the name.
+            is Playable.Episode -> container.xtream.episodeStreamUrl(
+                account,
+                com.ipterebi.core.Episode(id = playable.id, containerExtension = playable.extension),
             )
         }
     }
@@ -168,7 +175,7 @@ private fun PlayerContent(
                                 // real extension, mp4 and mkv need different
                                 // extractors, and sniffing the container is
                                 // exactly what the progressive extractors do.
-                                is Playable.Film -> null
+                                is Playable.Film, is Playable.Episode -> null
                             }
                         )
                         .build()
@@ -187,6 +194,8 @@ private fun PlayerContent(
                         "open channel ${playable.id} as ${account.format.label}, ua=${account.userAgent}"
                     is Playable.Film ->
                         "open film ${playable.id} as .${playable.extension}, ua=${account.userAgent}"
+                    is Playable.Episode ->
+                        "open episode ${playable.id} as .${playable.extension}, ua=${account.userAgent}"
                 },
             )
             // The real URL carries the credentials in its path, so only its
@@ -199,6 +208,8 @@ private fun PlayerContent(
                         "  ${account.base}/live/***/***/${playable.id}.${account.format.extension}"
                     is Playable.Film ->
                         "  ${account.base}/movie/***/***/${playable.id}.${playable.extension}"
+                    is Playable.Episode ->
+                        "  ${account.base}/series/***/***/${playable.id}.${playable.extension}"
                 },
             )
         }
@@ -240,6 +251,7 @@ private fun PlayerContent(
                     is HttpDataSource.InvalidResponseCodeException -> when (playable) {
                         is Playable.Channel -> describeStreamHttpError(cause.responseCode)
                         is Playable.Film -> describeFilmHttpError(cause.responseCode)
+                        is Playable.Episode -> describeEpisodeHttpError(cause.responseCode)
                     }
 
                     is HttpDataSource.HttpDataSourceException ->
@@ -284,12 +296,12 @@ private fun PlayerContent(
                 // the whole line held by an app in the background — a film no
                 // less than a channel.
                 //
-                // A film is paused first so that it comes back paused. Nobody
-                // who pressed home in the middle of a film wants it to start
+                // A film or episode is paused first so it comes back paused. Nobody
+                // who pressed home halfway through one wants it to start
                 // again the instant they return; they want it where they left it.
                 Lifecycle.Event.ON_STOP -> {
                     wasStopped = true
-                    if (isFilm) player.pause()
+                    if (onDemand) player.pause()
                     player.stop()
                 }
 
@@ -307,7 +319,7 @@ private fun PlayerContent(
                         }
                         // Reconnected at the position stop() kept, and left
                         // paused for the user to resume.
-                        is Playable.Film -> player.prepare()
+                        is Playable.Film, is Playable.Episode -> player.prepare()
                     }
                 }
 
@@ -354,8 +366,8 @@ private fun PlayerContent(
                     // A live stream has no duration and no seekable window, so
                     // skipping could only ever be inert. A film is the opposite:
                     // skipping is most of what its controls are for.
-                    setShowFastForwardButton(isFilm)
-                    setShowRewindButton(isFilm)
+                    setShowFastForwardButton(onDemand)
+                    setShowRewindButton(onDemand)
                     // Everything this screen draws over the picture follows the
                     // player's own controls in and out. A title and a guide sat
                     // permanently across the top of a film would be the first
@@ -380,7 +392,11 @@ private fun PlayerContent(
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = if (isFilm) "Back to films" else "Back to channels",
+                    contentDescription = when (playable) {
+                        is Playable.Channel -> "Back to channels"
+                        is Playable.Film -> "Back to films"
+                        is Playable.Episode -> "Back to episodes"
+                    },
                     tint = Color.White,
                 )
             }
@@ -420,7 +436,7 @@ private fun PlayerContent(
                         // real. A channel rejoins the broadcast rather than the
                         // point it failed at; a film carries on from where it
                         // stopped, which is the point of it having a position.
-                        if (!isFilm) player.seekToDefaultPosition()
+                        if (!onDemand) player.seekToDefaultPosition()
                         player.prepare()
                         player.play()
                     },
@@ -434,6 +450,7 @@ private fun PlayerContent(
 private fun Playable.logName(): String = when (this) {
     is Playable.Channel -> "channel $id"
     is Playable.Film -> "film $id"
+    is Playable.Episode -> "episode $id"
 }
 
 /**
@@ -448,7 +465,7 @@ private fun playbackStateName(state: Int, playable: Playable): String = when (st
     Player.STATE_READY -> "ready"
     Player.STATE_ENDED -> when (playable) {
         is Playable.Channel -> "ended (source closed the connection)"
-        is Playable.Film -> "ended"
+        is Playable.Film, is Playable.Episode -> "ended"
     }
     else -> "state $state"
 }

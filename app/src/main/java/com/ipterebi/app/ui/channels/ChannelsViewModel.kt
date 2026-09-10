@@ -46,7 +46,13 @@ data class ChannelsUiState(
     val favourites: List<LiveStream> = emptyList(),
     val recents: List<LiveStream> = emptyList(),
     val query: String = "",
-    val busy: Boolean = false,
+    /**
+     * True from the start: before the first load has even begun — while the
+     * saved line is still being read from disk — "not busy, nothing listed"
+     * would draw as a genuinely empty category, and every launch would open
+     * on a message saying there is nothing here.
+     */
+    val busy: Boolean = true,
     val error: String? = null,
     /**
      * Set when the panel named no categories, so the error can offer the
@@ -168,7 +174,9 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
         _state.update { it.copy(busy = true, error = null, offerFullLoad = false) }
         try {
             val categories = container.xtream.liveCategories(account)
-            _state.update { it.copy(categories = categories, busy = false) }
+            // Still busy: the first category is about to load, and dropping
+            // busy in between would flash "nothing in this category" for a frame.
+            _state.update { it.copy(categories = categories) }
 
             // A panel that names no categories used to fall through to
             // loadChannels(null), and null means *every* category at once —

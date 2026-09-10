@@ -111,7 +111,12 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
             // in a shelf of stream ids from somebody else's panel.
             account?.let { container.channelLists.clear(it) }
             container.credentials.clear()
+            // Ids are a panel's private numbering, so anything still held here
+            // would put this line's titles on the next line's ids.
             container.channels.publish(emptyList())
+            container.films.publish(emptyList())
+            container.series.publish(emptyList())
+            container.episodes.publish(emptyList())
             _state.update { it.copy(signedOut = true) }
         }
     }
