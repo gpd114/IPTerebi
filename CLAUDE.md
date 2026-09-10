@@ -150,6 +150,29 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   is then stopped, which also ends the notification. A play key after that
   still works: Android lets a media key start a foreground service from the
   background, and the session's `LivePlayer` rejoins at the live edge.
+- **Live streams drop, and a clean hang-up looks like the end of the stream.**
+  A panel restarting a channel closes the connection normally, and ExoPlayer
+  reports `ENDED` — for live, never true. A phone leaving Wi-Fi fails the read
+  instead. Either way a channel that *has played* is reconnected with a
+  back-off (`LiveReconnect` in `core/`: 1, 2, 4, 8, 15 s, then the error card);
+  one that never played was refused, and says why at once. Three things about
+  how, each learned the hard way:
+
+  ExoPlayer's own retry resumes a progressive stream at the byte it reached,
+  with a Range request. A live panel answers from now with a 200, and the HTTP
+  layer then *skips* every byte already watched — at the pace the panel sends,
+  so after ten minutes, ten minutes of nothing. `LiveFailsFast` stops that,
+  and stops ExoPlayer re-asking three times after a refusal, which measured as
+  four requests per attempt against a panel that had just said no.
+
+  The back-off is waited out inside the data source (`DelayedOpenFactory`),
+  while the player reads as *buffering*, and stop-seek-prepare happens inside
+  the listener so the session never sees the player stopped. Media3 keeps the
+  service in the foreground only while the session is buffering or ready, and
+  once out, Android will not let it back in from the background — so a timer
+  before `prepare()` would reconnect fine on screen and never in a pocket. With
+  the screen off the fake panel's **Drops every 20 s** shows the service
+  foreground throughout.
 - **`prepare()` does nothing unless the player is idle.** `ExoPlayerImpl`
   returns early for any other state, and the first `prepare()` leaves the
   player buffering synchronously — so a second call, or a `prepare()` after

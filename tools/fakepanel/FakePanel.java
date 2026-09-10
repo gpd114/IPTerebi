@@ -78,6 +78,8 @@ public class FakePanel {
                 if (file.startsWith("103.")) {
                     // A line at its connection limit.
                     status(ex, 403);
+                } else if (file.startsWith("104.") || file.startsWith("105.")) {
+                    streamDropping(ex, file.substring(0, 3));
                 } else if (file.endsWith(".ts")) {
                     streamLive(ex);
                 } else {
@@ -149,6 +151,8 @@ public class FakePanel {
                 String news = "{\"num\":1,\"name\":\"Test News HD\",\"stream_id\":101,\"category_id\":\"1\",\"stream_icon\":\"\",\"epg_channel_id\":\"news.test\"}," +
                     "{\"num\":\"2\",\"name\":\"Test Pattern TV\",\"stream_id\":\"102\",\"category_id\":1}," +
                     "{\"num\":3,\"name\":\"Refused (connection limit)\",\"stream_id\":103,\"category_id\":\"1\"}," +
+                    "{\"num\":6,\"name\":\"Drops every 20 s\",\"stream_id\":104,\"category_id\":\"1\"}," +
+                    "{\"num\":7,\"name\":\"Drops, then off air\",\"stream_id\":105,\"category_id\":\"1\"}," +
                     "{\"num\":4,\"name\":\"No stream id A\",\"category_id\":\"1\"}," +
                     "{\"num\":5,\"name\":\"No stream id B\",\"category_id\":\"1\"}";
                 String sport = "{\"num\":\"1\",\"name\":\"Sport One\",\"stream_id\":\"201\",\"category_id\":\"2\",\"stream_icon\":null}";
@@ -241,6 +245,68 @@ public class FakePanel {
      * the player logs as "ended (source closed the connection)" — the same thing
      * a real line's connection limit looks like, so worth knowing it is this.
      */
+    /** When each dropping channel last hung up, and when 105 goes back on air. */
+    static final Map<String, Long> droppedAt = new java.util.concurrent.ConcurrentHashMap<>();
+    static volatile long offAirUntil = 0;
+
+    /**
+     * A channel that plays for about 20 seconds and then closes the connection
+     * cleanly, as a panel restarting a stream does. Sent at the pace it plays,
+     * so the hang-up comes when the picture runs out rather than minutes
+     * earlier into a buffer.
+     *
+     * 104 then refuses a new connection for 2.5 s with a 456, as a panel still
+     * counting the old one does: a reconnect that is too quick is refused, and
+     * one that waits a moment gets in. 105 goes off air for 45 s — longer than
+     * the app keeps trying — and then comes back, for Try again.
+     */
+    static void streamDropping(HttpExchange ex, String id) throws IOException {
+        long now = System.currentTimeMillis();
+        Long last = droppedAt.get(id);
+        if (id.equals("104") && last != null && now - last < 2_500) {
+            log("   (104 refused: old connection still counted)");
+            status(ex, 456);
+            return;
+        }
+        if (id.equals("105") && now < offAirUntil) {
+            log("   (105 off air for " + (offAirUntil - now) / 1000 + " s more)");
+            status(ex, 503);
+            return;
+        }
+        Path file = media.resolve("live.ts");
+        if (!Files.exists(file)) {
+            missing(ex, file);
+            return;
+        }
+        long size = Files.size(file);
+        long perSecond = size / 600; // the clip is 600 s long
+        long toSend = perSecond * 20;
+        ex.getResponseHeaders().set("Content-Type", "video/mp2t");
+        ex.sendResponseHeaders(200, 0);
+        try (OutputStream out = ex.getResponseBody();
+             java.io.InputStream in = Files.newInputStream(file)) {
+            byte[] buf = new byte[16 * 1024];
+            long sent = 0;
+            long start = System.currentTimeMillis();
+            while (sent < toSend) {
+                int n = in.read(buf, 0, (int) Math.min(buf.length, toSend - sent));
+                if (n < 0) break;
+                out.write(buf, 0, n);
+                out.flush();
+                sent += n;
+                // Two seconds up front for the player to start on, then real time.
+                long due = start + (sent - 2 * perSecond) * 1000 / perSecond;
+                long wait = due - System.currentTimeMillis();
+                if (wait > 0) {
+                    try { Thread.sleep(wait); } catch (InterruptedException e) { return; }
+                }
+            }
+        }
+        droppedAt.put(id, System.currentTimeMillis());
+        if (id.equals("105")) offAirUntil = System.currentTimeMillis() + 45_000;
+        log("   (" + id + " hung up after 20 s, as planned)");
+    }
+
     static void streamLive(HttpExchange ex) throws IOException {
         Path file = media.resolve("live.ts");
         if (!Files.exists(file)) {
