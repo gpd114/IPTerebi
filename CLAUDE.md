@@ -121,6 +121,14 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   another can refuse. Some forks report it as HTTP 456, which is not a real
   status code. `describeStreamHttpError` exists to turn these into sentences.
 
+  Switching channel by swiping therefore happens *inside* the player screen,
+  never by navigating to a new one: a new screen animates in while the old is
+  still playing, and for that moment two players hold two connections. And the
+  player is prepared in the effect that runs after the previous player's
+  release, not where it is built — Compose builds the new one before disposing
+  the old, so preparing in the builder opens the next connection first. The
+  fake panel's log shows the old stream closing before the new one is asked for.
+
   So a player the user is not watching should not be holding the line. A
   *paused* ExoPlayer keeps its connection open; a *stopped* one releases it.
   `PlayerScreen` stops on `ON_STOP` for that reason.

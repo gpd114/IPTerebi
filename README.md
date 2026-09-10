@@ -31,6 +31,11 @@ poster grid, played with a seek bar and skip buttons, and paused rather than
 restarted when you come back to the app. Nothing is fetched until the tab is
 first opened, so a line with no films costs nothing.
 
+In the player, swipe up for the next channel and down for the previous one, through
+whichever list the channel was opened from — a category, favourites, recents or
+search results. It wraps at either end, and works on a channel that has just
+been refused, which is where it is most wanted.
+
 Search covers every channel on the line, not just the category on screen.
 Xtream panels offer no search of their own, so the first search fetches the
 full channel list once and keeps it; browsing never does.

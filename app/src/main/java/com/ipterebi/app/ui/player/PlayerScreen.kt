@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.util.Log
+import android.view.MotionEvent
 import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -24,9 +25,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,19 +70,41 @@ import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.describeEpisodeHttpError
 import com.ipterebi.core.describeFilmHttpError
 import com.ipterebi.core.describeStreamHttpError
+import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 @Composable
 fun PlayerScreen(container: AppContainer, playable: Playable, onBack: () -> Unit) {
     val state by container.credentials.state.collectAsStateWithLifecycle(AccountState.Loading)
 
+    // The channel being watched, which swiping changes. Held here rather than
+    // by navigating to a new player: a new screen animates in while the old one
+    // is still playing, so for a moment two players would hold two connections
+    // — and a line that allows one refuses the channel being switched to.
+    // Saveable, so rotation or a process death comes back to the channel that
+    // was on rather than the one first opened.
+    var channelId by rememberSaveable { mutableIntStateOf((playable as? Playable.Channel)?.id ?: 0) }
+
+    // Through the list the channel was opened from — a category, favourites,
+    // recents or search results — wrapping at either end as a television remote
+    // does. Nothing happens when that list is not to hand, after a process death.
+    val zapThroughList: (Int) -> Unit = { step ->
+        val list = container.channels.items.value
+        val here = list.indexOfFirst { it.streamId == channelId }
+        if (here >= 0 && list.size > 1) {
+            channelId = list[(here + step).mod(list.size)].streamId
+        }
+    }
+
     when (val current = state) {
         is AccountState.SignedIn ->
             PlayerContent(
                 container = container,
                 account = current.account,
-                playable = playable,
+                playable = if (playable is Playable.Channel) Playable.Channel(channelId) else playable,
                 onBack = onBack,
+                // Channels only: films and episodes have nothing to switch to.
+                onZap = if (playable is Playable.Channel) zapThroughList else null,
             )
 
         else -> Box(
@@ -97,8 +123,12 @@ private fun PlayerContent(
     account: XtreamAccount,
     playable: Playable,
     onBack: () -> Unit,
+    /** Moves to the next (+1) or previous (-1) channel. Null for films and episodes. */
+    onZap: ((Int) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    // The view's touch listener is created once, so it reads the latest of this.
+    val zap by rememberUpdatedState(onZap)
     val onDemand = playable.isOnDemand
 
     // Looked up from whichever list was on screen, because the id is all that
@@ -190,8 +220,8 @@ private fun PlayerContent(
                         )
                         .build()
                 )
+                // Not prepared here: see the effect below.
                 playWhenReady = true
-                prepare()
             }
     }
 
@@ -278,6 +308,18 @@ private fun PlayerContent(
             }
         }
         player.addListener(listener)
+        // Prepared here rather than where the player is built, because of the
+        // order Compose runs things in. A new player is built during composition,
+        // but the old one is released in this effect's onDispose, which runs
+        // afterwards. Preparing in the builder would open the new channel's
+        // connection while the old one was still open; preparing here, after
+        // the old effect has been disposed, closes one before opening the next.
+        // On a one-connection line that is the difference between switching
+        // channel and being refused.
+        player.prepare()
+        // Show the controls — and with them the name and the guide — whenever
+        // the player is new, so a swipe to the next channel says where it went.
+        playerView.value?.showController()
         onDispose {
             player.removeListener(listener)
             player.release()
@@ -411,6 +453,75 @@ private fun PlayerContent(
                     // focus, so it is given it.
                     isFocusable = true
                     playerView.value = this
+
+                    // Swipe up for the next channel, down for the previous. On
+                    // the view itself rather than a Compose layer over it: a
+                    // Compose layer would take every touch, and tapping to show
+                    // the controls would stop working.
+                    //
+                    // Judged by how far the finger travelled, not by how fast
+                    // it was going when it lifted. Android's fling detection
+                    // needs speed at the moment of lifting, and people often
+                    // swipe, slow, and then let go — measured on an emulator,
+                    // where most swipes were never reported as flings at all.
+                    val swipeDistance = 60 * resources.displayMetrics.density
+                    var downX = 0f
+                    var downY = 0f
+                    var tracking = false
+                    setOnTouchListener { view, event ->
+                        when (event.actionMasked) {
+                            MotionEvent.ACTION_DOWN -> {
+                                downX = event.x
+                                downY = event.y
+                                tracking = true
+                                // The rest of a gesture only comes to a view that
+                                // claims its first touch, and the player stops
+                                // claiming touches when its controls are off —
+                                // which they are while an error is up. Without
+                                // this, a refused channel could not be swiped
+                                // past: the one place a swipe is most wanted.
+                                // So the touch is claimed here, and still handed
+                                // to the player so that a tap stays a tap. Not
+                                // for films, which have nothing to swipe to:
+                                // returning false leaves them to the player as
+                                // before, and handing the touch over as well
+                                // would give it the same touch twice.
+                                if (zap != null) {
+                                    view.onTouchEvent(event)
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                            // A second finger is a pinch, never a swipe.
+                            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> {
+                                tracking = false
+                                false
+                            }
+                            MotionEvent.ACTION_UP -> {
+                                val step = zap
+                                val dy = event.y - downY
+                                val dx = event.x - downX
+                                // Clearly vertical and clearly deliberate: a
+                                // sideways drag, or a nudge, changes nothing.
+                                val swiped = tracking && step != null &&
+                                    abs(dy) >= swipeDistance && abs(dy) >= 2 * abs(dx)
+                                tracking = false
+                                if (swiped) {
+                                    // The player saw the touch go down and would
+                                    // take this lift as a tap, hiding the
+                                    // controls about to be shown. A cancel ends
+                                    // its gesture cleanly instead.
+                                    val cancel = MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_CANCEL }
+                                    view.onTouchEvent(cancel)
+                                    cancel.recycle()
+                                    step?.invoke(if (dy < 0) 1 else -1)
+                                }
+                                swiped
+                            }
+                            else -> false
+                        }
+                    }
                     // Once, when created: asking on every update would pull focus back
                     // off the Try again button the moment an error drew it.
                     post { requestFocus() }
@@ -459,6 +570,25 @@ private fun PlayerContent(
             )
         }
 
+        // While an error is up, the player's own controls are switched off.
+        // Media3 raises them when playback fails and they take focus, so on a
+        // remote OK went to their settings gear rather than to Try again —
+        // measured on an emulator, not supposed. They have nothing to offer
+        // here anyway: there is nothing to play or seek.
+        //
+        // Keyed on whether an error is showing, not switched on and off by
+        // hand. It used to be: off when the error appeared, on again only from
+        // Try again — so swiping away from a refused channel left them off for
+        // good, and a tap did nothing on every channel after.
+        val showingError = error != null
+        LaunchedEffect(showingError) {
+            playerView.value?.apply {
+                useController = !showingError
+                isFocusable = !showingError
+                if (!showingError) requestFocus()
+            }
+        }
+
         error?.let { message ->
             Column(
                 modifier = Modifier
@@ -483,12 +613,8 @@ private fun PlayerContent(
                         if (!onDemand) player.seekToDefaultPosition()
                         player.prepare()
                         player.play()
-                        // The controls come back, and with them the remote.
-                        playerView.value?.apply {
-                            useController = true
-                            isFocusable = true
-                            requestFocus()
-                        }
+                        // Clearing the error brings the controls, and with
+                        // them the remote, back — see showingError above.
                     },
                     modifier = Modifier
                         .padding(top = 16.dp)
@@ -496,16 +622,9 @@ private fun PlayerContent(
                         .focusRing(),
                 ) { Text("Try again") }
             }
-            // While an error is up, the player's own controls are switched off.
-            // Media3 raises them when playback fails and they take focus, so
-            // on a remote OK went to their settings gear rather than to Try
-            // again — measured on an emulator, not supposed. They have nothing
-            // to offer here anyway: there is nothing to play or seek.
+            // Focus to the button when the error appears, so on a remote OK
+            // means "try again".
             LaunchedEffect(message) {
-                playerView.value?.apply {
-                    useController = false
-                    isFocusable = false
-                }
                 retryFocus.requestFocus()
             }
         }
