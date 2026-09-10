@@ -132,6 +132,12 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   So a player the user is not watching should not be holding the line. A
   *paused* ExoPlayer keeps its connection open; a *stopped* one releases it.
   `PlayerScreen` stops on `ON_STOP` for that reason.
+
+  Picture-in-picture leans on exactly this. In the floating window the
+  activity is *paused*, not stopped, so nothing fires and the video carries on;
+  closing the window stops the activity and the same `ON_STOP` lets the
+  connection go. Do not "pause the player on `ON_PAUSE`" — it would freeze the
+  window, and still hold the line.
 - **`prepare()` does nothing unless the player is idle.** `ExoPlayerImpl`
   returns early for any other state, and the first `prepare()` leaves the
   player buffering synchronously — so a second call, or a `prepare()` after
