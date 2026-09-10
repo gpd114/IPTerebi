@@ -4,8 +4,10 @@ import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.ipterebi.app.R
 
 /**
  * Keeps a stream playing while the screen is off.
@@ -33,6 +35,17 @@ class PlaybackService : MediaSessionService() {
             // a started service outlives the screen that bound it unless told.
             if (sessions.isEmpty()) stopSelf()
         }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        // The app's own set in the status bar, rather than Media3's generic
+        // note — which reads as a music player, not a television.
+        setMediaNotificationProvider(
+            DefaultMediaNotificationProvider.Builder(this).build().apply {
+                setSmallIcon(R.drawable.ic_notification)
+            }
+        )
     }
 
     override fun onBind(intent: Intent?): IBinder? =

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The small icon in the status bar and the media notification. Android draws
+  it in plain white from its shape alone, so this is the monochrome icon,
+  cropped to the set: white where it is solid, transparent where the screen is.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="64"
+    android:viewportHeight="64"
+    android:tint="#FFFFFF">
+    <group
+        android:translateX="-22"
+        android:translateY="-16">
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="4.5"
+            android:strokeLineCap="round"
+            android:pathData="M54,36 L45,25 M54,36 L64,26" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M40.5,25 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0 z M59.5,26 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0 z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M39,36 h30 a11,11 0 0,1 11,11 v18 a11,11 0 0,1 -11,11 h-30 a11,11 0 0,1 -11,-11 v-18 a11,11 0 0,1 11,-11 z M40,41 h28 a7,7 0 0,1 7,7 v14 a7,7 0 0,1 -7,7 h-28 a7,7 0 0,1 -7,-7 v-14 a7,7 0 0,1 7,-7 z" />
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3.4"
+            android:strokeLineCap="round"
+            android:pathData="M41,56 q4,-5 8,0 M59,56 q4,-5 8,0 M50,61 q4,4 8,0" />
+    </group>
+</vector>

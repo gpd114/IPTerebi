@@ -1,32 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The Android TV home-screen banner: 320 x 180, the launcher's set-and-ears
-  glyph on the launcher's background. A TV home screen shows this rather than
-  the icon, and without one the app does not appear there at all.
+  The Android TV home-screen banner: 320 x 180, the launcher icon's set on the
+  launcher icon's cobalt. A TV home screen shows this rather than the icon, and
+  without one the app does not appear there at all.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="320dp"
     android:height="180dp"
     android:viewportWidth="320"
     android:viewportHeight="180">
-    <path
-        android:fillColor="@color/ic_launcher_background"
-        android:pathData="M0,0 L320,0 L320,180 L0,180 z" />
-    <!-- The icon's glyph, centred and scaled from its 108-unit viewport. -->
+    <path android:pathData="M0,0 L320,0 L320,180 L0,180 z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="320"
+                android:endY="180">
+                <item android:offset="0" android:color="#FF0E2A52" />
+                <item android:offset="1" android:color="#FF1F63C6" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- The icon's set, from its 108-unit canvas, doubled and centred. -->
     <group
-        android:scaleX="1.8"
-        android:scaleY="1.8"
-        android:translateX="62.8"
-        android:translateY="-12.6">
+        android:scaleX="2"
+        android:scaleY="2"
+        android:translateX="52"
+        android:translateY="-18">
         <path
-            android:strokeColor="#E8EEF4"
-            android:strokeWidth="4"
-            android:strokeLineJoin="round"
-            android:pathData="M32,50 L54,34 L76,50" />
+            android:fillColor="#000000"
+            android:fillAlpha="0.32"
+            android:pathData="M31,83 a23,3.4 0 1,0 46,0 a23,3.4 0 1,0 -46,0 z" />
         <path
-            android:strokeColor="#E8EEF4"
-            android:strokeWidth="4"
-            android:strokeLineJoin="round"
-            android:pathData="M30,52 m0,4 a4,4 0 0 1 4,-4 l40,0 a4,4 0 0 1 4,4 l0,20 a4,4 0 0 1 -4,4 l-40,0 a4,4 0 0 1 -4,-4 z" />
+            android:strokeColor="#EAF1FB"
+            android:strokeWidth="3.4"
+            android:strokeLineCap="round"
+            android:pathData="M54,36 L45,25 M54,36 L64,26" />
+        <path
+            android:fillColor="#FFE066"
+            android:pathData="M41.2,25 a3.8,3.8 0 1,0 7.6,0 a3.8,3.8 0 1,0 -7.6,0 z M60.2,26 a3.8,3.8 0 1,0 7.6,0 a3.8,3.8 0 1,0 -7.6,0 z" />
+        <path
+            android:fillColor="#8FA6C4"
+            android:pathData="M39,41 h30 a11,11 0 0,1 11,11 v16 a11,11 0 0,1 -11,11 h-30 a11,11 0 0,1 -11,-11 v-16 a11,11 0 0,1 11,-11 z" />
+        <path android:pathData="M39,36 h30 a11,11 0 0,1 11,11 v16 a11,11 0 0,1 -11,11 h-30 a11,11 0 0,1 -11,-11 v-16 a11,11 0 0,1 11,-11 z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="54"
+                    android:startY="36"
+                    android:endX="54"
+                    android:endY="74">
+                    <item android:offset="0" android:color="#FFFFFFFF" />
+                    <item android:offset="1" android:color="#FFD5E0EF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path android:pathData="M40,41 h28 a7,7 0 0,1 7,7 v14 a7,7 0 0,1 -7,7 h-28 a7,7 0 0,1 -7,-7 v-14 a7,7 0 0,1 7,-7 z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:type="linear"
+                    android:startX="33"
+                    android:startY="41"
+                    android:endX="75"
+                    android:endY="69">
+                    <item android:offset="0" android:color="#FF3A2F6E" />
+                    <item android:offset="1" android:color="#FF211A45" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <group>
+            <clip-path android:pathData="M40,41 h28 a7,7 0 0,1 7,7 v14 a7,7 0 0,1 -7,7 h-28 a7,7 0 0,1 -7,-7 v-14 a7,7 0 0,1 7,-7 z" />
+            <path
+                android:fillColor="#FFFFFF"
+                android:fillAlpha="0.1"
+                android:pathData="M33,41 L55,41 L40,69 L33,69 z" />
+        </group>
+        <path
+            android:strokeColor="#FFE066"
+            android:strokeWidth="2.8"
+            android:strokeLineCap="round"
+            android:pathData="M41,56 q4,-5 8,0 M59,56 q4,-5 8,0" />
+        <path
+            android:strokeColor="#FF8FA3"
+            android:strokeWidth="2.6"
+            android:strokeLineCap="round"
+            android:pathData="M50,61 q4,4 8,0" />
+        <path
+            android:fillColor="#FF6B8B"
+            android:fillAlpha="0.75"
+            android:pathData="M36.4,62 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 z M66.4,62 a2.6,2.6 0 1,0 5.2,0 a2.6,2.6 0 1,0 -5.2,0 z" />
     </group>
 </vector>
