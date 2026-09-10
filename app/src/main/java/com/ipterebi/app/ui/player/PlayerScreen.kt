@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.util.Log
+import android.util.Rational
 import android.view.MotionEvent
 import android.view.View
 import androidx.compose.foundation.background
@@ -156,6 +157,7 @@ private fun PlayerContent(
     val scope = rememberCoroutineScope()
     var recorded by remember(playable) { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
+    var videoAspect by remember { mutableStateOf<Rational?>(null) }
 
     // A plain reference rather than state: nothing redraws when it is set, and
     // setting state from inside a view factory would be a write mid-composition.
@@ -284,6 +286,9 @@ private fun PlayerContent(
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG_PLAY, "${playable.logName()} video ${videoSize.width}x${videoSize.height}")
                 }
+                // So a picture-in-picture window is the shape of the picture.
+                pictureInPictureAspect(videoSize.width, videoSize.height, videoSize.pixelWidthHeightRatio)
+                    ?.let { videoAspect = it }
             }
 
             override fun onPlayerError(e: PlaybackException) {
@@ -383,6 +388,7 @@ private fun PlayerContent(
     }
 
     val activity = remember(context) { context.findActivity() }
+    val inPictureInPicture = rememberPictureInPicture(activity, videoAspect)
     DisposableEffect(activity) {
         val previousOrientation = activity?.requestedOrientation
         val controller = activity?.window?.let { window ->
@@ -532,8 +538,9 @@ private fun PlayerContent(
         )
 
         // Also while an error is up: the controls are switched off then, and
-        // the way out and the name of what failed should not go with them.
-        if (controlsVisible || error != null) {
+        // the way out and the name of what failed should not go with them. Never
+        // in picture-in-picture, where the window is the size of a stamp.
+        if ((controlsVisible || error != null) && !inPictureInPicture) {
             IconButton(
                 onClick = onBack,
                 modifier = Modifier
@@ -580,16 +587,19 @@ private fun PlayerContent(
         // hand. It used to be: off when the error appeared, on again only from
         // Try again — so swiping away from a refused channel left them off for
         // good, and a tap did nothing on every channel after.
+        //
+        // Off in picture-in-picture too, where the system draws its own.
         val showingError = error != null
-        LaunchedEffect(showingError) {
+        val controlsWanted = !showingError && !inPictureInPicture
+        LaunchedEffect(controlsWanted) {
             playerView.value?.apply {
-                useController = !showingError
-                isFocusable = !showingError
-                if (!showingError) requestFocus()
+                useController = controlsWanted
+                isFocusable = controlsWanted
+                if (controlsWanted) requestFocus()
             }
         }
 
-        error?.let { message ->
+        error?.takeIf { !inPictureInPicture }?.let { message ->
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)

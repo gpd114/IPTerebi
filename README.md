@@ -36,6 +36,11 @@ whichever list the channel was opened from — a category, favourites, recents o
 search results. It wraps at either end, and works on a channel that has just
 been refused, which is where it is most wanted.
 
+Leaving the app from the player — the home button or gesture — keeps the video
+playing in a small floating window (Android 8 and later). Tap it for the system's
+controls or to go back to full screen; close it and the stream stops, freeing
+the line's connection.
+
 Search covers every channel on the line, not just the category on screen.
 Xtream panels offer no search of their own, so the first search fetches the
 full channel list once and keeps it; browsing never does.
