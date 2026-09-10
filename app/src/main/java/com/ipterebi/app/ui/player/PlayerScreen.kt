@@ -210,28 +210,36 @@ private fun PlayerContent(
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, player) {
-        // Only true once the app has actually been away. The player above is
-        // built already prepared, and addObserver replays the owner's current
-        // state into a new observer — so ON_START arrives here immediately,
-        // before anything has happened. Re-preparing on that first one tears
-        // down the request that was just opened and dials the panel a second
-        // time within milliseconds, which on a one-connection line is precisely
-        // the refusal this app spends most of its error messages explaining.
+        // Only true once the app has actually been away. addObserver replays the
+        // owner's current state into a new observer, so ON_START arrives here
+        // once at registration before anything has happened, and there is
+        // nothing to rejoin yet.
         var wasStopped = false
 
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
+                // Stopped rather than paused, for two reasons.
+                //
+                // pause() keeps the player prepared, and prepare() is a no-op on
+                // a player that is not idle — so pausing here and "re-preparing"
+                // on return does nothing at all, and live television resumes from
+                // a buffer that is stale by however long the app was away.
+                // stop() is what makes the later prepare() real.
+                //
+                // It also lets go of the stream. A paused player keeps its
+                // connection open, and on a line that allows one stream that is
+                // the whole line held by an app in the background.
                 Lifecycle.Event.ON_STOP -> {
                     wasStopped = true
-                    player.pause()
+                    player.stop()
                 }
 
-                // Re-prepared rather than resumed. This is live television: the
-                // buffer held across a trip to the home screen is stale by
-                // however long the app was away, and resuming plays that back
-                // minutes behind the broadcast.
+                // Rejoined at the live edge rather than resumed. stop() keeps the
+                // playback position, and for HLS that position has usually slid
+                // out of the live window while the app was away.
                 Lifecycle.Event.ON_START -> if (wasStopped) {
                     wasStopped = false
+                    player.seekToDefaultPosition()
                     player.prepare()
                     player.play()
                 }
@@ -328,6 +336,11 @@ private fun PlayerContent(
                 Button(
                     onClick = {
                         error = null
+                        // An error leaves the player idle, so this prepare() is
+                        // real. The seek is for the same reason as on return
+                        // from the background: rejoin the broadcast, not the
+                        // point it failed at.
+                        player.seekToDefaultPosition()
                         player.prepare()
                         player.play()
                     },
