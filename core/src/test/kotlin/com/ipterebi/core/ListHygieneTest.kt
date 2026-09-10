@@ -62,8 +62,8 @@ class ListHygieneTest {
         // A blank category_id cannot be sent as a get_live_streams filter, so
         // the category could only ever open with nothing in it.
         val categories = listOf(
-            LiveCategory(id = "", name = "Uncategorised"),
-            LiveCategory(id = "3", name = "Sport"),
+            XtreamCategory(id = "", name = "Uncategorised"),
+            XtreamCategory(id = "3", name = "Sport"),
         )
 
         assertEquals(listOf("3"), categories.usableCategories().map { it.id })
@@ -72,9 +72,9 @@ class ListHygieneTest {
     @Test
     fun `a repeated category is listed once`() {
         val categories = listOf(
-            LiveCategory(id = "3", name = "Sport"),
-            LiveCategory(id = "3", name = "Sport"),
-            LiveCategory(id = "4", name = "News"),
+            XtreamCategory(id = "3", name = "Sport"),
+            XtreamCategory(id = "3", name = "Sport"),
+            XtreamCategory(id = "4", name = "News"),
         )
 
         assertEquals(listOf("3", "4"), categories.usableCategories().map { it.id })

@@ -134,6 +134,12 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   property of the panel, not the channel, and `allowed_output_formats` is
   aspirational — panels advertise `m3u8` and then serve a playlist that 404s.
   MPEG-TS is the safer default.
+- **A film is a file, not a stream.** Its URL is `/movie/u/p/{id}.{ext}` where
+  the extension is the film's own `container_extension` — `mp4`, `mkv` and `avi`
+  all turn up on one line. The Stream format setting (TS or HLS) has nothing to
+  do with films and must not follow them: `12345.ts` 404s against a panel
+  holding `12345.mkv`. Error wording is separate for the same reason —
+  `describeFilmHttpError` never suggests changing the format.
 - **Live has no duration.** The seek bar stays empty and the position never
   moves. That is correct, not a bug, and the transport buttons are hidden
   because they could only ever be inert.

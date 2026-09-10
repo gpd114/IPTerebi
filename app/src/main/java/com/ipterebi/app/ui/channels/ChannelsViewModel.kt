@@ -6,7 +6,7 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
-import com.ipterebi.core.LiveCategory
+import com.ipterebi.core.XtreamCategory
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.XtreamException
@@ -39,7 +39,7 @@ sealed interface Shelf {
 }
 
 data class ChannelsUiState(
-    val categories: List<LiveCategory> = emptyList(),
+    val categories: List<XtreamCategory> = emptyList(),
     val shelf: Shelf = Shelf.Panel(null),
     /** What the panel last returned. Not what is necessarily on screen — see [listed]. */
     val channels: List<LiveStream> = emptyList(),

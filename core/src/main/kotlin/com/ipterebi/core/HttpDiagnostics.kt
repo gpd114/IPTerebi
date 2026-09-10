@@ -33,3 +33,22 @@ fun describeStreamHttpError(code: Int): String = when (code) {
         "Other channels will probably still work."
     else -> "The stream could not be opened (HTTP $code)."
 }
+
+/**
+ * The same, for a film. Mostly the same sentences, because the connection limit
+ * applies to films exactly as it does to channels — but a 404 cannot be answered
+ * with "try the other stream format", because that setting has nothing to do
+ * with films. Saying it would send someone to flip a switch that changes
+ * nothing, and then conclude the app is broken.
+ */
+fun describeFilmHttpError(code: Int): String = when (code) {
+    401, 403 -> "The panel refused the film. The usual cause is the connection " +
+        "limit on your line — close whatever else is playing, and give the " +
+        "panel a moment to notice the old connection has gone."
+    456 -> "The line has hit its connection limit."
+    404 -> "The film is not there. It may have been taken out of your package, " +
+        "or the panel has lost the file."
+    in 500..599 -> "The provider's server failed on this film ($code). " +
+        "Other films will probably still play."
+    else -> "The film could not be opened (HTTP $code)."
+}

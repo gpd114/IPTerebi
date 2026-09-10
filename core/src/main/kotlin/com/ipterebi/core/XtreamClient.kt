@@ -23,9 +23,9 @@ fun defaultXtreamHttpClient(): OkHttpClient = OkHttpClient.Builder()
     .build()
 
 /**
- * Everything this app asks an Xtream panel for. Live television only: VOD and
- * series use the same `player_api.php` with different actions and are not
- * wired up yet.
+ * Everything this app asks an Xtream panel for: live television, its guide,
+ * and films. Series use the same `player_api.php` with different actions and
+ * are not wired up yet.
  *
  * [log] receives one line per request with the credentials stripped. Wire it to
  * something that only fires in debug builds — see IPTerebiApi in :app.
@@ -67,9 +67,9 @@ class XtreamClient(
         return info
     }
 
-    suspend fun liveCategories(account: XtreamAccount): List<LiveCategory> = decode(
+    suspend fun liveCategories(account: XtreamAccount): List<XtreamCategory> = decode(
         body = get(account, action = "get_live_categories"),
-        deserializer = ListSerializer(LiveCategory.serializer()),
+        deserializer = ListSerializer(XtreamCategory.serializer()),
         what = "the category list",
     ).usableCategories().also { log("  parsed ${it.size} usable categories") }
 
@@ -99,6 +99,41 @@ class XtreamClient(
                 (channels.firstOrNull()?.let { ", first: ${it.name} (id ${it.streamId})" } ?: "")
         )
         channels
+    }
+
+    suspend fun vodCategories(account: XtreamAccount): List<XtreamCategory> = decode(
+        body = get(account, action = "get_vod_categories"),
+        deserializer = ListSerializer(XtreamCategory.serializer()),
+        what = "the film categories",
+    ).usableCategories().also { log("  parsed ${it.size} usable film categories") }
+
+    /**
+     * Films, optionally in one category. Same size problem as the channel list,
+     * so the UI asks one category at a time for the same reason.
+     */
+    suspend fun vodStreams(
+        account: XtreamAccount,
+        categoryId: String? = null,
+    ): List<VodStream> = decode(
+        body = get(
+            account = account,
+            action = "get_vod_streams",
+            params = categoryId?.let { mapOf("category_id" to it) }.orEmpty(),
+        ),
+        deserializer = ListSerializer(VodStream.serializer()),
+        what = "the film list",
+    ).let { parsed ->
+        val films = parsed.playableFilms()
+        log(
+            "  parsed ${parsed.size} films in category ${categoryId ?: "(all)"}" +
+                (if (films.size != parsed.size) {
+                    ", ${parsed.size - films.size} dropped as unplayable"
+                } else "") +
+                (films.firstOrNull()?.let {
+                    ", first: ${it.name} (id ${it.streamId}, .${it.playbackExtension})"
+                } ?: "")
+        )
+        films
     }
 
     /**
@@ -155,11 +190,37 @@ class XtreamClient(
      * it, and be careful about putting it anywhere a crash reporter can see.
      */
     fun liveStreamUrl(account: XtreamAccount, streamId: Int): String =
+        mediaUrl(account, "live", streamId, account.format.extension)
+
+    /**
+     * Where a film is.
+     *
+     * Note what is *not* here: [XtreamAccount.format]. That setting picks
+     * between MPEG-TS and HLS for live television, and neither has anything to
+     * do with a film, which is a file on disk with its own extension. Asking
+     * for `12345.ts` because live television uses `.ts` gets a 404 from a panel
+     * holding the film quite happily — so the extension comes from the film.
+     */
+    fun vodStreamUrl(account: XtreamAccount, film: VodStream): String =
+        mediaUrl(account, "movie", film.streamId, film.playbackExtension)
+
+    /**
+     * Live, films and series differ only in the first path segment and the
+     * extension, so they share this. The credentials are added as path segments
+     * rather than interpolated, so a password containing `/` or a space is
+     * encoded instead of inventing a path.
+     */
+    private fun mediaUrl(
+        account: XtreamAccount,
+        section: String,
+        id: Int,
+        extension: String,
+    ): String =
         requireBase(account).newBuilder()
-            .addPathSegment("live")
+            .addPathSegment(section)
             .addPathSegment(account.username)
             .addPathSegment(account.password)
-            .addPathSegment("$streamId.${account.format.extension}")
+            .addPathSegment("$id.$extension")
             .build()
             .toString()
 
