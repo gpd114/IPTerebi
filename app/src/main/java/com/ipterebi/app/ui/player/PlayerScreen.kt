@@ -22,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +30,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -55,6 +59,7 @@ import com.ipterebi.app.AppContainer
 import com.ipterebi.app.BuildConfig
 import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.app.data.AccountState
+import com.ipterebi.app.ui.focusRing
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.VodStream
 import com.ipterebi.core.XtreamAccount
@@ -121,6 +126,11 @@ private fun PlayerContent(
     val scope = rememberCoroutineScope()
     var recorded by remember(playable) { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
+
+    // A plain reference rather than state: nothing redraws when it is set, and
+    // setting state from inside a view factory would be a write mid-composition.
+    val playerView = remember { ViewRef<PlayerView>() }
+    val retryFocus = remember { FocusRequester() }
 
     val url = remember(playable, account) {
         when (playable) {
@@ -375,20 +385,45 @@ private fun PlayerContent(
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { visibility ->
                             controlsVisible = visibility == View.VISIBLE
+                            // Media3 moves focus to play/pause when its controls
+                            // appear. When they time out, that button goes with
+                            // them and focus falls back to Compose, where nothing
+                            // takes key presses — so every press after the first
+                            // auto-hide went nowhere, and the remote was dead
+                            // until the screen was left. Handing focus back to
+                            // the player means the next press shows the controls
+                            // again, as it did the first time.
+                            if (visibility != View.VISIBLE) playerView.value?.requestFocus()
                         }
                     )
+                    // The remote belongs to the player's own controls: OK shows
+                    // them and pauses, left and right skip, and the media keys
+                    // work. They only receive keys while the player view holds
+                    // focus, so it is given it.
+                    isFocusable = true
+                    playerView.value = this
+                    // Once, when created: asking on every update would pull focus back
+                    // off the Try again button the moment an error drew it.
+                    post { requestFocus() }
                 }
             },
             update = { view -> view.player = player },
             modifier = Modifier.fillMaxSize(),
         )
 
-        if (controlsVisible) {
+        // Also while an error is up: the controls are switched off then, and
+        // the way out and the name of what failed should not go with them.
+        if (controlsVisible || error != null) {
             IconButton(
                 onClick = onBack,
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    .padding(8.dp),
+                    .padding(8.dp)
+                    // A tap target, never a focus target. Left focusable, it is
+                    // the first thing a remote lands on — so the first press of
+                    // OK, which everyone uses to pause, left the film instead.
+                    // The remote has its own Back key for leaving.
+                    .focusProperties { canFocus = false },
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
@@ -439,9 +474,30 @@ private fun PlayerContent(
                         if (!onDemand) player.seekToDefaultPosition()
                         player.prepare()
                         player.play()
+                        // The controls come back, and with them the remote.
+                        playerView.value?.apply {
+                            useController = true
+                            isFocusable = true
+                            requestFocus()
+                        }
                     },
-                    modifier = Modifier.padding(top = 16.dp),
+                    modifier = Modifier
+                        .padding(top = 16.dp)
+                        .focusRequester(retryFocus)
+                        .focusRing(),
                 ) { Text("Try again") }
+            }
+            // While an error is up, the player's own controls are switched off.
+            // Media3 raises them when playback fails and they take focus, so
+            // on a remote OK went to their settings gear rather than to Try
+            // again — measured on an emulator, not supposed. They have nothing
+            // to offer here anyway: there is nothing to play or seek.
+            LaunchedEffect(message) {
+                playerView.value?.apply {
+                    useController = false
+                    isFocusable = false
+                }
+                retryFocus.requestFocus()
             }
         }
     }
@@ -478,3 +534,6 @@ private fun Context.findActivity(): Activity? {
     }
     return null
 }
+
+/** Holds a view created inside an AndroidView factory, for calls made outside it. */
+private class ViewRef<T : View>(var value: T? = null)

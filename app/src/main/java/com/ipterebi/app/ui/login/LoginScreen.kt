@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ipterebi.app.AppContainer
+import com.ipterebi.app.ui.DpadTextField
+import com.ipterebi.app.ui.focusRing
 import com.ipterebi.core.StreamFormat
 
 @Composable
@@ -71,57 +74,63 @@ fun LoginScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        OutlinedTextField(
-            value = state.address,
-            onValueChange = viewModel::onAddressChange,
-            label = { Text("Server address") },
-            placeholder = { Text("line.example.com:8080") },
-            supportingText = {
-                Text("A full player_api.php or get.php link works too — it fills in the rest.")
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Uri,
-                imeAction = ImeAction.Next,
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        )
+        DpadTextField(Modifier.fillMaxWidth()) { fieldModifier ->
+            OutlinedTextField(
+                value = state.address,
+                onValueChange = viewModel::onAddressChange,
+                label = { Text("Server address") },
+                placeholder = { Text("line.example.com:8080") },
+                supportingText = {
+                    Text("A full player_api.php or get.php link works too — it fills in the rest.")
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Uri,
+                    imeAction = ImeAction.Next,
+                ),
+                modifier = fieldModifier.fillMaxWidth(),
+            )
+        }
 
         Spacer(Modifier.height(12.dp))
 
-        OutlinedTextField(
-            value = state.username,
-            onValueChange = viewModel::onUsernameChange,
-            label = { Text("Username") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            modifier = Modifier.fillMaxWidth(),
-        )
+        DpadTextField(Modifier.fillMaxWidth()) { fieldModifier ->
+            OutlinedTextField(
+                value = state.username,
+                onValueChange = viewModel::onUsernameChange,
+                label = { Text("Username") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                modifier = fieldModifier.fillMaxWidth(),
+            )
+        }
 
         Spacer(Modifier.height(12.dp))
 
-        OutlinedTextField(
-            value = state.password,
-            onValueChange = viewModel::onPasswordChange,
-            label = { Text("Password") },
-            singleLine = true,
-            visualTransformation =
-                if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password,
-                imeAction = ImeAction.Done,
-            ),
-            trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(
-                        imageVector =
-                            if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                        contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                    )
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
+        DpadTextField(Modifier.fillMaxWidth()) { fieldModifier ->
+            OutlinedTextField(
+                value = state.password,
+                onValueChange = viewModel::onPasswordChange,
+                label = { Text("Password") },
+                singleLine = true,
+                visualTransformation =
+                    if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done,
+                ),
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector =
+                                if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                        )
+                    }
+                },
+                modifier = fieldModifier.fillMaxWidth(),
+            )
+        }
 
         Spacer(Modifier.height(20.dp))
 
@@ -130,6 +139,7 @@ fun LoginScreen(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StreamFormat.entries.forEach { format ->
                 FilterChip(
+                    modifier = Modifier.focusRing(FilterChipDefaults.shape),
                     selected = state.format == format,
                     onClick = { viewModel.onFormatChange(format) },
                     label = { Text(format.label) },

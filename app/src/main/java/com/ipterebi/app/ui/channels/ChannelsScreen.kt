@@ -27,6 +27,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +49,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.ipterebi.app.AppContainer
+import com.ipterebi.app.ui.DpadTextField
+import com.ipterebi.app.ui.focusRing
 import com.ipterebi.core.LiveStream
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -74,16 +77,19 @@ fun ChannelsScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
 
-            OutlinedTextField(
-                value = state.query,
-                onValueChange = viewModel::onQueryChange,
-                placeholder = { Text("Search this list") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+            // Click-to-edit under a remote: this sits above the list, so without
+            // it every trip up the channels would pass through it and open a
+            // keyboard. See DpadTextField.
+            DpadTextField(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) { fieldModifier ->
+                OutlinedTextField(
+                    value = state.query,
+                    onValueChange = viewModel::onQueryChange,
+                    placeholder = { Text("Search this list") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    singleLine = true,
+                    modifier = fieldModifier.fillMaxWidth(),
+                )
+            }
 
             // Only offered once there is something to carry on with, and hidden
             // while already looking at the recents shelf, where it would sit
@@ -149,6 +155,7 @@ private fun ShelfChips(state: ChannelsUiState, onSelect: (Shelf) -> Unit) {
         if (state.favourites.isNotEmpty()) {
             item {
                 FilterChip(
+                    modifier = Modifier.focusRing(FilterChipDefaults.shape),
                     selected = state.shelf == Shelf.Favourites,
                     onClick = { onSelect(Shelf.Favourites) },
                     label = { Text("Favourites") },
@@ -158,6 +165,7 @@ private fun ShelfChips(state: ChannelsUiState, onSelect: (Shelf) -> Unit) {
         if (state.recents.isNotEmpty()) {
             item {
                 FilterChip(
+                    modifier = Modifier.focusRing(FilterChipDefaults.shape),
                     selected = state.shelf == Shelf.Recent,
                     onClick = { onSelect(Shelf.Recent) },
                     label = { Text("Recent") },
@@ -167,6 +175,7 @@ private fun ShelfChips(state: ChannelsUiState, onSelect: (Shelf) -> Unit) {
         if (state.categories.isNotEmpty()) {
             item {
                 FilterChip(
+                    modifier = Modifier.focusRing(FilterChipDefaults.shape),
                     selected = state.shelf == Shelf.Panel(null),
                     onClick = { onSelect(Shelf.Panel(null)) },
                     label = { Text("All") },
@@ -174,6 +183,7 @@ private fun ShelfChips(state: ChannelsUiState, onSelect: (Shelf) -> Unit) {
             }
             items(state.categories, key = { it.id }) { category ->
                 FilterChip(
+                    modifier = Modifier.focusRing(FilterChipDefaults.shape),
                     selected = state.shelf == Shelf.Panel(category.id),
                     onClick = { onSelect(Shelf.Panel(category.id)) },
                     label = { Text(category.name) },
@@ -200,6 +210,7 @@ private fun ResumeBar(channel: LiveStream, onClick: () -> Unit) {
             .padding(horizontal = 16.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
+            .focusRing(RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -237,6 +248,7 @@ private fun ChannelRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .focusRing()
             .clickable(onClick = onClick)
             .padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
