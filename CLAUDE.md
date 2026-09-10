@@ -189,6 +189,12 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   overnight. Stored lists match on `streamId` alone for that reason; matching a
   whole record would quietly empty someone's favourites the next time their
   provider tidied up.
+- **The API has no search.** Finding a channel outside the loaded category
+  means holding every channel, which is the large request everything else
+  avoids. So the channel list fetches it once, the first time something is
+  searched, and keeps it — with names normalised once into a `NameIndex`, since
+  re-normalising tens of thousands of names per keystroke is the slow part. A
+  failed fetch falls back to searching what is on screen, and says so.
 - **A whole channel list can be tens of thousands of entries.** Asking
   `get_live_streams` with no category is several megabytes on a large line, so
   the UI loads one category at a time and the player is navigated to with a

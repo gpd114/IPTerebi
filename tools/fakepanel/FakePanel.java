@@ -142,18 +142,24 @@ public class FakePanel {
                     "{\"category_id\":2,\"category_name\":\"Sport\"}," +
                     "{\"category_id\":\"\",\"category_name\":\"Blank id\"}," +
                     "{\"category_id\":\"1\",\"category_name\":\"News\"}]";
-            case "get_live_streams":
-                if ("2".equals(q.get("category_id"))) {
-                    return "[{\"num\":\"1\",\"name\":\"Sport One\",\"stream_id\":\"201\",\"category_id\":\"2\",\"stream_icon\":null}]";
-                }
+            case "get_live_streams": {
                 // Ids as numbers and strings, one refusing channel, and two with
                 // no stream_id at all — they would share list key 0 and crash
                 // the list if they got through.
-                return "[{\"num\":1,\"name\":\"Test News HD\",\"stream_id\":101,\"category_id\":\"1\",\"stream_icon\":\"\",\"epg_channel_id\":\"news.test\"}," +
+                String news = "{\"num\":1,\"name\":\"Test News HD\",\"stream_id\":101,\"category_id\":\"1\",\"stream_icon\":\"\",\"epg_channel_id\":\"news.test\"}," +
                     "{\"num\":\"2\",\"name\":\"Test Pattern TV\",\"stream_id\":\"102\",\"category_id\":1}," +
                     "{\"num\":3,\"name\":\"Refused (connection limit)\",\"stream_id\":103,\"category_id\":\"1\"}," +
                     "{\"num\":4,\"name\":\"No stream id A\",\"category_id\":\"1\"}," +
-                    "{\"num\":5,\"name\":\"No stream id B\",\"category_id\":\"1\"}]";
+                    "{\"num\":5,\"name\":\"No stream id B\",\"category_id\":\"1\"}";
+                String sport = "{\"num\":\"1\",\"name\":\"Sport One\",\"stream_id\":\"201\",\"category_id\":\"2\",\"stream_icon\":null}";
+                String category = q.get("category_id");
+                // No category means every channel on the line, as on a real
+                // panel — which is what searching every channel asks for.
+                if (category == null || category.isEmpty()) return "[" + news + "," + sport + "]";
+                if (category.equals("2")) return "[" + sport + "]";
+                if (category.equals("1")) return "[" + news + "]";
+                return "[]";
+            }
             case "get_short_epg":
                 // A guide for 101 only; every other channel has none, which is the
                 // normal case and must draw nothing rather than an error.

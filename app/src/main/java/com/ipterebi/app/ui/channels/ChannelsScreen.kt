@@ -84,24 +84,32 @@ fun ChannelsScreen(
                 OutlinedTextField(
                     value = state.query,
                     onValueChange = viewModel::onQueryChange,
-                    placeholder = { Text("Search this list") },
+                    placeholder = { Text("Search all channels") },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     singleLine = true,
                     modifier = fieldModifier.fillMaxWidth(),
                 )
             }
 
-            // Only offered once there is something to carry on with, and hidden
-            // while already looking at the recents shelf, where it would sit
-            // directly above the same channel.
-            state.lastWatched?.takeIf { state.shelf != Shelf.Recent }?.let { channel ->
-                ResumeBar(channel = channel, onClick = { onChannel(channel.streamId) })
+            if (state.searching) {
+                SearchStatus(state)
+            } else {
+                // Only offered once there is something to carry on with, and
+                // hidden while already looking at the recents shelf, where it
+                // would sit directly above the same channel.
+                state.lastWatched?.takeIf { state.shelf != Shelf.Recent }?.let { channel ->
+                    ResumeBar(channel = channel, onClick = { onChannel(channel.streamId) })
+                }
+
+                // Hidden while searching: results come from every channel, so a
+                // chip would claim a filter that is not being applied.
+                ShelfChips(state = state, onSelect = viewModel::selectShelf)
             }
 
-            ShelfChips(state = state, onSelect = viewModel::selectShelf)
-
             when {
-                state.error != null -> ErrorPanel(
+                // A search is not answered from the category, so the category's
+                // own error and loading states do not stand in for its results.
+                !state.searching && state.error != null -> ErrorPanel(
                     message = state.error.orEmpty(),
                     onRetry = viewModel::retry,
                     // Only when the panel named no categories. Asking for every
@@ -113,7 +121,7 @@ fun ChannelsScreen(
                     } else null,
                 )
 
-                state.busy && state.channels.isEmpty() ->
+                !state.searching && state.busy && state.channels.isEmpty() ->
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
@@ -308,11 +316,46 @@ private fun ChannelRow(
     }
 }
 
+/**
+ * What is being searched, so a short list of results is not mistaken for the
+ * whole answer. The first search on a line has to fetch every channel, which
+ * on a big line takes a while, and saying so beats a list that silently grows.
+ */
+@Composable
+private fun SearchStatus(state: ChannelsUiState) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (state.indexing) {
+            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+            Spacer(Modifier.size(8.dp))
+        }
+        val count = state.visibleChannels.size
+        Text(
+            text = when {
+                state.indexing -> "Fetching every channel to search…"
+                state.searchNote != null -> state.searchNote
+                count == 1 -> "1 channel matches"
+                else -> "$count channels match"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (state.searchNote != null && !state.indexing) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        )
+    }
+}
+
 /** Says which list is empty, because "no channels" answers a different question. */
 @Composable
 private fun EmptyPanel(state: ChannelsUiState) {
     val message = when {
-        state.query.isNotBlank() -> "Nothing here matches \"${state.query}\"."
+        state.searching && state.indexing -> "Searching every channel…"
+        state.searching && state.searchNote != null -> "Nothing in this list matches \"${state.query}\"."
+        state.searching -> "No channel on this line matches \"${state.query}\"."
         state.shelf == Shelf.Favourites ->
             "No favourites yet. Tap the star beside a channel to keep it here."
         state.shelf == Shelf.Recent -> "Nothing watched yet."
