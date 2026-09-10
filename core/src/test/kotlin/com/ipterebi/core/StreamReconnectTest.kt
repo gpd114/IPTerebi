@@ -6,33 +6,33 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** Reconnecting a live channel that dropped, without hammering a panel that has gone. */
-class LiveReconnectTest {
+/** Reconnecting a stream that dropped, without hammering a panel that has gone. */
+class StreamReconnectTest {
 
-    private fun LiveReconnect.dropsUntilGivingUp(nowMs: Long): List<Long> =
+    private fun StreamReconnect.dropsUntilGivingUp(nowMs: Long): List<Long> =
         generateSequence { onDropped(nowMs) }.toList()
 
     @Test
     fun `a channel that never played is not reconnected`() {
         // Refused at the door: the reason is worth showing, not retrying over.
-        assertNull(LiveReconnect().onDropped(nowMs = 0))
+        assertNull(StreamReconnect().onDropped(nowMs = 0))
     }
 
     @Test
     fun `a dropped channel is retried with growing waits, then given up on`() {
-        val reconnect = LiveReconnect()
+        val reconnect = StreamReconnect()
         reconnect.onPlaying(nowMs = 0)
         assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L, 15_000L), reconnect.dropsUntilGivingUp(nowMs = 5_000))
     }
 
     @Test
     fun `the whole sequence gives up within about half a minute`() {
-        assertTrue(LiveReconnect.DEFAULT_DELAYS_MS.sum() <= 30_000)
+        assertTrue(StreamReconnect.DEFAULT_DELAYS_MS.sum() <= 30_000)
     }
 
     @Test
     fun `failed attempts keep counting until the stream plays again`() {
-        val reconnect = LiveReconnect()
+        val reconnect = StreamReconnect()
         reconnect.onPlaying(nowMs = 0)
         assertEquals(1_000L, reconnect.onDropped(nowMs = 60_000))
         // The reconnect itself is refused — the panel still counts the old
@@ -43,7 +43,7 @@ class LiveReconnectTest {
 
     @Test
     fun `a stream that drops again soon after coming back keeps escalating`() {
-        val reconnect = LiveReconnect()
+        val reconnect = StreamReconnect()
         reconnect.onPlaying(nowMs = 0)
         var now = 60_000L
         val waits = mutableListOf<Long?>()
@@ -58,7 +58,7 @@ class LiveReconnectTest {
 
     @Test
     fun `playing steadily forgives earlier drops`() {
-        val reconnect = LiveReconnect()
+        val reconnect = StreamReconnect()
         reconnect.onPlaying(nowMs = 0)
         reconnect.onDropped(nowMs = 60_000)
         reconnect.onDropped(nowMs = 61_000)
@@ -69,7 +69,7 @@ class LiveReconnectTest {
 
     @Test
     fun `reconnecting is true from a drop until playing again`() {
-        val reconnect = LiveReconnect()
+        val reconnect = StreamReconnect()
         reconnect.onPlaying(nowMs = 0)
         assertFalse(reconnect.reconnecting)
         reconnect.onDropped(nowMs = 60_000)
@@ -80,7 +80,7 @@ class LiveReconnectTest {
 
     @Test
     fun `giving up is not reconnecting`() {
-        val reconnect = LiveReconnect()
+        val reconnect = StreamReconnect()
         reconnect.onPlaying(nowMs = 0)
         reconnect.dropsUntilGivingUp(nowMs = 60_000)
         assertFalse(reconnect.reconnecting)
@@ -88,7 +88,7 @@ class LiveReconnectTest {
 
     @Test
     fun `try again starts over, and a retry that is refused at once is shown, not retried`() {
-        val reconnect = LiveReconnect()
+        val reconnect = StreamReconnect()
         reconnect.onPlaying(nowMs = 0)
         reconnect.dropsUntilGivingUp(nowMs = 60_000)
         reconnect.reset()
