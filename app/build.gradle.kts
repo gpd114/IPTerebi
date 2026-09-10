@@ -71,6 +71,9 @@ dependencies {
     // extractor in media3-exoplayer and needs nothing extra.
     implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
+    // Playing on with the screen off: the media notification, lock-screen and
+    // headphone controls, and the foreground service that keeps the app alive.
+    implementation("androidx.media3:media3-session:1.4.1")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
 }

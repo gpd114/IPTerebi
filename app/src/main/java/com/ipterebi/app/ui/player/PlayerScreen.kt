@@ -4,6 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
+import android.os.Handler
+import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import android.util.Rational
 import android.view.MotionEvent
@@ -48,8 +51,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.core.net.toUri
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -145,6 +151,15 @@ private fun PlayerContent(
             is Playable.Episode -> container.episodes.find(playable.id)?.title
         }
     }
+    // For the notification and the lock screen. Often blank and often a dead
+    // link; either way the notification simply goes without.
+    val artwork = remember(playable) {
+        when (playable) {
+            is Playable.Channel -> channel?.icon
+            is Playable.Film -> container.films.find(playable.id)?.icon
+            is Playable.Episode -> null
+        }?.takeIf { it.isNotBlank() }
+    }
 
     // A film has no guide, and asking the panel for one by a film's id would
     // spend a request on an answer that cannot exist.
@@ -195,6 +210,18 @@ private fun PlayerContent(
 
         ExoPlayer.Builder(context)
             .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
+            // Takes audio focus: a call or a voice note pauses it, a
+            // navigation prompt ducks it, and it no longer plays over music.
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                /* handleAudioFocus = */ true,
+            )
+            // Headphones coming out pause it, rather than carrying on through
+            // the phone's speaker in someone's pocket on a bus.
+            .setHandleAudioBecomingNoisy(true)
             .build()
             .apply {
                 // Holds the network up while the screen is off. Without it a
@@ -219,6 +246,13 @@ private fun PlayerContent(
                                 // exactly what the progressive extractors do.
                                 is Playable.Film, is Playable.Episode -> null
                             }
+                        )
+                        // What the notification and the lock screen show.
+                        .setMediaMetadata(
+                            MediaMetadata.Builder()
+                                .setTitle(title)
+                                .setArtworkUri(artwork?.toUri())
+                                .build()
                         )
                         .build()
                 )
@@ -331,7 +365,10 @@ private fun PlayerContent(
         }
     }
 
+    MediaSessionFor(player, live = playable is Playable.Channel)
+
     val lifecycleOwner = LocalLifecycleOwner.current
+    val power = remember(context) { context.getSystemService(PowerManager::class.java) }
     DisposableEffect(lifecycleOwner, player) {
         // Only true once the app has actually been away. addObserver replays the
         // owner's current state into a new observer, so ON_START arrives here
@@ -339,44 +376,79 @@ private fun PlayerContent(
         // nothing to rejoin yet.
         var wasStopped = false
 
+        // Paused while away — from the notification, the lock screen, or by
+        // headphones coming out — is the line held by nobody listening. It is
+        // let go after a while, not at once: the earbud taken out to answer
+        // someone goes back in, and play should still be there when it does.
+        // Stopping ends the notification, so after that it is the app or nothing.
+        val mainThread = Handler(Looper.getMainLooper())
+        val letGo = Runnable { player.stop() }
+        val pausedWhileAway = object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                mainThread.removeCallbacks(letGo)
+                val away = !lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                if (!playWhenReady && away) mainThread.postDelayed(letGo, PAUSED_AWAY_GRACE_MS)
+            }
+        }
+        player.addListener(pausedWhileAway)
+
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                // Stopped rather than paused, for both kinds, for two reasons.
-                //
-                // pause() keeps the player prepared, and prepare() is a no-op on
-                // a player that is not idle — so pausing here and "re-preparing"
-                // on return does nothing at all. stop() is what makes the later
-                // prepare() real.
-                //
-                // It also lets go of the stream. A paused player keeps its
-                // connection open, and on a line that allows one stream that is
-                // the whole line held by an app in the background — a film no
-                // less than a channel.
-                //
-                // A film or episode is paused first so it comes back paused. Nobody
-                // who pressed home halfway through one wants it to start
-                // again the instant they return; they want it where they left it.
+                // The screen went off with something playing: it plays on, as
+                // sound, with the notification to stop it. That is the one way
+                // of being stopped that means "keep going" — the phone into a
+                // pocket. Picture-in-picture is not stopped at all, so it never
+                // arrives here; closing its window does, with the screen on.
                 Lifecycle.Event.ON_STOP -> {
                     wasStopped = true
+                    if (power?.isInteractive == false && player.playWhenReady) return@LifecycleEventObserver
+
+                    // Anything else — home, another app, the window closed — is
+                    // someone who has finished, and it stops rather than pauses,
+                    // for two reasons.
+                    //
+                    // pause() keeps the player prepared, and prepare() is a no-op
+                    // on a player that is not idle — so pausing here and
+                    // "re-preparing" on return does nothing at all. stop() is
+                    // what makes the later prepare() real.
+                    //
+                    // It also lets go of the stream. A paused player keeps its
+                    // connection open, and on a line that allows one stream that
+                    // is the whole line held by an app in the background — a film
+                    // no less than a channel.
+                    //
+                    // A film or episode is paused first so it comes back paused.
+                    // Nobody who pressed home halfway through one wants it to
+                    // start again the instant they return; they want it where
+                    // they left it.
                     if (onDemand) player.pause()
                     player.stop()
                 }
 
                 Lifecycle.Event.ON_START -> if (wasStopped) {
                     wasStopped = false
+                    mainThread.removeCallbacks(letGo)
+                    // Played on through the screen being off, and still is.
+                    if (player.playWhenReady && player.playbackState != Player.STATE_IDLE) {
+                        return@LifecycleEventObserver
+                    }
                     when (playable) {
                         // Rejoined at the live edge rather than resumed. stop()
                         // keeps the playback position, and for HLS that position
                         // has usually slid out of the live window while the app
-                        // was away.
+                        // was away. Stopped first, because a channel paused from
+                        // the lock screen is still prepared, minutes behind.
                         is Playable.Channel -> {
+                            player.stop()
                             player.seekToDefaultPosition()
                             player.prepare()
                             player.play()
                         }
                         // Reconnected at the position stop() kept, and left
-                        // paused for the user to resume.
-                        is Playable.Film, is Playable.Episode -> player.prepare()
+                        // paused for the user to resume. One paused from the lock
+                        // screen and not yet let go is still connected, and fine.
+                        is Playable.Film, is Playable.Episode ->
+                            if (player.playbackState == Player.STATE_IDLE) player.prepare()
                     }
                 }
 
@@ -384,7 +456,11 @@ private fun PlayerContent(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            player.removeListener(pausedWhileAway)
+            mainThread.removeCallbacks(letGo)
+        }
     }
 
     val activity = remember(context) { context.findActivity() }
@@ -640,6 +716,13 @@ private fun PlayerContent(
         }
     }
 }
+
+/**
+ * How long something paused while the app is away keeps the line before it is
+ * let go. Long enough for an earbud out and back in; short of the minute after
+ * which Android starts winding down a backgrounded app's services.
+ */
+private const val PAUSED_AWAY_GRACE_MS = 30_000L
 
 private fun Playable.logName(): String = when (this) {
     is Playable.Channel -> "channel $id"
