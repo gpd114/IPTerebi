@@ -31,6 +31,10 @@ poster grid, played with a seek bar and skip buttons, and paused rather than
 restarted when you come back to the app. Nothing is fetched until the tab is
 first opened, so a line with no films costs nothing.
 
+Search covers every channel on the line, not just the category on screen.
+Xtream panels offer no search of their own, so the first search fetches the
+full channel list once and keeps it; browsing never does.
+
 Starring a channel keeps it on a Favourites shelf, watching one puts it on a
 Recent shelf, and the last thing watched is offered back as a "carry on
 watching" row. Both shelves are stored per line and cost no request. Resuming is

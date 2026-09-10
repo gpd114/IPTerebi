@@ -6,13 +6,17 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
-import com.ipterebi.core.XtreamCategory
 import com.ipterebi.core.LiveStream
+import com.ipterebi.core.NameIndex
 import com.ipterebi.core.XtreamAccount
+import com.ipterebi.core.XtreamCategory
 import com.ipterebi.core.XtreamException
 import com.ipterebi.core.holds
+import com.ipterebi.core.searchByName
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +26,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Which list the screen is showing.
@@ -59,8 +64,17 @@ data class ChannelsUiState(
      * unfiltered load rather than leaving a line with no way in.
      */
     val offerFullLoad: Boolean = false,
+    /**
+     * Matches for [query] across every channel on the line — or, until the
+     * full list has arrived, across [listed]. Null while not searching.
+     */
+    val results: List<LiveStream>? = null,
+    /** The full channel list is being fetched for the first search. */
+    val indexing: Boolean = false,
+    /** Why search is only covering [listed], when the full list could not be had. */
+    val searchNote: String? = null,
 ) {
-    /** The list the chosen shelf is showing, before the search box narrows it. */
+    /** The list the chosen shelf is showing, when nothing is being searched. */
     val listed: List<LiveStream>
         get() = when (shelf) {
             Shelf.Favourites -> favourites
@@ -68,12 +82,16 @@ data class ChannelsUiState(
             is Shelf.Panel -> channels
         }
 
+    val searching: Boolean get() = query.isNotBlank()
+
+    /**
+     * What is on screen. While searching that is [results], which cover every
+     * channel rather than the shelf underneath — and, for the moment before the
+     * first results are ready, the shelf as it was rather than an empty list
+     * that would read as "nothing matches".
+     */
     val visibleChannels: List<LiveStream>
-        get() = if (query.isBlank()) {
-            listed
-        } else {
-            listed.filter { it.name.contains(query, ignoreCase = true) }
-        }
+        get() = if (searching) results ?: listed else listed
 
     /** The channel to offer as "carry on watching". Null before anything has been played. */
     val lastWatched: LiveStream? get() = recents.firstOrNull()
@@ -102,6 +120,26 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
      */
     private var loadJob: Job? = null
 
+    /**
+     * Every channel on the line, with names ready to search, fetched the first
+     * time anything is searched and kept for as long as this screen lives.
+     *
+     * The Xtream API has no search. The only way to find a channel in a
+     * category you are not looking at is to hold the whole list — the
+     * several-megabyte request everything else here is arranged to avoid. So
+     * it is made once, only when somebody asks to search, and never to browse.
+     */
+    private var index: NameIndex<LiveStream>? = null
+    private var indexJob: Job? = null
+
+    /**
+     * Set when the full list could not be had, so that every keystroke does not
+     * ask again. Cleared when the search box is emptied, so starting a new
+     * search tries once more.
+     */
+    private var indexFailed = false
+    private var searchJob: Job? = null
+
     init {
         val signedIn = container.credentials.state.filterIsInstance<AccountState.SignedIn>()
 
@@ -116,7 +154,14 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
                 val sameLine = previous != null &&
                     previous.base == current.account.base &&
                     previous.username == current.account.username
-                if (!sameLine) startLoad { loadCategories() }
+                if (!sameLine) {
+                    // Another line's channels are not this line's channels.
+                    index = null
+                    indexJob?.cancel()
+                    indexFailed = false
+                    _state.update { it.copy(query = "", results = null, searchNote = null) }
+                    startLoad { loadCategories() }
+                }
             }
         }
 
@@ -133,14 +178,70 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
 
         // The repository is "the channel list currently on screen", which the
         // player reads to put a name on what it is playing. Keeping it fed from
-        // here means a favourite opened from a different category still has a
-        // title, which it would not if only panel responses were published.
+        // here means a favourite or a search result from a category that is not
+        // loaded still has a title, which it would not if only panel responses
+        // were published.
         viewModelScope.launch {
-            _state.map { it.listed }.distinctUntilChanged().collect(container.channels::publish)
+            _state.map { it.visibleChannels }.distinctUntilChanged().collect(container.channels::publish)
         }
     }
 
-    fun onQueryChange(value: String) = _state.update { it.copy(query = value) }
+    fun onQueryChange(value: String) {
+        // The previous results stay up while the next are worked out, rather
+        // than blanking the list on every key.
+        _state.update { it.copy(query = value, results = if (value.isBlank()) null else it.results) }
+        searchJob?.cancel()
+        if (value.isBlank()) {
+            indexFailed = false
+            _state.update { it.copy(searchNote = null) }
+            return
+        }
+        ensureIndex()
+        searchJob = viewModelScope.launch {
+            delay(SEARCH_DEBOUNCE_MS)
+            runSearch(value)
+        }
+    }
+
+    /**
+     * Matches [query] across the index, or across what is on screen when there
+     * is no index yet. Off the main thread: even with names normalised up front,
+     * tens of thousands of comparisons per key is not work for the UI thread.
+     */
+    private suspend fun runSearch(query: String) {
+        val source = index
+        val listed = _state.value.listed
+        val results = withContext(Dispatchers.Default) {
+            source?.search(query) ?: listed.searchByName(query) { it.name }
+        }
+        // A slow search must not overwrite the results of a newer one.
+        _state.update { if (it.query == query) it.copy(results = results) else it }
+    }
+
+    private fun ensureIndex() {
+        if (index != null || indexFailed || indexJob?.isActive == true) return
+        val account = account ?: return
+        indexJob = viewModelScope.launch {
+            _state.update { it.copy(indexing = true, searchNote = null) }
+            try {
+                val everything = container.xtream.liveStreams(account, categoryId = null)
+                index = withContext(Dispatchers.Default) { NameIndex(everything) { it.name } }
+                _state.update { it.copy(indexing = false) }
+                _state.value.query.takeIf { it.isNotBlank() }?.let { runSearch(it) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                indexFailed = true
+                _state.update {
+                    it.copy(
+                        indexing = false,
+                        searchNote = "Could not fetch every channel to search " +
+                            "(${e.message ?: "no reason given"}), so these are matches from this list only.",
+                    )
+                }
+            }
+        }
+    }
 
     /** Favourites and recents come from storage, so neither costs a request. */
     fun selectShelf(shelf: Shelf) {
@@ -238,3 +339,10 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 }
+
+/**
+ * How long typing has to pause before a search runs. Short enough to feel
+ * immediate, long enough that typing "bbc one" searches once rather than seven
+ * times over every channel on the line.
+ */
+private const val SEARCH_DEBOUNCE_MS = 150L
