@@ -134,6 +134,21 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   property of the panel, not the channel, and `allowed_output_formats` is
   aspirational — panels advertise `m3u8` and then serve a playlist that 404s.
   MPEG-TS is the safer default.
+- **`get_series_info` is structurally unreliable, not just loosely typed.**
+  `episodes` is documented as an object of season number → episodes, and also
+  arrives as an array of arrays (seasons by position) or one flat array
+  (grouped by each episode's `season`). `seasons` is often empty while
+  `episodes` is full, so it is used for names only. `parseSeriesDetail` reads
+  the JSON tree by hand for this reason — annotations cannot express "one of
+  three shapes" — and skips an unreadable episode rather than losing the season.
+- **PHP spells an empty object `[]`.** Most panels are PHP, and `json_encode` of
+  an empty associative array is `[]`, so `info: []` and `episodes: []` are what
+  "nothing here" looks like. Anything expecting an object must treat an array
+  as empty rather than throw.
+- **An episode's id is a string, and its URL uses it, not the series id.**
+  `/series/u/p/{episode_id}.{ext}`. It stays a string end to end — parsed
+  nowhere, encoded into routes and URLs — so a panel that uses something
+  non-numeric still plays.
 - **A film is a file, not a stream.** Its URL is `/movie/u/p/{id}.{ext}` where
   the extension is the film's own `container_extension` — `mp4`, `mkv` and `avi`
   all turn up on one line. The Stream format setting (TS or HLS) has nothing to
@@ -182,9 +197,19 @@ Measure before concluding. The panel quirks above are guesswork made concrete;
 each one is pinned by a test in `core/src/test`, and when a provider turns up
 that behaves differently the test is where the new truth goes.
 
-**`app/` compiles but has never been run.** CI builds it green and produces an
-installable APK, and `core/`'s tests pass — but nothing here has ever been
-pointed at a real panel or run on a phone. Everything the UI does is inference
-from the API shapes, so the first session on an actual line is where the real
-answers are. Expect the surprises to be in what panels return, not in whether
-the code builds.
+**`app/` has run on an emulator, never against a real panel.** It has been
+driven end to end on an API 34 emulator against a fake panel — a small local
+server serving generated test media and deliberately malformed responses —
+covering sign-in, live playback with the guide, the background/return
+behaviour, the 403 refusal, films in mp4 and mkv with seeking, and series in
+each `episodes` shape. That proves the app does what the code says. It does not
+prove the code is right about panels: the fake panel only misbehaves in the
+ways already written down here. The first session on an actual line is still
+where the real answers are, and the surprises will be in what panels return.
+
+An emulator run is worth doing for any change to `app/` — the SDK on the dev
+machine has an emulator and a `phone34` AVD, and it caught a real bug (see
+`busy` in `LibraryUiState`) that no test could. Boot it headless with
+`-no-window -gpu swiftshader_indirect`; on a cold boot the launcher and System
+UI time out for a minute or two, and `settings put global hide_error_dialogs 1`
+stops their dialogs eating input. From the emulator the host is `10.0.2.2`.

@@ -10,12 +10,17 @@ with, which is yours to supply.
 
 ## Status
 
-Early. The live-television path is written end to end — sign in, categories,
-channel list, search, playback — and it builds, but it has not yet been run
-against a real panel, so treat "works" as unproven. Not there yet:
+Early. Live television, films and series are written end to end, and have been
+run on an Android emulator against a fake panel built to misbehave the way real
+ones do — but not yet against a real provider, so treat "works" as unproven
+there. Not there yet:
 
-- Series, which use the same API with different actions
 - Android TV and D-pad navigation — this is a phone and tablet build
+
+Series are in: a Series tab, a poster grid of programmes, and each one opening
+onto its seasons and episodes. Specials are listed after the numbered seasons
+rather than before them, and episode titles lose the "Show Name - S01E03 - "
+prefix panels tend to repeat on every one.
 
 Films are in: a Films tab beside Live TV, browsed one category at a time as a
 poster grid, played with a seek bar and skip buttons, and paused rather than
