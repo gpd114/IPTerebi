@@ -41,6 +41,10 @@ playing in a small floating window (Android 8 and later). Tap it for the system'
 controls or to go back to full screen; close it and the stream stops, freeing
 the line's connection.
 
+A channel that drops — the provider restarting it, or the phone leaving Wi-Fi —
+reconnects by itself, waiting a little longer each time, and says so on screen.
+If it has not come back after about half a minute it stops and offers Try again.
+
 Turning the screen off while something plays keeps it playing as sound, with
 controls on the lock screen, in the notification and on headphone buttons.
 Pulling headphones out pauses it rather than switching to the speaker, and a

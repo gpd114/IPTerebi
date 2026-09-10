@@ -7,6 +7,7 @@ import android.content.pm.ActivityInfo
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.util.Log
 import android.util.Rational
 import android.view.MotionEvent
@@ -71,12 +72,14 @@ import com.ipterebi.app.BuildConfig
 import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.app.ui.focusRing
+import com.ipterebi.core.LiveReconnect
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.VodStream
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.describeEpisodeHttpError
 import com.ipterebi.core.describeFilmHttpError
 import com.ipterebi.core.describeStreamHttpError
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -195,6 +198,12 @@ private fun PlayerContent(
     }
     var error by remember(url) { mutableStateOf<String?>(null) }
 
+    // A channel that drops is reconnected; see LiveReconnect for when and how
+    // often. The delay is read by the loading thread, hence atomic.
+    val reconnect = remember(url) { LiveReconnect() }
+    val reconnectDelay = remember(url) { AtomicLong(0) }
+    var reconnecting by remember(url) { mutableStateOf(false) }
+
     val player = remember(url) {
         val httpFactory = DefaultHttpDataSource.Factory()
             // Same reasoning as the API calls: a default user agent gets the
@@ -208,8 +217,16 @@ private fun PlayerContent(
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(20_000)
 
+        val sources = when (playable) {
+            is Playable.Channel ->
+                DefaultMediaSourceFactory(DelayedOpenFactory(httpFactory, reconnectDelay)).apply {
+                    if (account.format == StreamFormat.TS) setLoadErrorHandlingPolicy(LiveFailsFast())
+                }
+            is Playable.Film, is Playable.Episode -> DefaultMediaSourceFactory(httpFactory)
+        }
+
         ExoPlayer.Builder(context)
-            .setMediaSourceFactory(DefaultMediaSourceFactory(httpFactory))
+            .setMediaSourceFactory(sources)
             // Takes audio focus: a call or a voice note pauses it, a
             // navigation prompt ducks it, and it no longer plays over music.
             .setAudioAttributes(
@@ -290,10 +307,47 @@ private fun PlayerContent(
             )
         }
 
+        /**
+         * A channel stopped by itself — the panel hung up, or the connection
+         * failed. Reconnects, or gives up and shows [why].
+         *
+         * Stop, seek and prepare all happen here, inside the listener, so the
+         * stopped state never outlives this call: the media session only sees
+         * where the player ends up, which is buffering. The back-off is waited
+         * out while buffering, in [DelayedOpenFactory]. Both are for the screen
+         * being off — see there.
+         *
+         * Not while paused: a paused channel that drops has nobody waiting on
+         * it, and reconnecting would hold the line for them.
+         */
+        fun dropped(why: String) {
+            val wait = if (player.playWhenReady) reconnect.onDropped(SystemClock.elapsedRealtime()) else null
+            if (wait == null) {
+                reconnecting = false
+                error = why
+                if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} not reconnecting")
+                return
+            }
+            if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} dropped; reconnecting in $wait ms")
+            reconnecting = true
+            reconnectDelay.set(wait)
+            player.stop()
+            player.seekToDefaultPosition()
+            player.prepare()
+        }
+
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG_PLAY, "${playable.logName()} ${playbackStateName(playbackState, playable)}")
+                }
+
+                // Live has no end. A channel that "ends" is a panel that hung up.
+                if (playbackState == Player.STATE_ENDED && playable is Playable.Channel) {
+                    dropped(
+                        "The channel stopped, and reconnecting did not bring it back. " +
+                            "It may be off air, or the panel may be down."
+                    )
                 }
 
                 // Recorded when the channel actually plays, not when it is
@@ -313,6 +367,10 @@ private fun PlayerContent(
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG_PLAY, "${playable.logName()} ${if (isPlaying) "playing" else "stopped"}")
                 }
+                if (isPlaying) {
+                    reconnect.onPlaying(SystemClock.elapsedRealtime())
+                    reconnecting = false
+                }
             }
 
             /** First proof that video is actually arriving, and at what size. */
@@ -326,7 +384,7 @@ private fun PlayerContent(
             }
 
             override fun onPlayerError(e: PlaybackException) {
-                error = when (val cause = e.cause) {
+                val message = when (val cause = e.cause) {
                     is HttpDataSource.InvalidResponseCodeException -> when (playable) {
                         is Playable.Channel -> describeStreamHttpError(cause.responseCode)
                         is Playable.Film -> describeFilmHttpError(cause.responseCode)
@@ -343,6 +401,12 @@ private fun PlayerContent(
                 // logged — only what was playing and how it failed.
                 if (BuildConfig.DEBUG) {
                     Log.w(TAG_PLAY, "${playable.logName()} failed: ${e.errorCodeName}", e)
+                }
+                // A channel that was playing is reconnected, and only says why
+                // if that fails; one that never started says why at once.
+                when (playable) {
+                    is Playable.Channel -> dropped(message)
+                    is Playable.Film, is Playable.Episode -> error = message
                 }
             }
         }
@@ -439,6 +503,10 @@ private fun PlayerContent(
                         // was away. Stopped first, because a channel paused from
                         // the lock screen is still prepared, minutes behind.
                         is Playable.Channel -> {
+                            // A fresh start: whatever went wrong while away —
+                            // reconnecting given up on, say — is not current.
+                            error = null
+                            reconnect.reset()
                             player.stop()
                             player.seekToDefaultPosition()
                             player.prepare()
@@ -675,6 +743,21 @@ private fun PlayerContent(
             }
         }
 
+        // Under the player's own buffering spinner, which is already turning:
+        // the wait before a reconnect reads as buffering, deliberately.
+        if (reconnecting && error == null && !inPictureInPicture) {
+            Text(
+                text = "Reconnecting…",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(top = 96.dp)
+                    .background(Color(0x99000000))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+            )
+        }
+
         error?.takeIf { !inPictureInPicture }?.let { message ->
             Column(
                 modifier = Modifier
@@ -692,11 +775,19 @@ private fun PlayerContent(
                 Button(
                     onClick = {
                         error = null
+                        reconnect.reset()
+                        reconnectDelay.set(0)
                         // An error leaves the player idle, so this prepare() is
                         // real. A channel rejoins the broadcast rather than the
                         // point it failed at; a film carries on from where it
                         // stopped, which is the point of it having a position.
-                        if (!onDemand) player.seekToDefaultPosition()
+                        // Stopped first for a channel, which may have given up
+                        // on reconnecting from ended rather than from idle —
+                        // and prepare() on an ended player does nothing.
+                        if (!onDemand) {
+                            player.stop()
+                            player.seekToDefaultPosition()
+                        }
                         player.prepare()
                         player.play()
                         // Clearing the error brings the controls, and with

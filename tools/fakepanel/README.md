@@ -46,6 +46,8 @@ the app. If the app misbehaves here, that is the place to look.
 | Every channel when no category is given, as a real panel does | Searching all channels: search from **News** for "sport" and **Sport One**, in another category, has to turn up |
 | Ids quoted in one record and bare in the next | The flexible serialisers |
 | **Refused (connection limit)**, which answers 403 | The error wording, and Try again being reachable with a remote |
+| **Drops every 20 s**: hangs up cleanly after 20 s of playing, and answers 456 to a reconnect within 2.5 s of that, as a panel still counting the old connection does | Reconnecting a dropped channel, the "Reconnecting…" label, and — with the screen off — the app staying in the foreground through it. Dropping this often, it runs out of attempts on about the sixth drop, which is correct |
+| **Drops, then off air**: hangs up after 20 s, then answers 503 for 45 s | The back-off (one request per attempt, 1, 2, 4, 8, 15 s apart), giving up after about half a minute with Try again, and Try again working once it is back |
 | A guide for **Test News HD** only: base64 titles, one timestamp quoted and one bare, and `start`/`end` strings that are deliberately wrong | `decodeEpgText`, and the guide reading timestamps rather than strings. Every other channel has no guide, the normal case |
 | A film in mp4 and one in mkv | Film URLs using the film's own extension, not the live stream format; the mkv needs a ranged read of its index before it starts |
 | **Test Horses**: episodes keyed by season and out of order, specials in season 0, an empty `seasons`, an episode with `info: []`, a repeated and a blank episode id, titles with a `Show - S01E01 - ` prefix | `parseSeriesDetail` — the order, the names, the damage limitation, and the title clean-up |
@@ -59,9 +61,10 @@ the app. If the app misbehaves here, that is the place to look.
 - **HLS.** Only MPEG-TS is served, so switching the Stream format setting to HLS
   gets a 404 — a realistic answer, but not a test of HLS playback.
 - **Live that never ends.** The "live" stream is ten minutes long and then the
-  connection closes; the player logs that as `ended (source closed the
-  connection)`, which on a real line is usually the connection limit.
-- **A connection limit.** Only channel 103 refuses; nothing counts connections.
+  connection closes, which the app treats as a drop and reconnects — so the
+  test pattern starts again from 0.
+- **A connection limit.** Only channels 103 and 104 refuse, each on its own
+  rule; nothing counts connections across channels.
 - **Anything a real provider does that is not written down yet.** It only
   misbehaves in the ways already known. The first session on an actual line is
   still where the new ones will turn up — and each one found belongs here as
