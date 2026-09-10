@@ -7,6 +7,21 @@ package com.ipterebi.core
  * Turning them into a sentence is most of the support burden of an IPTV client.
  */
 
+/**
+ * Not real HTTP codes. Panel forks use them for exactly one condition, the
+ * connection limit, and it is worth naming rather than reporting as a number.
+ *
+ * 456 comes from several forks. 458 was measured on a real line: answered to
+ * every reconnect for about fifteen seconds after the phone left Wi-Fi, while
+ * the panel still counted the connection that had dropped, and then let the
+ * next one in.
+ */
+private val CONNECTION_LIMIT_CODES = setOf(456, 458)
+
+private const val AT_CONNECTION_LIMIT = "The line has hit its connection limit. If " +
+    "nothing else is playing, the panel may still be counting a connection that " +
+    "just dropped — try again in a few seconds."
+
 fun describeApiHttpError(code: Int, host: String): String = when (code) {
     401, 403 -> "$host refused the request. Either the username and password " +
         "are wrong, or the panel is rejecting this client — try a different " +
@@ -23,9 +38,7 @@ fun describeStreamHttpError(code: Int): String = when (code) {
     401, 403 -> "The panel refused the stream. The usual cause is the " +
         "connection limit on your line — close whatever else is playing, and " +
         "give the panel a moment to notice the old connection has gone."
-    // Not a real HTTP code. Several panel forks return it for exactly one
-    // condition, and it is worth naming rather than reporting as a number.
-    456 -> "The line has hit its connection limit."
+    in CONNECTION_LIMIT_CODES -> AT_CONNECTION_LIMIT
     404 -> "The channel is not there. Either it has been removed from your " +
         "package, or this panel does not serve this output format — try " +
         "switching between MPEG-TS and HLS in settings."
@@ -48,7 +61,7 @@ fun describeOnDemandHttpError(code: Int, noun: String): String = when (code) {
     401, 403 -> "The panel refused the $noun. The usual cause is the connection " +
         "limit on your line — close whatever else is playing, and give the " +
         "panel a moment to notice the old connection has gone."
-    456 -> "The line has hit its connection limit."
+    in CONNECTION_LIMIT_CODES -> AT_CONNECTION_LIMIT
     404 -> "The $noun is not there. It may have been taken out of your package, " +
         "or the panel has lost the file."
     in 500..599 -> "The provider's server failed on this $noun ($code). " +
