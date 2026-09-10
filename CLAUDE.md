@@ -119,7 +119,10 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   allows one stream at a time, and the panel takes a moment to notice the
   previous connection has gone — so leaving a channel and immediately opening
   another can refuse. Some forks report it as HTTP 456, which is not a real
-  status code. `describeStreamHttpError` exists to turn these into sentences.
+  status code, and a real line answered 458 — to every reconnect for about
+  fifteen seconds after a phone left Wi-Fi, until it stopped counting the
+  dropped connection. `describeStreamHttpError` exists to turn these into
+  sentences.
 
   Switching channel by swiping therefore happens *inside* the player screen,
   never by navigating to a new one: a new screen animates in while the old is
@@ -296,16 +299,21 @@ Measure before concluding. The panel quirks above are guesswork made concrete;
 each one is pinned by a test in `core/src/test`, and when a provider turns up
 that behaves differently the test is where the new truth goes.
 
-**`app/` has run on an emulator, never against a real panel.** It has been
-driven end to end on an API 34 emulator against the fake panel in
+**`app/` has run against one real line, and mostly on an emulator.** It has
+been driven end to end on an API 34 emulator against the fake panel in
 `tools/fakepanel` — one Java file serving generated test media and deliberately
 malformed responses; its README says how to run it and what each fault tests —
 covering sign-in, live playback with the guide, the background/return
-behaviour, the 403 refusal, films in mp4 and mkv with seeking, and series in
-each `episodes` shape. That proves the app does what the code says. It does not
-prove the code is right about panels: the fake panel only misbehaves in the
-ways already written down here. The first session on an actual line is still
-where the real answers are, and the surprises will be in what panels return.
+behaviour, the 403 refusal, films in mp4 and mkv with seeking, series in each
+`episodes` shape, and dropped channels. That proves the app does what the code
+says. It does not prove the code is right about panels: the fake panel only
+misbehaves in the ways already written down here.
+
+The first real line was on a Pixel 10 (Android 17): sign-in, live at 720p,
+an mkv film with seeking, series, picture-in-picture, playing on with the
+screen off, and a reconnect from Wi-Fi to mobile data all worked, and it
+turned up the 458 above. That is one provider. The next one will differ, and
+the surprises will be in what it returns.
 
 An emulator run is worth doing for any change to `app/` — the SDK on the dev
 machine has an emulator and a `phone34` AVD, and it caught a real bug (see
