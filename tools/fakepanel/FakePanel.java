@@ -129,6 +129,26 @@ public class FakePanel {
         return "http://" + host;
     }
 
+    static String cp(int... codePoints) {
+        return new String(codePoints, 0, codePoints.length);
+    }
+
+    /** Live categories with nothing in them, so the category shelf has a real line's worth to lay out. */
+    static final String[] PADDING_CATEGORIES = {
+        "UK | Entertainment", "UK | Documentaries", "UK | Kids", "UK | Music", "UK | Sports HD",
+        "UK | Movies", "US | News", "US | Entertainment", "US | Sports", "US | Local",
+        // Built from code points rather than typed: `java FakePanel.java` on
+        // JDK 17 reads the source in the platform encoding, which on Windows is
+        // not UTF-8, and a typed "é" arrives as "Ã©".
+        "IE | General", "FR | G" + cp(0xE9) + "n" + cp(0xE9) + "ral", "DE | Unterhaltung",
+        "ES | Deportes", "IT | Intrattenimento", "NL | Algemeen", "PT | Desporto",
+        "PL | Og" + cp(0xF3) + "lne", "TR | Ulusal", "GR | " + cp(0x393, 0x3B5, 0x3BD, 0x3B9, 0x3BA, 0x3AC),
+        "AR | " + cp(0x639, 0x627, 0x645), "IN | Hindi", "PK | Urdu",
+        "JP | " + cp(0x30C6, 0x30EC, 0x30D3), "KR | " + cp(0xC885, 0xD569),
+        "CA | English", "AU | General", "NZ | General", "ZA | General", "LATAM | Novelas",
+        "PPV | Events", "24/7 | Classic Sitcoms", "24/7 | Cartoons", "Radio", "4K UHD",
+    };
+
     static String api(String action, Map<String, String> q, String base) {
         long now = Instant.now().getEpochSecond();
         switch (action) {
@@ -139,12 +159,20 @@ public class FakePanel {
                     "\"status\":\"Active\",\"exp_date\":\"1893456000\",\"max_connections\":\"1\"," +
                     "\"active_cons\":0,\"allowed_output_formats\":[\"m3u8\",\"ts\"]}," +
                     "\"server_info\":{\"url\":\"" + base.replaceFirst("^http://", "").replaceFirst(":.*", "") + "\"}}";
-            case "get_live_categories":
+            case "get_live_categories": {
                 // A blank id and a repeat, which must not reach the screen as keys.
-                return "[{\"category_id\":\"1\",\"category_name\":\"News\"}," +
+                StringBuilder categories = new StringBuilder("[{\"category_id\":\"1\",\"category_name\":\"News\"}," +
                     "{\"category_id\":2,\"category_name\":\"Sport\"}," +
                     "{\"category_id\":\"\",\"category_name\":\"Blank id\"}," +
-                    "{\"category_id\":\"1\",\"category_name\":\"News\"}]";
+                    "{\"category_id\":\"1\",\"category_name\":\"News\"}");
+                // Then as many as a real line has, named the way providers name
+                // them. All empty, which real lines have too.
+                for (int i = 0; i < PADDING_CATEGORIES.length; i++) {
+                    categories.append(",{\"category_id\":\"").append(300 + i)
+                        .append("\",\"category_name\":\"").append(PADDING_CATEGORIES[i]).append("\"}");
+                }
+                return categories.append("]").toString();
+            }
             case "get_live_streams": {
                 // Ids as numbers and strings, one refusing channel, and two with
                 // no stream_id at all — they would share list key 0 and crash

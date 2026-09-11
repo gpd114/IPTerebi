@@ -296,6 +296,14 @@ survived until something was pressed.
   `NavigationRail`, one press of left from anywhere. The `NavHost` must stay the
   same call in the same place whichever bar is showing, or it is recreated and
   every screen's state goes with it.
+- **The category shelf costs a remote a press per row.** Categories wrap in a
+  `CategoryShelf` four rows tall that scrolls downwards — asked for, because a
+  single sideways row was tedious by touch on a real line's dozens of
+  categories. Down from a chip moves one row, so on a line with fifty
+  categories the list under the shelf is up to a dozen presses from the top
+  ones. Accepted: phone and tablet first. If it matters on a TV, give the chips
+  a `focusProperties { down = … }` to the list and keep left and right for the
+  shelf.
 - **A TV needs `android.hardware.touchscreen` required="false"**, or it counts
   as unable to run the app, plus `LEANBACK_LAUNCHER` and a banner to appear on
   its home screen. Those three are in the manifest but have not been checked on

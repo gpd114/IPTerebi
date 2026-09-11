@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -24,8 +23,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +43,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.ipterebi.app.ui.CategoryShelf
 import com.ipterebi.app.ui.DpadTextField
+import com.ipterebi.app.ui.ShelfChip
 import com.ipterebi.app.ui.focusRing
 import java.util.Locale
 
@@ -96,28 +95,28 @@ fun <T : Any> LibraryScreen(
             }
 
             if (state.categories.isNotEmpty()) {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    item {
-                        FilterChip(
-                            modifier = Modifier.focusRing(FilterChipDefaults.shape),
-                            selected = state.selectedCategoryId == null,
-                            onClick = { viewModel.selectCategory(null) },
-                            label = { Text("All") },
+                CategoryShelf(
+                    buildList {
+                        add(
+                            ShelfChip(
+                                key = "all",
+                                label = "All",
+                                selected = state.selectedCategoryId == null,
+                                onClick = { viewModel.selectCategory(null) },
+                            )
                         )
+                        state.categories.forEach { category ->
+                            add(
+                                ShelfChip(
+                                    key = "c:${category.id}",
+                                    label = category.name,
+                                    selected = state.selectedCategoryId == category.id,
+                                    onClick = { viewModel.selectCategory(category.id) },
+                                )
+                            )
+                        }
                     }
-                    items(state.categories, key = { it.id }) { category ->
-                        FilterChip(
-                            modifier = Modifier.focusRing(FilterChipDefaults.shape),
-                            selected = state.selectedCategoryId == category.id,
-                            onClick = { viewModel.selectCategory(category.id) },
-                            label = { Text(category.name) },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
+                )
             }
 
             when {
