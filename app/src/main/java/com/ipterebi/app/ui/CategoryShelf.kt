@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -27,8 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ipterebi.app.ui.theme.Night
 
 /** One chip on a [CategoryShelf]. [key] must be unique on the shelf. */
 class ShelfChip(
@@ -36,6 +39,8 @@ class ShelfChip(
     val label: String,
     val selected: Boolean,
     val onClick: () -> Unit,
+    /** The app's own shelves — favourites, recents — rather than the panel's. */
+    val special: Boolean = false,
 )
 
 /**
@@ -71,13 +76,32 @@ fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
             chips.forEach { chip ->
                 key(chip.key) {
                     val bringIntoView = remember { BringIntoViewRequester() }
+                    // Night set: the category you are in is the set's glossy
+                    // white; the rest are soft navy pills with no outline; the
+                    // app's own shelves are picked out in yellow.
                     FilterChip(
                         modifier = Modifier
                             .bringIntoViewRequester(bringIntoView)
-                            .focusRing(FilterChipDefaults.shape),
+                            .focusRing(ChipShape),
                         selected = chip.selected,
                         onClick = chip.onClick,
-                        label = { Text(chip.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        label = {
+                            Text(
+                                chip.label,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        },
+                        shape = ChipShape,
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Night.chip,
+                            labelColor = if (chip.special) Night.yellow else Night.chipInk,
+                            selectedContainerColor = Night.glossy,
+                            selectedLabelColor = Night.ground,
+                        ),
+                        border = null,
+                        elevation = FilterChipDefaults.filterChipElevation(elevation = 0.dp),
                     )
                     if (chip.selected) {
                         LaunchedEffect(Unit) { bringIntoView.bringIntoView() }
@@ -107,3 +131,5 @@ private const val SHELF_ROWS = 4
 
 /** How much of the row after the last whole one shows, to say there is more. */
 private val PEEK = 22.dp
+
+private val ChipShape = RoundedCornerShape(16.dp)
