@@ -46,6 +46,11 @@ reconnects by itself, waiting a little longer each time, and says so on screen.
 If it has not come back after about half a minute it stops and offers Try again.
 Films and episodes do the same, carrying on from the second they had reached.
 
+The button at the top right of the player opens what is playing in another
+video app — VLC, MX Player, or a casting app — and stops it here first, so a
+line that allows one connection has it free. Coming back shows "Play here"
+rather than taking the line back on its own.
+
 Turning the screen off while something plays keeps it playing as sound, with
 controls on the lock screen, in the notification and on headphone buttons.
 Pulling headphones out pauses it rather than switching to the speaker, and a

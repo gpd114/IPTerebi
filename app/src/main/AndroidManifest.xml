@@ -20,6 +20,23 @@
       run the app, because declaring nothing implies a touchscreen is required —
       and televisions do not have one.
     -->
+    <!--
+      "Open in another player" asks whether any video player is installed
+      before it stops the stream here. From Android 11 other apps are hidden
+      unless declared, and this is the declaration: apps that view video, and
+      HLS playlists, which some players list apart from video.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="video/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/x-mpegurl" />
+        </intent>
+    </queries>
+
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 

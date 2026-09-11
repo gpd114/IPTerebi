@@ -256,6 +256,15 @@ is at fault — a panel that does not list `m3u8` will not serve it.
 - **A missing guide is the normal case, not an error.** Lines carry no EPG,
   channels are missing from guides that exist, and some forks answer `false`.
   All of it arrives as an empty list.
+- **Handing a stream to another player hands over the password.** The URL is
+  the only thing a player can use, and the credentials are in its path. So
+  "open in another player" is `ACTION_VIEW` through a chooser, to an app the
+  user picks — never `ACTION_SEND`, which would offer messaging apps. It stops
+  here *before* starting the other app, because of the connection limit, and
+  on return shows "Play here" instead of re-preparing: VLC keeps playing in
+  the background and would be the one refused. The `<queries>` in the
+  manifest are what let it check a player exists first; without them Android
+  11+ reports none, and the stream would be stopped for an empty chooser.
 - **A stream id means nothing off its own panel.** It is the provider's private
   numbering, so id 4271 on one line and 4271 on another are unrelated channels.
   Anything stored against an id — favourites, recents — is therefore keyed on

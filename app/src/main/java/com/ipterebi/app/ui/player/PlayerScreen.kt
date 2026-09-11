@@ -10,6 +10,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.util.Log
 import android.util.Rational
+import android.widget.Toast
 import android.view.MotionEvent
 import android.view.View
 import androidx.compose.foundation.background
@@ -20,6 +21,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -69,9 +72,13 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.BuildConfig
+import com.ipterebi.app.MainActivity
 import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.nightCard
+import com.ipterebi.app.ui.theme.Night
+import com.ipterebi.core.playerMimeType
 import com.ipterebi.core.StreamReconnect
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.VodStream
@@ -203,6 +210,11 @@ private fun PlayerContent(
     val reconnect = remember(url) { StreamReconnect() }
     val reconnectDelay = remember(url) { AtomicLong(0) }
     var reconnecting by remember(url) { mutableStateOf(false) }
+
+    // Handed to another player: this one is stopped, and stays stopped until
+    // asked — coming back here must not take the line from the other app,
+    // which may well still be playing in the background.
+    var handedOff by remember(url) { mutableStateOf(false) }
 
     val player = remember(url) {
         val httpFactory = DefaultHttpDataSource.Factory()
@@ -500,6 +512,9 @@ private fun PlayerContent(
                 Lifecycle.Event.ON_START -> if (wasStopped) {
                     wasStopped = false
                     mainThread.removeCallbacks(letGo)
+                    // Back from the player this was handed to. It may still
+                    // hold the line; "Play here" is the way back in.
+                    if (handedOff) return@LifecycleEventObserver
                     // Played on through the screen being off, and still is.
                     if (player.playWhenReady && player.playbackState != Player.STATE_IDLE) {
                         return@LifecycleEventObserver
@@ -546,7 +561,48 @@ private fun PlayerContent(
     }
 
     val activity = remember(context) { context.findActivity() }
-    val inPictureInPicture = rememberPictureInPicture(activity, videoAspect)
+    val inPictureInPicture = rememberPictureInPicture(activity, videoAspect, offered = !handedOff)
+
+    /**
+     * Stops here and opens the stream in another player. Stopped first, and
+     * before the other app is even started: on a line that allows one
+     * connection, the other player asking while this one still streams is
+     * refused — and a real line went on refusing for fifteen seconds after.
+     */
+    val openElsewhere: () -> Unit = openElsewhere@{
+        val intent = anotherPlayerIntent(
+            url = url,
+            mimeType = playerMimeType(
+                when (playable) {
+                    is Playable.Channel -> account.format.extension
+                    is Playable.Film -> playable.extension
+                    is Playable.Episode -> playable.extension
+                }
+            ),
+            title = title,
+            userAgent = account.userAgent,
+            positionMs = if (onDemand) player.currentPosition else 0L,
+        )
+        // Checked before anything stops: with no other player installed, the
+        // stream would be lost for a chooser that says so.
+        if (!context.canOpenInAnotherPlayer(intent)) {
+            Toast.makeText(
+                context,
+                "No other video player is installed. VLC or MX Player from the Play Store will do.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return@openElsewhere
+        }
+        handedOff = true
+        error = null
+        reconnecting = false
+        // Withdrawn now rather than when the state above recomposes, which is
+        // after the other app has already opened over this one.
+        (activity as? MainActivity)?.pictureInPicture = null
+        if (onDemand) player.pause()
+        player.stop()
+        context.openInAnotherPlayer(intent)
+    }
     DisposableEffect(activity) {
         val previousOrientation = activity?.requestedOrientation
         val controller = activity?.window?.let { window ->
@@ -698,7 +754,25 @@ private fun PlayerContent(
         // Also while an error is up: the controls are switched off then, and
         // the way out and the name of what failed should not go with them. Never
         // in picture-in-picture, where the window is the size of a stamp.
-        if ((controlsVisible || error != null) && !inPictureInPicture) {
+        if ((controlsVisible || error != null || handedOff) && !inPictureInPicture) {
+            // Opposite the back button, and like it a tap target only: see
+            // there for why nothing over the video may take a remote's focus.
+            if (!handedOff) {
+                IconButton(
+                    onClick = openElsewhere,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .focusProperties { canFocus = false },
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = "Open in another player",
+                        tint = Color.White,
+                    )
+                }
+            }
+
             IconButton(
                 onClick = onBack,
                 modifier = Modifier
@@ -748,7 +822,7 @@ private fun PlayerContent(
         //
         // Off in picture-in-picture too, where the system draws its own.
         val showingError = error != null
-        val controlsWanted = !showingError && !inPictureInPicture
+        val controlsWanted = !showingError && !handedOff && !inPictureInPicture
         LaunchedEffect(controlsWanted) {
             playerView.value?.apply {
                 useController = controlsWanted
@@ -770,6 +844,52 @@ private fun PlayerContent(
                     .background(Color(0x99000000))
                     .padding(horizontal = 12.dp, vertical = 6.dp),
             )
+        }
+
+        if (handedOff && !inPictureInPicture) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(24.dp)
+                    .nightCard(RoundedCornerShape(20.dp))
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.OpenInNew,
+                    contentDescription = null,
+                    tint = Night.yellow,
+                )
+                Text(
+                    text = "Playing in another app",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+                Text(
+                    text = "Stopped here, so your line is free for it.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Night.inkSoft,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Button(
+                    onClick = {
+                        handedOff = false
+                        reconnect.reset()
+                        reconnectDelay.set(0)
+                        // As Try again: a channel rejoins the broadcast, a film
+                        // carries on from where it was handed over.
+                        if (!onDemand) player.seekToDefaultPosition()
+                        player.prepare()
+                        player.play()
+                    },
+                    modifier = Modifier
+                        .padding(top = 16.dp)
+                        .focusRequester(retryFocus)
+                        .focusRing(),
+                ) { Text("Play here") }
+            }
+            LaunchedEffect(Unit) { retryFocus.requestFocus() }
         }
 
         error?.takeIf { !inPictureInPicture }?.let { message ->
