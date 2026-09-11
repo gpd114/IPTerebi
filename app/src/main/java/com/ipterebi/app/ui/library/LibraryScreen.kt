@@ -36,8 +36,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,8 +49,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.ipterebi.app.ui.CategoryShelf
 import com.ipterebi.app.ui.DpadTextField
+import com.ipterebi.app.ui.SearchFieldShape
+import com.ipterebi.app.ui.SectionTopBar
 import com.ipterebi.app.ui.ShelfChip
 import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.searchFieldColours
+import com.ipterebi.app.ui.theme.Night
 import java.util.Locale
 
 /**
@@ -68,16 +76,9 @@ fun <T : Any> LibraryScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(title) },
-                actions = {
-                    IconButton(onClick = onSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                    }
-                },
-            )
-        },
+        topBar = { SectionTopBar(title = title, onSettings = onSettings) },
+        // The glow behind the section screens is drawn once, under the NavHost.
+        containerColor = Color.Transparent,
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
 
@@ -90,6 +91,8 @@ fun <T : Any> LibraryScreen(
                     placeholder = { Text("Search this category") },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     singleLine = true,
+                    shape = SearchFieldShape,
+                    colors = searchFieldColours(),
                     modifier = fieldModifier.fillMaxWidth(),
                 )
             }
@@ -176,19 +179,21 @@ fun PosterTile(
     ratingOutOfTen: Double?,
     onClick: () -> Unit,
 ) {
-    Column(modifier = Modifier.focusRing().clickable(onClick = onClick)) {
+    val poster = RoundedCornerShape(14.dp)
+    Column(modifier = Modifier.focusRing(poster).clickable(onClick = onClick)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .shadow(8.dp, poster)
+                .clip(poster)
+                .background(Night.card),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 placeholder,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                tint = Night.inkSoft.copy(alpha = 0.4f),
             )
             if (image.isNotBlank()) {
                 AsyncImage(
@@ -198,22 +203,41 @@ fun PosterTile(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+            // The glare across the icon's screen, laid over every poster.
+            Box(
+                Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.linearGradient(
+                            0f to Color.White.copy(alpha = 0.16f),
+                            0.45f to Color.Transparent,
+                        )
+                    )
+            )
+            ratingOutOfTen?.let { rating ->
+                Text(
+                    text = "★ " + String.format(Locale.ROOT, "%.1f", rating),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Night.onYellow,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Night.yellow)
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                )
+            }
         }
 
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(7.dp))
         Text(
             text = title,
             style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Bold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        ratingOutOfTen?.let { rating ->
-            Text(
-                text = "★ " + String.format(Locale.ROOT, "%.1f", rating),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 

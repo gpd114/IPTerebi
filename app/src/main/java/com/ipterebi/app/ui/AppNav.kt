@@ -1,13 +1,22 @@
 package com.ipterebi.app.ui
 
 import android.net.Uri
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
@@ -15,10 +24,9 @@ import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -27,8 +35,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import androidx.navigation.NavType
@@ -47,6 +61,7 @@ import com.ipterebi.app.ui.player.PlayerScreen
 import com.ipterebi.app.ui.series.SeriesDetailScreen
 import com.ipterebi.app.ui.series.SeriesScreen
 import com.ipterebi.app.ui.settings.SettingsScreen
+import com.ipterebi.app.ui.theme.Night
 
 object Route {
     const val LOGIN = "login"
@@ -123,18 +138,14 @@ fun AppNav(container: AppContainer) {
                     // insets, so this Scaffold claims none of them — see the
                     // consumeWindowInsets below for the bottom.
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
+                    // Night blue lit cobalt from the top, drawn once here for all
+                    // three sections; their own Scaffolds are transparent over it.
+                    // The screens that are not sections paint their own ground.
+                    containerColor = Color.Transparent,
+                    modifier = Modifier.background(Night.backdrop),
                     bottomBar = {
                         if (section != null && !wide) {
-                            NavigationBar {
-                                Section.entries.forEach { item ->
-                                    NavigationBarItem(
-                                        selected = item == section,
-                                        onClick = { nav.switchSection(item.route) },
-                                        icon = { Icon(item.icon, contentDescription = null) },
-                                        label = { Text(item.label) },
-                                    )
-                                }
-                            }
+                            FloatingTabBar(current = section, onSelect = { nav.switchSection(it.route) })
                         }
                     },
                 ) { padding ->
@@ -144,7 +155,7 @@ fun AppNav(container: AppContainer) {
                     // empty space above the bar.
                     Row(Modifier.padding(padding).consumeWindowInsets(padding)) {
                         if (section != null && wide) {
-                            NavigationRail {
+                            NavigationRail(containerColor = Color.Transparent) {
                                 Spacer(Modifier.weight(1f))
                                 Section.entries.forEach { item ->
                                     NavigationRailItem(
@@ -152,6 +163,13 @@ fun AppNav(container: AppContainer) {
                                         onClick = { nav.switchSection(item.route) },
                                         icon = { Icon(item.icon, contentDescription = null) },
                                         label = { Text(item.label) },
+                                        colors = NavigationRailItemDefaults.colors(
+                                            selectedIconColor = Color.White,
+                                            selectedTextColor = Night.ink,
+                                            indicatorColor = Night.cobalt,
+                                            unselectedIconColor = Night.inkSoft,
+                                            unselectedTextColor = Night.inkSoft,
+                                        ),
                                         modifier = Modifier.focusRing(),
                                     )
                                 }
@@ -278,6 +296,54 @@ fun AppNav(container: AppContainer) {
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * The sections along the bottom on a phone: a pill that floats above the
+ * screen's edge, the one you are on filled cobalt with its name beside it.
+ * Each tab is focusable and ringed, so a remote on a narrow screen can still
+ * reach it — a wide one gets the rail instead, above.
+ */
+@Composable
+private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
+    val bar = RoundedCornerShape(31.dp)
+    val tab = RoundedCornerShape(21.dp)
+    Row(
+        modifier = Modifier
+            .navigationBarsPadding()
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .fillMaxWidth()
+            .shadow(14.dp, bar)
+            .nightCard(bar)
+            .height(62.dp)
+            .padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.SpaceAround,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Section.entries.forEach { item ->
+            val selected = item == current
+            val tint = if (selected) Color.White else Night.inkSoft
+            Row(
+                modifier = Modifier
+                    .clip(tab)
+                    .background(if (selected) Night.cobalt else Color.Transparent)
+                    .focusRing(tab)
+                    .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(item) })
+                    .height(42.dp)
+                    .padding(horizontal = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(item.icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(7.dp))
+                Text(
+                    item.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = tint,
+                )
             }
         }
     }

@@ -18,6 +18,21 @@ change that alters the tablet layout.
 Keep that line where it is. Anything that could be decided without an Android
 class belongs in `core/`, because that is the half that can be proven.
 
+## The look
+
+"Night set", taken from the launcher icon (Terebi-kun): night blue lit cobalt
+from the top, glossy white for what is selected, yellow for what you can act
+on (play, favourites), pink along the one edge that matters. The palette is
+`Night` in `ui/theme/Theme.kt`; the shared pieces — `SectionTopBar`,
+`nightCard`, the search field's shape and colours — are in `ui/NightParts.kt`.
+Use those rather than new literals, or the app drifts back to stock Material.
+It stays dark-only, for the reason given in `Theme.kt`.
+
+The typeface is M PLUS Rounded 1c, bundled in `res/font` (three weights, about
+10 MB — it carries Japanese). It is under the SIL Open Font License, which
+allows bundling on condition the licence travels with it: that is
+`assets/licenses/mplus_rounded_1c_OFL.txt`, and it must stay.
+
 ## Building
 
 **There is no Gradle wrapper, deliberately.** CI provisions Gradle 8.9 and runs

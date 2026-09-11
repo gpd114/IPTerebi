@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,17 +15,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,24 +32,36 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.ui.CategoryShelf
 import com.ipterebi.app.ui.DpadTextField
+import com.ipterebi.app.ui.SearchFieldShape
+import com.ipterebi.app.ui.SectionTopBar
 import com.ipterebi.app.ui.ShelfChip
 import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.nightCard
+import com.ipterebi.app.ui.searchFieldColours
+import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.LiveStream
+import com.ipterebi.core.channelInitials
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,16 +74,9 @@ fun ChannelsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Live TV") },
-                actions = {
-                    IconButton(onClick = onSettings) {
-                        Icon(Icons.Filled.Settings, contentDescription = "Settings")
-                    }
-                },
-            )
-        },
+        topBar = { SectionTopBar(title = "Live TV", onSettings = onSettings) },
+        // The glow behind the section screens is drawn once, under the NavHost.
+        containerColor = Color.Transparent,
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
 
@@ -85,6 +90,8 @@ fun ChannelsScreen(
                     placeholder = { Text("Search all channels") },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     singleLine = true,
+                    shape = SearchFieldShape,
+                    colors = searchFieldColours(),
                     modifier = fieldModifier.fillMaxWidth(),
                 )
             }
@@ -126,15 +133,28 @@ fun ChannelsScreen(
 
                 state.visibleChannels.isEmpty() -> EmptyPanel(state)
 
-                else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(state.visibleChannels, key = { it.streamId }) { channel ->
-                        ChannelRow(
-                            channel = channel,
-                            starred = state.isFavourite(channel.streamId),
-                            onClick = { onChannel(channel.streamId) },
-                            onStar = { viewModel.toggleFavourite(channel) },
-                        )
-                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                else -> {
+                    val categoryNames = remember(state.categories) {
+                        state.categories.associate { it.id to it.name }
+                    }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(state.visibleChannels, key = { it.streamId }) { channel ->
+                            ChannelRow(
+                                channel = channel,
+                                // Worth saying on favourites, recents, All and
+                                // search results; inside the category, it would
+                                // only repeat the chip.
+                                category = categoryNames[channel.categoryId]
+                                    ?.takeIf { state.shelf != Shelf.Panel(channel.categoryId) },
+                                starred = state.isFavourite(channel.streamId),
+                                onClick = { onChannel(channel.streamId) },
+                                onStar = { viewModel.toggleFavourite(channel) },
+                            )
+                        }
                     }
                 }
             }
@@ -152,13 +172,13 @@ fun ChannelsScreen(
  */
 @Composable
 private fun ShelfChips(state: ChannelsUiState, onSelect: (Shelf) -> Unit) {
-    fun chip(key: String, label: String, shelf: Shelf) =
-        ShelfChip(key, label, selected = state.shelf == shelf, onClick = { onSelect(shelf) })
+    fun chip(key: String, label: String, shelf: Shelf, special: Boolean = false) =
+        ShelfChip(key, label, selected = state.shelf == shelf, onClick = { onSelect(shelf) }, special = special)
 
     CategoryShelf(
         buildList {
-            if (state.favourites.isNotEmpty()) add(chip("favourites", "Favourites", Shelf.Favourites))
-            if (state.recents.isNotEmpty()) add(chip("recent", "Recent", Shelf.Recent))
+            if (state.favourites.isNotEmpty()) add(chip("favourites", "★ Favourites", Shelf.Favourites, special = true))
+            if (state.recents.isNotEmpty()) add(chip("recent", "Recent", Shelf.Recent, special = true))
             if (state.categories.isNotEmpty()) {
                 add(chip("all", "All", Shelf.Panel(null)))
                 state.categories.forEach { add(chip("c:${it.id}", it.name, Shelf.Panel(it.id))) }
@@ -177,43 +197,58 @@ private fun ShelfChips(state: ChannelsUiState, onSelect: (Shelf) -> Unit) {
  */
 @Composable
 private fun ResumeBar(channel: LiveStream, onClick: () -> Unit) {
-    Row(
+    // The one card on the screen with an edge: cobalt to pink, like the icon.
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .focusRing(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clip(RoundedCornerShape(18.dp))
+            .background(Night.edge)
+            .padding(1.5.dp),
     ) {
-        Icon(
-            Icons.Filled.PlayArrow,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(Modifier.size(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Carry on watching",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = channel.name,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .nightCard(RoundedCornerShape(16.5.dp), Night.cardStrong)
+                .focusRing(RoundedCornerShape(16.5.dp))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(Night.yellow),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Night.onYellow)
+            }
+            Spacer(Modifier.size(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "CARRY ON WATCHING",
+                    style = MaterialTheme.typography.labelSmall,
+                    letterSpacing = 0.8.sp,
+                    color = Night.inkSoft,
+                )
+                Text(
+                    text = channel.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(12.dp))
 }
 
 @Composable
 private fun ChannelRow(
     channel: LiveStream,
+    category: String?,
     starred: Boolean,
     onClick: () -> Unit,
     onStar: () -> Unit,
@@ -221,29 +256,13 @@ private fun ChannelRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .focusRing()
+            .nightCard()
+            .focusRing(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick)
-            .padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+            .padding(start = 9.dp, end = 2.dp, top = 9.dp, bottom = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Channel logos are provider-hosted and a good share of them are dead
-        // links, so this is decoration and never load-bearing: a failure leaves
-        // the placeholder block and the row still reads fine.
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (channel.icon.isNotBlank()) {
-                AsyncImage(
-                    model = channel.icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(44.dp),
-                )
-            }
-        }
+        ChannelLogo(channel)
 
         Spacer(Modifier.size(12.dp))
 
@@ -251,16 +270,32 @@ private fun ChannelRow(
             Text(
                 text = channel.name,
                 style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.ExtraBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (channel.number > 0) {
+            if (category != null) {
                 Text(
-                    text = "Channel ${channel.number}",
+                    text = category,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Night.inkSoft,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+
+        if (channel.number > 0) {
+            Text(
+                text = "${channel.number}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Night.inkSoft,
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Night.ground)
+                    .padding(horizontal = 7.dp, vertical = 4.dp),
+            )
         }
 
         IconButton(onClick = onStar) {
@@ -271,14 +306,63 @@ private fun ChannelRow(
                 } else {
                     "Add ${channel.name} to favourites"
                 },
-                tint = if (starred) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
+                tint = if (starred) Night.yellow else Night.inkSoft,
             )
         }
     }
+}
+
+/**
+ * The channel's logo in a rounded tile, or — when there is none, or the link is
+ * dead, which is a good share of them — its initials on a colour picked from its
+ * name. Picked, not random, so a channel keeps its colour from one visit to the
+ * next. Logos are decoration and never load-bearing: the row reads fine either way.
+ */
+@Composable
+private fun ChannelLogo(channel: LiveStream) {
+    var failed by remember(channel.icon) { mutableStateOf(false) }
+    val showLogo = channel.icon.isNotBlank() && !failed
+    val tile = RoundedCornerShape(13.dp)
+    Box(
+        modifier = Modifier
+            .size(46.dp)
+            .clip(tile)
+            .background(if (showLogo) Brush.linearGradient(listOf(LogoGround, LogoGround)) else tileColours(channel.name)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (showLogo) {
+            AsyncImage(
+                model = channel.icon,
+                contentDescription = null,
+                onError = { failed = true },
+                modifier = Modifier.size(40.dp),
+            )
+        } else {
+            Text(
+                text = channelInitials(channel.name),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White,
+            )
+        }
+    }
+}
+
+private val LogoGround = Color(0xFF1C2548)
+
+/** Pairs from the icon's own colours, darkened enough for white initials. */
+private val TilePairs = listOf(
+    Color(0xFF2F6BFF) to Color(0xFF1B3A8C),
+    Color(0xFFFF8FA3) to Color(0xFFC2456B),
+    Color(0xFF3CC6B0) to Color(0xFF1D7F74),
+    Color(0xFFFFB14E) to Color(0xFFC9692A),
+    Color(0xFF8A7BFF) to Color(0xFF3A2F6E),
+    Color(0xFF5AA9E6) to Color(0xFF1F4F8C),
+)
+
+private fun tileColours(name: String): Brush {
+    val (from, to) = TilePairs[Math.floorMod(name.hashCode(), TilePairs.size)]
+    return Brush.linearGradient(listOf(from, to))
 }
 
 /**
