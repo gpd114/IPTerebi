@@ -43,6 +43,7 @@ the app. If the app misbehaves here, that is the place to look.
 |---|---|
 | Two categories that are a blank id and a repeat | `usableCategories()` — both must vanish, not crash the category row |
 | Two channels with no `stream_id` | `playableChannels()` — they would share list key 0 and take the list down |
+| 35 more live categories, empty, named the way providers name them — `UK \| Sports HD`, `24/7 \| Cartoons`, and some in Greek, Arabic, Japanese and Korean | The category shelf at a real line's size: four rows, the next peeking under the fade, scrolling, and the open one scrolled into view on return. Also the empty-category message |
 | Every channel when no category is given, as a real panel does | Searching all channels: search from **News** for "sport" and **Sport One**, in another category, has to turn up |
 | Ids quoted in one record and bare in the next | The flexible serialisers |
 | **Refused (connection limit)**, which answers 403 | The error wording, and Try again being reachable with a remote |
