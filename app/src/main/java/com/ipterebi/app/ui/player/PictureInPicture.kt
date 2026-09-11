@@ -30,14 +30,19 @@ import com.ipterebi.core.pictureInPictureShape
  * frees the line's one connection — does not fire and the video carries on.
  * When the window is closed the app is stopped, and that same code lets the
  * connection go.
+ *
+ * Not [offered] while the stream has been handed to another player: there is
+ * nothing playing here to shrink.
  */
 @Composable
-fun rememberPictureInPicture(activity: Activity?, videoAspect: Rational?): Boolean {
+fun rememberPictureInPicture(activity: Activity?, videoAspect: Rational?, offered: Boolean = true): Boolean {
     val host = activity as? MainActivity
     var inPictureInPicture by remember { mutableStateOf(host?.isInPictureInPictureMode == true) }
 
-    DisposableEffect(host, videoAspect) {
-        if (host != null && host.supportsPictureInPicture) {
+    DisposableEffect(host, videoAspect, offered) {
+        if (!offered) {
+            host?.pictureInPicture = null
+        } else if (host != null && host.supportsPictureInPicture) {
             host.pictureInPicture = PictureInPictureParams.Builder()
                 .setAspectRatio(videoAspect ?: Rational(16, 9))
                 .apply {
