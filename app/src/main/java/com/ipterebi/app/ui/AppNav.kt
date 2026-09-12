@@ -55,6 +55,7 @@ import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.app.ui.channels.ChannelsScreen
 import com.ipterebi.app.ui.films.FilmsScreen
+import com.ipterebi.app.ui.guide.GuideScreen
 import com.ipterebi.app.ui.login.LoginScreen
 import com.ipterebi.app.ui.player.Playable
 import com.ipterebi.app.ui.player.PlayerScreen
@@ -70,6 +71,7 @@ object Route {
     const val SERIES = "series"
     const val SERIES_DETAIL = "series/{id}"
     const val SETTINGS = "settings"
+    const val GUIDE = "guide"
     const val PLAY_CHANNEL = "player/channel/{id}"
     const val PLAY_FILM = "player/film/{id}/{ext}"
     const val PLAY_EPISODE = "player/episode/{id}/{ext}"
@@ -200,6 +202,7 @@ fun AppNav(container: AppContainer) {
                                     container = container,
                                     onChannel = { id -> nav.navigate(Route.playChannel(id)) },
                                     onSettings = { nav.navigate(Route.SETTINGS) },
+                                    onGuide = { nav.navigate(Route.GUIDE) },
                                 )
                             }
 
@@ -233,6 +236,14 @@ fun AppNav(container: AppContainer) {
                                             Route.playEpisode(episode.episode.id, episode.episode.playbackExtension)
                                         )
                                     },
+                                    onBack = { nav.popBackStack() },
+                                )
+                            }
+
+                            composable(Route.GUIDE) {
+                                GuideScreen(
+                                    container = container,
+                                    onChannel = { id -> nav.navigate(Route.playChannel(id)) },
                                     onBack = { nav.popBackStack() },
                                 )
                             }
