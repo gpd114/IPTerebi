@@ -76,10 +76,9 @@ fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
             chips.forEach { chip ->
                 key(chip.key) {
                     val bringIntoView = remember { BringIntoViewRequester() }
-                    // White pills with dark ink, so they stand off the cobalt
-                    // glow behind them — see Night.button for the two rounds of
-                    // navy that did not. The category you are in is cobalt, like
-                    // the tab you are on; the app's own shelves are in pink.
+                    // Debritsu's pattern: quiet white-tinted pills on the flat
+                    // page, the one you are in solid cobalt, like the tab you are
+                    // on. The app's own shelves are named in pink.
                     FilterChip(
                         modifier = Modifier
                             .bringIntoViewRequester(bringIntoView)
@@ -96,8 +95,8 @@ fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
                         },
                         shape = ChipShape,
                         colors = FilterChipDefaults.filterChipColors(
-                            containerColor = Night.button,
-                            labelColor = if (chip.special) Night.pinkOnButton else Night.onButton,
+                            containerColor = Night.quiet,
+                            labelColor = if (chip.special) Night.pink else Night.quietText,
                             selectedContainerColor = Night.cobalt,
                             selectedLabelColor = Color.White,
                         ),
@@ -133,4 +132,4 @@ private const val SHELF_ROWS = 4
 /** How much of the row after the last whole one shows, to say there is more. */
 private val PEEK = 22.dp
 
-private val ChipShape = RoundedCornerShape(16.dp)
+private val ChipShape = RoundedCornerShape(12.dp)

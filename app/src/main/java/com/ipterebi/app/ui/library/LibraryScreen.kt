@@ -1,6 +1,7 @@
 package com.ipterebi.app.ui.library
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,11 +50,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.ipterebi.app.ui.CategoryShelf
 import com.ipterebi.app.ui.DpadTextField
+import com.ipterebi.app.ui.PrimaryButton
+import com.ipterebi.app.ui.QuietPill
+import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.SearchFieldShape
 import com.ipterebi.app.ui.SectionTopBar
 import com.ipterebi.app.ui.ShelfChip
 import com.ipterebi.app.ui.focusRing
-import com.ipterebi.app.ui.searchFieldColours
+import com.ipterebi.app.ui.fieldColours
 import com.ipterebi.app.ui.theme.Night
 import java.util.Locale
 
@@ -77,7 +81,7 @@ fun <T : Any> LibraryScreen(
 
     Scaffold(
         topBar = { SectionTopBar(title = title, onSettings = onSettings) },
-        // The glow behind the section screens is drawn once, under the NavHost.
+        // The page is drawn once, under the NavHost.
         containerColor = Color.Transparent,
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -92,7 +96,7 @@ fun <T : Any> LibraryScreen(
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     singleLine = true,
                     shape = SearchFieldShape,
-                    colors = searchFieldColours(),
+                    colors = fieldColours(),
                     modifier = fieldModifier.fillMaxWidth(),
                 )
             }
@@ -179,15 +183,17 @@ fun PosterTile(
     ratingOutOfTen: Double?,
     onClick: () -> Unit,
 ) {
-    val poster = RoundedCornerShape(14.dp)
+    // Rounded, with a faint rim so a dark cover still has an edge against the
+    // page — Debritsu's PosterArt, which every cover there is drawn with.
+    val poster = RoundedCornerShape(16.dp)
     Column(modifier = Modifier.focusRing(poster).clickable(onClick = onClick)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
-                .shadow(8.dp, poster)
                 .clip(poster)
-                .background(Night.card),
+                .background(Night.veil)
+                .border(1.dp, Night.hairline, poster),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
@@ -203,29 +209,16 @@ fun PosterTile(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            // The glare across the icon's screen, laid over every poster.
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .background(
-                        Brush.linearGradient(
-                            0f to Color.White.copy(alpha = 0.16f),
-                            0.45f to Color.Transparent,
-                        )
-                    )
-            )
             ratingOutOfTen?.let { rating ->
-                Text(
+                // A translucent cobalt pill, so it reads on any poster without
+                // hiding it.
+                QuietPill(
                     text = "★ " + String.format(Locale.ROOT, "%.1f", rating),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Night.ground,
+                    fill = Night.badge,
+                    colour = Color.White,
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(6.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Night.glossy)
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                        .padding(7.dp),
                 )
             }
         }
@@ -260,10 +253,10 @@ fun ErrorPanel(
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(16.dp))
-        Button(onClick = onRetry) { Text("Try again") }
+        PrimaryButton(onClick = onRetry) { Text("Try again", style = MaterialTheme.typography.labelLarge) }
         if (onLoadEverything != null) {
             Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onLoadEverything) { Text(fullLoadLabel) }
+            SecondaryButton(text = fullLoadLabel, onClick = onLoadEverything)
             Text(
                 "One request for the whole library. On a large one this is several " +
                     "megabytes and takes a while.",

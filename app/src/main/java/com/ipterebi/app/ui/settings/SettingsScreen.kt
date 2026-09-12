@@ -2,8 +2,6 @@ package com.ipterebi.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,39 +12,39 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ipterebi.app.AppContainer
+import com.ipterebi.app.ui.ChoiceRow
 import com.ipterebi.app.ui.DpadTextField
-import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.Panel
+import com.ipterebi.app.ui.PrimaryButton
+import com.ipterebi.app.ui.ScreenTopBar
+import com.ipterebi.app.ui.SecondaryButton
+import com.ipterebi.app.ui.fieldColours
+import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.UserAgents
 import com.ipterebi.core.connectionsLabel
 import com.ipterebi.core.expiryLabel
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+/**
+ * Settings, as panels — one per thing that can be changed — on Debritsu's
+ * pattern: a choice is a row of pills with the chosen one solid, the one
+ * action a panel offers is the solid button.
+ */
 @Composable
 fun SettingsScreen(
     container: AppContainer,
@@ -61,159 +59,146 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
+        topBar = { ScreenTopBar("Settings", onBack) },
+        containerColor = Night.ground,
     ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             val account = state.account
 
-            SectionTitle("Line")
-            Text(
-                text = account?.base ?: "—",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                text = account?.username ?: "—",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Spacer(Modifier.height(20.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            Spacer(Modifier.height(20.dp))
-
-            SectionTitle("Stream format")
-            Text(
-                "Which container the panel is asked for. Applies the next time a " +
-                    "channel is opened. If channels fail instantly or never start, " +
-                    "this is the first thing to change.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StreamFormat.entries.forEach { format ->
-                    FilterChip(
-                        modifier = Modifier.focusRing(FilterChipDefaults.shape),
-                        selected = account?.format == format,
-                        onClick = { viewModel.setFormat(format) },
-                        label = { Text(format.label) },
+            Panel {
+                SectionTitle("Line")
+                Column {
+                    Text(
+                        text = account?.base ?: "—",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Night.ink,
+                    )
+                    Text(
+                        text = account?.username ?: "—",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Night.inkSoft,
                     )
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            Spacer(Modifier.height(20.dp))
+            Panel {
+                SectionTitle("Stream format")
+                ChoiceRow(
+                    options = StreamFormat.entries.map { it to it.label },
+                    isSelected = { it == account?.format },
+                    onSelect = viewModel::setFormat,
+                )
+                Hint(
+                    "Which container the panel is asked for. Applies the next time a " +
+                        "channel is opened. If channels fail instantly or never start, " +
+                        "this is the first thing to change.",
+                )
+            }
 
-            SectionTitle("User agent")
-            Text(
-                "How the app identifies itself. If the channel list loads but every " +
-                    "stream is refused, the panel is blocking the client — try another.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(10.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                UserAgents.presets.forEach { (label, value) ->
-                    FilterChip(
-                        modifier = Modifier.focusRing(FilterChipDefaults.shape),
-                        selected = state.userAgentDraft.trim() == value,
-                        onClick = { viewModel.onUserAgentChange(value) },
-                        label = { Text(label) },
+            Panel {
+                SectionTitle("User agent")
+                ChoiceRow(
+                    options = UserAgents.presets.map { (label, value) -> value to label },
+                    isSelected = { state.userAgentDraft.trim() == it },
+                    onSelect = viewModel::onUserAgentChange,
+                )
+                DpadTextField(Modifier.fillMaxWidth()) { fieldModifier ->
+                    OutlinedTextField(
+                        value = state.userAgentDraft,
+                        onValueChange = viewModel::onUserAgentChange,
+                        label = { Text("Sent as User-Agent") },
+                        singleLine = true,
+                        colors = fieldColours(),
+                        shape = MaterialTheme.shapes.large,
+                        modifier = fieldModifier.fillMaxWidth(),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SecondaryButton(
+                        text = if (state.userAgentChanged) "Apply" else "Saved",
+                        onClick = viewModel::applyUserAgent,
+                        enabled = state.userAgentChanged,
+                        height = 42.dp,
+                    )
+                }
+                Hint(
+                    "How the app identifies itself. If the channel list loads but every " +
+                        "stream is refused, the panel is blocking the client — try another.",
+                )
+            }
+
+            Panel {
+                SectionTitle("Check the line")
+                Hint("Asks the panel what it thinks of this account right now.")
+                PrimaryButton(
+                    onClick = viewModel::recheck,
+                    enabled = !state.checking,
+                    height = 46.dp,
+                ) {
+                    if (state.checking) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = LocalContentColor.current,
+                        )
+                        Spacer(Modifier.size(10.dp))
+                    }
+                    Text(
+                        if (state.checking) "Checking…" else "Check now",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+
+                state.info?.let { info ->
+                    Column {
+                        Fact("Status", info.status.ifBlank { "—" })
+                        Fact("Expires", info.expiryLabel())
+                        info.connectionsLabel().takeIf { it.isNotBlank() }?.let { Fact("Connections", it) }
+                        Fact(
+                            "Panel offers",
+                            info.allowedOutputFormats.takeIf { it.isNotEmpty() }?.joinToString(", ")
+                                ?: "it does not say",
+                        )
+                    }
+                }
+
+                state.error?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            DpadTextField(Modifier.fillMaxWidth()) { fieldModifier ->
-                OutlinedTextField(
-                    value = state.userAgentDraft,
-                    onValueChange = viewModel::onUserAgentChange,
-                    label = { Text("Sent as User-Agent") },
-                    singleLine = true,
-                    modifier = fieldModifier.fillMaxWidth(),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            TextButton(
-                onClick = viewModel::applyUserAgent,
-                enabled = state.userAgentChanged,
-            ) {
-                Text(if (state.userAgentChanged) "Apply" else "Saved")
-            }
 
-            Spacer(Modifier.height(20.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            Spacer(Modifier.height(20.dp))
-
-            SectionTitle("Check the line")
-            Text(
-                "Asks the panel what it thinks of this account right now.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(10.dp))
-            OutlinedButton(onClick = viewModel::recheck, enabled = !state.checking) {
-                if (state.checking) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.size(10.dp))
-                }
-                Text(if (state.checking) "Checking…" else "Check now")
-            }
-
-            state.info?.let { info ->
-                Spacer(Modifier.height(12.dp))
-                Fact("Status", info.status.ifBlank { "—" })
-                Fact("Expires", info.expiryLabel())
-                info.connectionsLabel().takeIf { it.isNotBlank() }?.let { Fact("Connections", it) }
-                Fact(
-                    "Panel offers",
-                    info.allowedOutputFormats.takeIf { it.isNotEmpty() }?.joinToString(", ")
-                        ?: "it does not say",
-                )
-            }
-
-            state.error?.let { message ->
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-
-            Spacer(Modifier.height(28.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-            Spacer(Modifier.height(20.dp))
-
-            Button(
+            SecondaryButton(
+                text = "Sign out",
                 onClick = viewModel::signOut,
+                colour = Night.pink,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Sign out") }
+            )
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text = text, style = MaterialTheme.typography.titleMedium)
-    Spacer(Modifier.height(6.dp))
+    Text(text = text, style = MaterialTheme.typography.titleLarge, color = Night.ink)
+}
+
+/** Small print under a control: what it does, in a sentence or two. */
+@Composable
+private fun Hint(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = Night.inkSoft)
 }
 
 @Composable
@@ -222,9 +207,9 @@ private fun Fact(label: String, value: String) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = Night.inkSoft,
             modifier = Modifier.width(120.dp),
         )
-        Text(text = value, style = MaterialTheme.typography.bodySmall)
+        Text(text = value, style = MaterialTheme.typography.bodySmall, color = Night.ink)
     }
 }

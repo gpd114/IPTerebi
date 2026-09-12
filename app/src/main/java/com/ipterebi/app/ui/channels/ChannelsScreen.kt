@@ -53,12 +53,15 @@ import coil.compose.AsyncImage
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.ui.CategoryShelf
 import com.ipterebi.app.ui.DpadTextField
+import com.ipterebi.app.ui.PrimaryButton
+import com.ipterebi.app.ui.QuietPill
+import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.SearchFieldShape
 import com.ipterebi.app.ui.SectionTopBar
 import com.ipterebi.app.ui.ShelfChip
 import com.ipterebi.app.ui.focusRing
 import com.ipterebi.app.ui.nightCard
-import com.ipterebi.app.ui.searchFieldColours
+import com.ipterebi.app.ui.fieldColours
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.channelInitials
@@ -75,7 +78,7 @@ fun ChannelsScreen(
 
     Scaffold(
         topBar = { SectionTopBar(title = "Live TV", onSettings = onSettings) },
-        // The glow behind the section screens is drawn once, under the NavHost.
+        // The page is drawn once, under the NavHost.
         containerColor = Color.Transparent,
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -91,7 +94,7 @@ fun ChannelsScreen(
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     singleLine = true,
                     shape = SearchFieldShape,
-                    colors = searchFieldColours(),
+                    colors = fieldColours(),
                     modifier = fieldModifier.fillMaxWidth(),
                 )
             }
@@ -197,49 +200,42 @@ private fun ShelfChips(state: ChannelsUiState, onSelect: (Shelf) -> Unit) {
  */
 @Composable
 private fun ResumeBar(channel: LiveStream, onClick: () -> Unit) {
-    // The one card on the screen with an edge: cobalt to pink, like the icon.
-    Box(
+    // A panel with the one solid-cobalt button on the screen: carrying on is
+    // the most likely thing anyone opening the app wants.
+    val shape = RoundedCornerShape(22.dp)
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(Night.edge)
-            .padding(1.5.dp),
+            .nightCard(shape)
+            .focusRing(shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .nightCard(RoundedCornerShape(16.5.dp), Night.cardStrong)
-                .focusRing(RoundedCornerShape(16.5.dp))
-                .clickable(onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(Night.cobalt),
+            contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(Night.cobalt),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White)
-            }
-            Spacer(Modifier.size(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "CARRY ON WATCHING",
-                    style = MaterialTheme.typography.labelSmall,
-                    letterSpacing = 0.8.sp,
-                    color = Night.inkSoft,
-                )
-                Text(
-                    text = channel.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White)
+        }
+        Spacer(Modifier.size(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "CARRY ON WATCHING",
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 0.8.sp,
+                color = Night.accent,
+            )
+            Text(
+                text = channel.name,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
     Spacer(Modifier.height(12.dp))
@@ -286,16 +282,7 @@ private fun ChannelRow(
         }
 
         if (channel.number > 0) {
-            Text(
-                text = "${channel.number}",
-                style = MaterialTheme.typography.labelSmall,
-                color = Night.inkSoft,
-                modifier = Modifier
-                    .padding(start = 8.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Night.ground)
-                    .padding(horizontal = 7.dp, vertical = 4.dp),
-            )
+            QuietPill("${channel.number}", Modifier.padding(start = 8.dp))
         }
 
         IconButton(onClick = onStar) {
@@ -327,7 +314,7 @@ private fun ChannelLogo(channel: LiveStream) {
         modifier = Modifier
             .size(46.dp)
             .clip(tile)
-            .background(if (showLogo) Brush.linearGradient(listOf(LogoGround, LogoGround)) else tileColours(channel.name)),
+            .background(if (showLogo) Night.quiet else tileColour(channel.name)),
         contentAlignment = Alignment.Center,
     ) {
         if (showLogo) {
@@ -348,22 +335,17 @@ private fun ChannelLogo(channel: LiveStream) {
     }
 }
 
-private val LogoGround = Color(0xFF1C2548)
-
-/** Pairs from the icon's own colours, darkened enough for white initials. */
-private val TilePairs = listOf(
-    Color(0xFF2F6BFF) to Color(0xFF1B3A8C),
-    Color(0xFFFF8FA3) to Color(0xFFC2456B),
-    Color(0xFF3CC6B0) to Color(0xFF1D7F74),
-    Color(0xFFFFB14E) to Color(0xFFC9692A),
-    Color(0xFF8A7BFF) to Color(0xFF3A2F6E),
-    Color(0xFF5AA9E6) to Color(0xFF1F4F8C),
+/** Flat, from the icon's own family, deep enough for white initials. No yellow. */
+private val TileColours = listOf(
+    Color(0xFF2F5FD6),
+    Color(0xFFC2456B),
+    Color(0xFF1D8A7E),
+    Color(0xFF5B4BC9),
+    Color(0xFF2B79B8),
+    Color(0xFF8A3F9E),
 )
 
-private fun tileColours(name: String): Brush {
-    val (from, to) = TilePairs[Math.floorMod(name.hashCode(), TilePairs.size)]
-    return Brush.linearGradient(listOf(from, to))
-}
+private fun tileColour(name: String): Color = TileColours[Math.floorMod(name.hashCode(), TileColours.size)]
 
 /**
  * What is being searched, so a short list of results is not mistaken for the
@@ -439,11 +421,11 @@ private fun ErrorPanel(
             style = MaterialTheme.typography.bodyMedium,
         )
         Spacer(Modifier.height(16.dp))
-        Button(onClick = onRetry) { Text("Try again") }
+        PrimaryButton(onClick = onRetry) { Text("Try again", style = MaterialTheme.typography.labelLarge) }
 
         if (onLoadEverything != null) {
             Spacer(Modifier.height(8.dp))
-            TextButton(onClick = onLoadEverything) { Text("Load every channel") }
+            SecondaryButton(text = "Load every channel", onClick = onLoadEverything)
             Text(
                 "One request for the whole line. On a large one this is several " +
                     "megabytes and takes a while.",

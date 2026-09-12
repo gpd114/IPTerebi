@@ -1,5 +1,7 @@
 M PLUS Rounded 1c (Medium, Bold, ExtraBold), bundled as app/src/main/res/font/mplus_rounded_*.ttf
-Source: https://github.com/google/fonts/tree/main/ofl/mplusrounded1c
+as Latin-only cuts of the fonts at https://github.com/google/fonts/tree/main/ofl/mplusrounded1c
+(the same cuts the Debritsu app ships). Cutting a font is a Modified Version under the licence
+below, which it permits; M PLUS Rounded 1c declares no Reserved Font Name.
 
 Copyright 2016 The Rounded M+ Project Authors.
 
