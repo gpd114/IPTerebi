@@ -219,12 +219,12 @@ fun PosterTile(
                     text = "★ " + String.format(Locale.ROOT, "%.1f", rating),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.ExtraBold,
-                    color = Night.onYellow,
+                    color = Night.ground,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .padding(6.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Night.yellow)
+                        .background(Night.glossy)
                         .padding(horizontal = 6.dp, vertical = 3.dp),
                 )
             }

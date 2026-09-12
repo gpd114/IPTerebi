@@ -858,7 +858,7 @@ private fun PlayerContent(
                 Icon(
                     Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = null,
-                    tint = Night.yellow,
+                    tint = Night.cobaltLight,
                 )
                 Text(
                     text = "Playing in another app",
