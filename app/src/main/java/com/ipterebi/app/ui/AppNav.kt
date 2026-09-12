@@ -2,6 +2,7 @@ package com.ipterebi.app.ui
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -318,6 +319,7 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
             .fillMaxWidth()
             .shadow(14.dp, bar)
             .nightCard(bar)
+            .border(1.dp, Night.controlEdge, bar)
             .height(62.dp)
             .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceAround,

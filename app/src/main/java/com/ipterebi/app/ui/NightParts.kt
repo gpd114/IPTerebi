@@ -2,6 +2,8 @@ package com.ipterebi.app.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
@@ -67,24 +69,27 @@ fun SectionTopBar(title: String, onSettings: () -> Unit) {
         actions = {
             IconButton(
                 onClick = onSettings,
-                colors = IconButtonDefaults.iconButtonColors(containerColor = Night.card),
-                modifier = Modifier.focusRing(CircleShape),
+                colors = IconButtonDefaults.iconButtonColors(containerColor = Night.control),
+                modifier = Modifier
+                    .padding(end = 4.dp)
+                    .border(1.dp, Night.controlEdge, CircleShape)
+                    .focusRing(CircleShape),
             ) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Night.inkSoft)
+                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = Night.chipInk)
             }
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
     )
 }
 
-/** The search field's look: a filled pill, outlined only while it is being typed in. */
+/** The search field's look: a filled pill with a thin outline, cobalt while being typed in. */
 val SearchFieldShape = RoundedCornerShape(26.dp)
 
 @Composable
 fun searchFieldColours(): TextFieldColors = OutlinedTextFieldDefaults.colors(
-    unfocusedContainerColor = Night.card,
-    focusedContainerColor = Night.card,
-    unfocusedBorderColor = Color.Transparent,
+    unfocusedContainerColor = Night.control,
+    focusedContainerColor = Night.control,
+    unfocusedBorderColor = Night.controlEdge,
     focusedBorderColor = Night.cobalt,
     unfocusedPlaceholderColor = Night.inkSoft,
     focusedPlaceholderColor = Night.inkSoft,

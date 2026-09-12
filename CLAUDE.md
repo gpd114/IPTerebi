@@ -21,8 +21,12 @@ class belongs in `core/`, because that is the half that can be proven.
 ## The look
 
 "Night set", taken from the launcher icon (Terebi-kun): night blue lit cobalt
-from the top, glossy white for what is selected, yellow for what you can act
-on (play, favourites), pink along the one edge that matters. The palette is
+from the top, cobalt for where you are and what you can act on, glossy white
+for what is selected, pink for favourites and along the one edge that matters.
+No yellow in the app — its owner asked for it out; the icon keeps it. Anything
+pressable (chips, the search field, the settings button) is `Night.control`
+with a `controlEdge` outline: in the cards' navy they vanished into the glow
+behind them. The palette is
 `Night` in `ui/theme/Theme.kt`; the shared pieces — `SectionTopBar`,
 `nightCard`, the search field's shape and colours — are in `ui/NightParts.kt`.
 Use those rather than new literals, or the app drifts back to stock Material.

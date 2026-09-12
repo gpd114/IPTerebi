@@ -14,8 +14,10 @@ import com.ipterebi.app.R
 
 /**
  * "Night set": the app dressed in its icon. Night blue behind, cobalt for where
- * you are, glossy white for what is selected, the yellow of Terebi-kun's eyes
- * for what you can act on, the pink of his smile along the edges.
+ * you are and for what you can act on, glossy white for what is selected, the
+ * pink of Terebi-kun's smile for favourites and along the one edge that
+ * matters. No yellow in the app itself: the owner asked for it gone. (The
+ * icon keeps its yellow eyes and bobbles.)
  *
  * Dark only, and not because a light scheme would be hard: the app is a frame
  * around moving video, and a light chrome around a dark picture is unpleasant
@@ -25,15 +27,23 @@ object Night {
     val ground = Color(0xFF0B1122)
     /** The cobalt glow at the top of every section screen. */
     val glow = Color(0xFF1A2B5E)
-    val card = Color(0xFF141C35)
-    val cardStrong = Color(0xFF172042)
-    val chip = Color(0xFF18213F)
-    val chipInk = Color(0xFFC9D3F2)
+    val card = Color(0xFF16203F)
+    val cardStrong = Color(0xFF1A2548)
+
+    /**
+     * What you press — category chips, the search field, the settings button —
+     * lighter than the cards and outlined. They were the cards' navy, and sat
+     * on a backdrop lit that same blue exactly where they are: measured on the
+     * phone, they disappeared into it.
+     */
+    val control = Color(0xFF26325E)
+    val controlEdge = Color(0xFF41508A)
+    val chipInk = Color(0xFFE3E9FF)
     val ink = Color(0xFFEEF2FF)
-    val inkSoft = Color(0xFF97A3C7)
+    val inkSoft = Color(0xFF9AA6CA)
     val cobalt = Color(0xFF2F6BFF)
-    val yellow = Color(0xFFFFE066)
-    val onYellow = Color(0xFF1B1A36)
+    /** Cobalt lifted for small marks on dark ground, where the full one sinks. */
+    val cobaltLight = Color(0xFF8FB4FF)
     val pink = Color(0xFFFF8FA3)
     /** Selected chips: the set's white, not a colour. */
     val glossy = Color(0xFFEAF0FB)
@@ -56,8 +66,8 @@ private val ColorScheme = darkColorScheme(
     onPrimary = Color.White,
     primaryContainer = Night.cobalt,
     onPrimaryContainer = Color.White,
-    secondary = Night.yellow,
-    onSecondary = Night.onYellow,
+    secondary = Night.cobaltLight,
+    onSecondary = Night.ground,
     secondaryContainer = Night.cobalt,
     onSecondaryContainer = Color.White,
     tertiary = Night.pink,
@@ -66,14 +76,14 @@ private val ColorScheme = darkColorScheme(
     onBackground = Night.ink,
     surface = Night.ground,
     onSurface = Night.ink,
-    surfaceVariant = Night.chip,
+    surfaceVariant = Night.control,
     onSurfaceVariant = Night.inkSoft,
     surfaceContainerLowest = Color(0xFF080D1A),
     surfaceContainerLow = Color(0xFF10172D),
     surfaceContainer = Night.card,
     surfaceContainerHigh = Night.cardStrong,
     surfaceContainerHighest = Color(0xFF1C2548),
-    outline = Color(0xFF3A4675),
+    outline = Night.controlEdge,
     outlineVariant = Color(0xFF26305A),
     error = Color(0xFFFF8A80),
     onError = Color(0xFF1A0A08),

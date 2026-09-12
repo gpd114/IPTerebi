@@ -219,10 +219,10 @@ private fun ResumeBar(channel: LiveStream, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(38.dp)
                     .clip(CircleShape)
-                    .background(Night.yellow),
+                    .background(Night.cobalt),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Night.onYellow)
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, tint = Color.White)
             }
             Spacer(Modifier.size(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -306,7 +306,7 @@ private fun ChannelRow(
                 } else {
                     "Add ${channel.name} to favourites"
                 },
-                tint = if (starred) Night.yellow else Night.inkSoft,
+                tint = if (starred) Night.pink else Night.inkSoft,
             )
         }
     }

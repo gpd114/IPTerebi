@@ -77,8 +77,9 @@ fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
                 key(chip.key) {
                     val bringIntoView = remember { BringIntoViewRequester() }
                     // Night set: the category you are in is the set's glossy
-                    // white; the rest are soft navy pills with no outline; the
-                    // app's own shelves are picked out in yellow.
+                    // white; the rest are lighter pills with a thin outline, so
+                    // they stand off the cobalt glow behind them; the app's own
+                    // shelves are picked out in pink.
                     FilterChip(
                         modifier = Modifier
                             .bringIntoViewRequester(bringIntoView)
@@ -95,12 +96,18 @@ fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
                         },
                         shape = ChipShape,
                         colors = FilterChipDefaults.filterChipColors(
-                            containerColor = Night.chip,
-                            labelColor = if (chip.special) Night.yellow else Night.chipInk,
+                            containerColor = Night.control,
+                            labelColor = if (chip.special) Night.pink else Night.chipInk,
                             selectedContainerColor = Night.glossy,
                             selectedLabelColor = Night.ground,
                         ),
-                        border = null,
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = chip.selected,
+                            borderColor = Night.controlEdge,
+                            selectedBorderColor = Color.Transparent,
+                            borderWidth = 1.dp,
+                        ),
                         elevation = FilterChipDefaults.filterChipElevation(elevation = 0.dp),
                     )
                     if (chip.selected) {
