@@ -30,9 +30,11 @@ import com.ipterebi.app.BuildConfig
 import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.core.EpgListing
 import com.ipterebi.core.XtreamAccount
+import com.ipterebi.core.lineKey
 import com.ipterebi.core.nowAndNext
 import kotlinx.coroutines.delay
 import java.time.Instant
+import java.time.ZoneId
 
 /**
  * How often the clock advances. Only the progress bar reads it, and a bar two
@@ -100,11 +102,15 @@ fun rememberProgrammeGuide(
         listings = container.xtream.shortEpg(account, streamId)
         lastFetched = Instant.now()
         if (BuildConfig.DEBUG) {
-            val current = listings.nowAndNext(Instant.now()).now
+            val at = Instant.now()
+            val current = container.guideClock
+                .correct(account.lineKey, listings, at, ZoneId.systemDefault()).nowAndNext(at).now
+            val shift = container.guideClock.shiftFor(account.lineKey)
             Log.d(
                 TAG_PLAY,
                 "stream $streamId guide: ${listings.size} programmes, " +
-                    "now ${current?.titleText ?: "(nothing listed)"}",
+                    "now ${current?.titleText ?: "(nothing listed)"}" +
+                    (if (shift != 0L) ", panel's clock put right by ${shift / 60} min" else ""),
             )
         }
     }
@@ -120,14 +126,21 @@ fun rememberProgrammeGuide(
     // ask for. Guarded twice over: on having been given anything at all, so a
     // channel with no guide does not re-ask forever, and on [MIN_REFETCH_SECONDS],
     // so one whose guide has stopped being updated does not either.
-    val lastKnownEnd = remember(listings) { listings.maxOfOrNull { it.stopTimestamp } ?: 0L }
+    // On the corrected clock, or a guide an hour out would run dry an hour
+    // before being asked again.
+    val lastKnownEnd = remember(listings, now) {
+        listings.maxOfOrNull { it.stopTimestamp }?.plus(container.guideClock.shiftFor(account.lineKey)) ?: 0L
+    }
     LaunchedEffect(now, lastKnownEnd) {
         val runOut = lastKnownEnd > 0L && now.epochSecond >= lastKnownEnd
         val cooledDown = now.epochSecond - lastFetched.epochSecond >= MIN_REFETCH_SECONDS
         if (runOut && cooledDown) reloads++
     }
 
-    val (current, upNext) = listings.nowAndNext(now)
+    // Put right first when the panel's clock is out; see GuideClock.
+    val (current, upNext) = remember(listings, now) {
+        container.guideClock.correct(account.lineKey, listings, now, ZoneId.systemDefault()).nowAndNext(now)
+    }
     return ProgrammeGuide(now = current, next = upNext, at = now)
 }
 
