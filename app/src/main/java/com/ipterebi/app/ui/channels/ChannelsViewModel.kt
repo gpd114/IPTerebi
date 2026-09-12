@@ -162,6 +162,10 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
                     _state.update { it.copy(query = "", results = null, searchNote = null) }
                     startLoad { loadCategories() }
                 }
+                // The full guide, in the background, when it is due and the
+                // phone is on Wi-Fi: it is tens of megabytes on a big line.
+                // Every change of settings asks, which costs nothing when fresh.
+                container.guide.refreshIfStale(current.account)
             }
         }
 

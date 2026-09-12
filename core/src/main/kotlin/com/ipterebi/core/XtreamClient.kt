@@ -1,6 +1,8 @@
 package com.ipterebi.core
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerializationException
@@ -10,7 +12,9 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.FilterInputStream
 import java.io.IOException
+import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
 fun defaultXtreamHttpClient(): OkHttpClient = OkHttpClient.Builder()
@@ -251,6 +255,64 @@ class XtreamClient(
     }
 
     /**
+     * The whole line's schedule, from `xmltv.php`, handed over a programme at a
+     * time as it downloads — see [readXmltv] for why it is never held whole.
+     * Blocking work on IO; cancelling the caller stops it at the next programme.
+     *
+     * Unlike [shortEpg], a failure here throws: this is asked for on purpose, to
+     * fill a guide, and "no guide" and "could not reach the panel" should not
+     * look the same. Returns what was read, for logs and for deciding whether
+     * the line has a guide at all.
+     */
+    suspend fun xmltv(
+        account: XtreamAccount,
+        onChannel: (XmltvChannel) -> Unit = {},
+        onProgramme: (XmltvProgramme) -> Unit,
+    ): XmltvSummary = withContext(Dispatchers.IO) {
+        val job = coroutineContext[Job]
+        val base = requireBase(account)
+        val url = base.newBuilder()
+            .addPathSegment("xmltv.php")
+            .addQueryParameter("username", account.username)
+            .addQueryParameter("password", account.password)
+            .build()
+        log("GET ${url.withoutCredentials()}")
+        val request = Request.Builder().url(url).header("User-Agent", account.userAgent).build()
+        val response = try {
+            http.newCall(request).execute()
+        } catch (e: IOException) {
+            throw XtreamException("Could not reach ${base.host}: ${e.message ?: "no response"}.", e)
+        }
+        response.use {
+            if (!it.isSuccessful) throw XtreamException(describeApiHttpError(it.code, base.host))
+            val body = it.body ?: throw XtreamException("The panel sent an empty TV guide.")
+            val counted = CountingInputStream(body.byteStream())
+            var channels = 0
+            var programmes = 0
+            val started = System.currentTimeMillis()
+            try {
+                readXmltv(
+                    input = counted.reader(body.contentType()?.charset() ?: Charsets.UTF_8),
+                    onChannel = { channel -> channels++; onChannel(channel) },
+                    onProgramme = { programme ->
+                        job?.ensureActive()
+                        programmes++
+                        onProgramme(programme)
+                    },
+                )
+            } catch (e: IOException) {
+                throw XtreamException("The TV guide stopped downloading part-way: ${e.message ?: "connection lost"}.", e)
+            }
+            XmltvSummary(channels, programmes, counted.count).also { summary ->
+                log(
+                    "  guide: ${summary.channels} channels, ${summary.programmes} programmes, " +
+                        "${summary.bytes / 1024} KB in ${System.currentTimeMillis() - started} ms"
+                )
+            }
+        }
+    }
+
+    /**
      * Where the video actually is. The credentials sit in the path, not in a
      * header, so this string is as sensitive as the password itself — never log
      * it, and be careful about putting it anywhere a crash reporter can see.
@@ -394,3 +456,17 @@ fun HttpUrl.withoutCredentials(): String = newBuilder()
     .setQueryParameter("password", "***")
     .build()
     .toString()
+
+/** How much of a guide was read. */
+data class XmltvSummary(val channels: Int, val programmes: Int, val bytes: Long)
+
+/** Counts what passes through, so a guide's size can be logged. */
+private class CountingInputStream(input: InputStream) : FilterInputStream(input) {
+    var count = 0L
+        private set
+
+    override fun read(): Int = super.read().also { if (it >= 0) count++ }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int =
+        super.read(b, off, len).also { if (it > 0) count += it }
+}

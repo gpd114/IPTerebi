@@ -109,7 +109,10 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
             // are keyed on it, and without the account there is no way to name
             // the keys to remove. Leaving them would hand the next line to sign
             // in a shelf of stream ids from somebody else's panel.
-            account?.let { container.channelLists.clear(it) }
+            account?.let {
+                container.channelLists.clear(it)
+                container.guide.forget(it)
+            }
             container.credentials.clear()
             // Ids are a panel's private numbering, so anything still held here
             // would put this line's titles on the next line's ids.

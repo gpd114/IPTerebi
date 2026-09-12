@@ -1,82 +1,129 @@
 package com.ipterebi.core
 
 import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 
 /**
- * Puts a line's guide back on the right clock when its panel has it wrong.
+ * Puts a line's `get_short_epg` answers back on the right clock when its panel
+ * has it wrong.
  *
- * `start_timestamp` is meant to be unix seconds, and everything here reads it
- * rather than the `start` string, which is the panel's wall clock in no stated
- * zone. But a real UK line sent Saturday Night Football as `"18:00:00"` with a
- * timestamp for 18:00 *UTC* — 19:00 in the UK in summer — so the match being
- * played was listed as an hour away, and "now" showed nothing. The panel had
- * written UK wall-clock times down as if they were UTC. Every programme on the
- * line was an hour late, for as long as the clocks were forward.
+ * `start_timestamp` is meant to be unix seconds. On the first real line it was
+ * two hours late: Saturday Night Football ran 17:00–20:00 UK time (kick-off
+ * 17:30, confirmed by the viewer, and the same in the line's `xmltv.php`), but
+ * `get_short_epg` sent it as `"18:00:00"` with a timestamp for 19:00 UK time.
+ * The panel's own wall clock was two hours ahead of UTC and it wrote that
+ * wall clock into the timestamps as if it were UTC.
  *
- * The string cannot simply be trusted instead: a panel in another zone writes
- * its own wall clock there, with timestamps that are right. What tells the two
- * apart is `get_short_epg` itself, which answers from the programme the panel
- * thinks is on now. So a guide is corrected only when **nothing in it is on
- * now, but moving it by the gap between its strings (read in this device's
- * zone) and its timestamps puts its first programme on now** — and that gap is
- * the same for every programme, a whole quarter-hour, and under fourteen hours.
- * A panel with honest timestamps has its current programme on now already, and
- * is never touched.
+ * A first attempt read the strings in the viewer's zone and took the gap to
+ * the timestamps as the error — an hour — and looked right, because a
+ * three-hour programme covers either start. It was still an hour out. The
+ * strings are in the panel's zone, which is unknown, so they prove nothing.
+ * What the error really is comes from two kinds of evidence, best first:
  *
- * The shift is kept once learned, per line — it is a property of the panel —
- * so a channel whose own listing happens to have a gap is still put right.
+ * 1. **The full guide.** `xmltv.php` times carry their own offset. A programme
+ *    found in both — same title, same length — gives the error exactly
+ *    ([learnFrom]). A line whose timestamps are right learns 0 this way, and is
+ *    then never shifted.
+ * 2. **What `get_short_epg` answers from.** It starts from the programme the
+ *    panel thinks is on now, so when nothing in an answer is on now, the error
+ *    must put that first programme on now: a window as wide as the programme.
+ *    One channel is not enough — an honest panel can simply have a gap — so a
+ *    shift is only made once two channels' windows agree, and the whole hour
+ *    nearest the middle of where they overlap is taken.
  */
 class GuideClock {
-    private val learned = HashMap<String, Long>()
+    private val exact = HashMap<String, Long>()
+    private val windows = HashMap<String, LinkedHashMap<String, LongRange>>()
 
     /**
-     * [listings] from [line], as they should be read at [now] in [zone]:
-     * shifted when the panel's timestamps are out, as they came otherwise.
+     * Learns [line]'s error exactly from one channel's short answer and the
+     * same channel's programmes in the full guide. Does nothing when no
+     * programme is in both.
      */
     @Synchronized
-    fun correct(line: String, listings: List<EpgListing>, now: Instant, zone: ZoneId): List<EpgListing> {
-        if (listings.isEmpty() || listings.any { it.isOnAt(now) }) return listings
-        val shift = guideShiftSeconds(listings, now, zone).takeIf { it != 0L }
-            ?.also { learned[line] = it }
-            ?: learned[line]
-            ?: return listings
+    fun learnFrom(line: String, short: List<EpgListing>, full: List<XmltvProgramme>) {
+        shiftAgainst(short, full)?.let { exact[line] = it }
+    }
+
+    /**
+     * [listings], one [channel]'s short answer on [line], as they should be
+     * read at [now]: shifted when the panel's clock is known, or agreed, to be
+     * out; as they came otherwise.
+     */
+    @Synchronized
+    fun correct(line: String, channel: String, listings: List<EpgListing>, now: Instant): List<EpgListing> {
+        exact[line]?.let { shift -> return if (shift == 0L) listings else listings.map { it.shiftedBy(shift) } }
+        val timed = listings.filter { it.hasKnownTimes }
+        if (timed.isEmpty() || timed.any { it.isOnAt(now) }) return listings
+
+        val first = timed.minBy { it.startTimestamp }
+        val seconds = now.epochSecond
+        val window = (seconds - first.stopTimestamp + 1)..(seconds - first.startTimestamp)
+        val seen = windows.getOrPut(line) { LinkedHashMap() }
+        seen.remove(channel)
+        seen[channel] = window
+        while (seen.size > MAX_WINDOWS) seen.remove(seen.keys.first())
+
+        val shift = agreed(seen.values) ?: return listings
         return listings.map { it.shiftedBy(shift) }
     }
 
-    /** The shift learned for [line], in seconds; 0 when none. For logs. */
+    /** Whether [line]'s error has been measured against the full guide — 0 included. */
     @Synchronized
-    fun shiftFor(line: String): Long = learned[line] ?: 0L
+    fun knows(line: String): Boolean = line in exact
+
+    /** The shift in use for [line], in seconds; 0 when none. For logs. */
+    @Synchronized
+    fun shiftFor(line: String): Long = exact[line] ?: windows[line]?.values?.let(::agreed) ?: 0L
+
+    /** Forgets [line], when it is signed out of. */
+    @Synchronized
+    fun forget(line: String) {
+        exact.remove(line)
+        windows.remove(line)
+    }
 }
 
 /**
- * How many seconds to add to [listings]' timestamps to put them right, or 0
- * when they look right or the evidence is not there. See [GuideClock].
+ * The error between a channel's short answer and the full guide, when they
+ * share a programme — same title, same length — and every shared programme
+ * says the same. Null when there is nothing to compare or they disagree.
  */
-fun guideShiftSeconds(listings: List<EpgListing>, now: Instant, zone: ZoneId): Long {
-    val timed = listings.filter { it.hasKnownTimes }
-    if (timed.isEmpty() || timed.any { it.isOnAt(now) }) return 0
-    val gaps = timed.map { p -> p.start.wallClockSeconds(zone)?.minus(p.startTimestamp) ?: return 0 }
-    val shift = gaps.first()
-    val plausible = shift != 0L && gaps.all { it == shift } &&
-        shift % QUARTER_HOUR == 0L && abs(shift) <= MAX_SHIFT
-    if (!plausible) return 0
-    return if (timed.minBy { it.startTimestamp }.shiftedBy(shift).isOnAt(now)) shift else 0
+fun shiftAgainst(short: List<EpgListing>, full: List<XmltvProgramme>): Long? {
+    val byTitle = full.groupBy { it.title.trim().lowercase() }
+    val gaps = short.filter { it.hasKnownTimes }.flatMap { listing ->
+        val length = listing.stopTimestamp - listing.startTimestamp
+        byTitle[listing.titleText.trim().lowercase()].orEmpty()
+            .filter { abs((it.stop - it.start) - length) < 60 }
+            .map { it.start - listing.startTimestamp }
+    }
+    val shift = gaps.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key ?: return null
+    return shift.takeIf { it % QUARTER_HOUR == 0L && abs(it) <= MAX_SHIFT }
+}
+
+/**
+ * What every window allows, as a whole hour nearest the middle of it — or a
+ * quarter-hour, for the zones that are not whole hours — or null when there
+ * are fewer than two windows or they do not overlap.
+ */
+private fun agreed(windows: Collection<LongRange>): Long? {
+    if (windows.size < 2) return null
+    val from = windows.maxOf { it.first }
+    val to = windows.minOf { it.last }
+    if (from > to) return null
+    val middle = (from + to) / 2
+    for (step in longArrayOf(3600L, QUARTER_HOUR)) {
+        val candidates = (Math.floorDiv(from, step) - 1..Math.floorDiv(to, step) + 1)
+            .map { it * step }
+            .filter { it in from..to && it != 0L && abs(it) <= MAX_SHIFT }
+        candidates.minByOrNull { abs(it - middle) }?.let { return it }
+    }
+    return null
 }
 
 fun EpgListing.shiftedBy(seconds: Long): EpgListing =
     copy(startTimestamp = startTimestamp + seconds, stopTimestamp = stopTimestamp + seconds)
 
-/** `"2026-09-12 18:00:00"` as unix seconds in [zone], or null for anything else. */
-private fun String.wallClockSeconds(zone: ZoneId): Long? = try {
-    LocalDateTime.parse(trim(), WALL_CLOCK).atZone(zone).toEpochSecond()
-} catch (e: Exception) {
-    null
-}
-
-private val WALL_CLOCK = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 private const val QUARTER_HOUR = 15 * 60L
 private const val MAX_SHIFT = 14 * 3600L
+private const val MAX_WINDOWS = 12
