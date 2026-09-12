@@ -76,6 +76,11 @@ watches the focused channel full screen; holding OK toggles it in
 Favourites (acted on at key-up, so a first repeat can mean "held"); Back
 closes.
 
+The groups slide over the channels, and that is the owner's choice, made
+twice: a version with the categories as a fixed column beside the channels
+(PR #36, the grid narrowed to 90 minutes to fit) was built, tried on their
+box, and put back to this on their word.
+
 - **A cursor, not focusable cells.** Thousands of cells of different widths
   would put focus wherever geometry says. One focusable handles the keys and
   the rules are `GuideGrid` in `core/`, tested: left/right programme by
