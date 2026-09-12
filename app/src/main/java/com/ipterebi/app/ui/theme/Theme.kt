@@ -31,11 +31,19 @@ object Night {
     val cardStrong = Color(0xFF1A2548)
 
     /**
-     * What you press — category chips, the search field, the settings button —
-     * lighter than the cards and outlined. They were the cards' navy, and sat
-     * on a backdrop lit that same blue exactly where they are: measured on the
-     * phone, they disappeared into it.
+     * What you press — category chips, the settings button — is white with
+     * dark ink. Two rounds of navy did not work: first the cards' own navy,
+     * then a lighter one with an outline, and on the phone both were still
+     * blue on blue against the cobalt glow they sit in. White is the one colour
+     * that glow cannot swallow. The chip you are on is cobalt, as the tab bar's
+     * is: cobalt means "where you are".
      */
+    val button = Color(0xFFEEF2FB)
+    val onButton = Color(0xFF0B1122)
+    /** Pink dark enough to read on [button]; the icon's own pink is too pale for it. */
+    val pinkOnButton = Color(0xFFC2456B)
+
+    /** Controls that stay dark — the tab bar, the search field — and their outline. */
     val control = Color(0xFF26325E)
     val controlEdge = Color(0xFF41508A)
     val chipInk = Color(0xFFE3E9FF)
