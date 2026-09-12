@@ -26,7 +26,11 @@ owner's Debritsu, whose TV app lives the same way on its own `tv` branch.
   handled (see the connection-limit notes below), everything is free, and the
   phone and TV apps are one family.
 - **Test on real Android TV**: the `googletv34` AVD (Google TV, Android 14).
-  The owner's own box is a Mi Box (Android TV 9); "any Google TV box" is the aim.
+  The owner's own box is a Xiaomi MiTV-AFKR0 (Android 11, 32-bit ARM, 1080p);
+  "any Google TV box" is the aim. It has run the app against the owner's real
+  line. Android 9–11 boxes do not announce network ADB, so find one by its IP
+  (or a scan for port 5555) and `adb connect <ip>:5555`. Screenshots of it come
+  out blank over video — the picture is on a hardware layer — so read the log.
   Its remote has a D-pad, OK and Back and nothing else a TV app can use — no
   number keys, no channel keys — so everything must work from those; digits
   and channel keys are extras for remotes that have them.
