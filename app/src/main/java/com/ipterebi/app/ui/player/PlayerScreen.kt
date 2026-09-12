@@ -78,6 +78,7 @@ import com.ipterebi.app.data.AccountState
 import com.ipterebi.app.ui.PrimaryButton
 import com.ipterebi.app.ui.focusRing
 import com.ipterebi.app.ui.theme.Night
+import com.ipterebi.app.ui.theme.OverVideo
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextAlign
@@ -840,13 +841,13 @@ private fun PlayerContent(
         if (reconnecting && error == null && !inPictureInPicture) {
             Text(
                 text = "Reconnecting…",
-                color = Night.ink,
+                color = OverVideo.ink,
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .padding(top = 96.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Night.veil.copy(alpha = 0.92f))
+                    .background(OverVideo.panel)
                     .padding(horizontal = 14.dp, vertical = 7.dp),
             )
         }
@@ -856,18 +857,18 @@ private fun PlayerContent(
                 Icon(
                     Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = null,
-                    tint = Night.accent,
+                    tint = OverVideo.accent,
                 )
                 Text(
                     text = "Playing in another app",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Night.ink,
+                    color = OverVideo.ink,
                     modifier = Modifier.padding(top = 12.dp),
                 )
                 Text(
                     text = "Stopped here, so your line is free for it.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Night.inkSoft,
+                    color = OverVideo.inkSoft,
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 PrimaryButton(
@@ -893,7 +894,7 @@ private fun PlayerContent(
             OverVideoPanel(Modifier.align(Alignment.Center)) {
                 Text(
                     text = message,
-                    color = Night.ink,
+                    color = OverVideo.ink,
                     style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
                 )
@@ -950,7 +951,7 @@ private fun OverVideoPanel(modifier: Modifier = Modifier, content: @Composable C
             .padding(24.dp)
             .widthIn(max = 420.dp)
             .clip(RoundedCornerShape(22.dp))
-            .background(Night.veil.copy(alpha = 0.96f))
+            .background(OverVideo.panel)
             .padding(22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         content = content,

@@ -3,14 +3,16 @@
     <!--
       Android 12 and later draw their own splash screen before the app's window,
       and it does not use windowBackground: without its own colour it follows the
-      system's light or dark setting, so on a phone in light mode a dark app
-      opened on a white flash. It needs saying separately here.
+      system's light or dark setting, and the app opened on a flash of the wrong
+      one. It needs saying separately here. It is the Light theme's page, the
+      default; the choice of theme is not known until the app is running, so on
+      Dark the splash is light for that moment.
 
       The whole style is repeated rather than inherited, because a style in a
       qualified folder replaces the one in values/ rather than adding to it.
     -->
     <style name="Theme.IPTerebi" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#101418</item>
-        <item name="android:windowSplashScreenBackground">#101418</item>
+        <item name="android:windowBackground">#F2F4FA</item>
+        <item name="android:windowSplashScreenBackground">#F2F4FA</item>
     </style>
 </resources>
