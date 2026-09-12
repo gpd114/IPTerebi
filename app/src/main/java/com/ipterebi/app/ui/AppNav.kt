@@ -62,10 +62,14 @@ import com.ipterebi.app.ui.series.SeriesDetailScreen
 import com.ipterebi.app.ui.series.SeriesScreen
 import com.ipterebi.app.ui.settings.SettingsScreen
 import com.ipterebi.app.ui.theme.Night
+import com.ipterebi.app.ui.tv.TvDestination
+import com.ipterebi.app.ui.tv.TvLiveScreen
 
 object Route {
     const val LOGIN = "login"
     const val CHANNELS = "channels"
+    // The TV app's home: live television, full screen. See TvLiveScreen.
+    const val TV_LIVE = "tv/live"
     const val FILMS = "films"
     const val SERIES = "series"
     const val SERIES_DETAIL = "series/{id}"
@@ -92,7 +96,7 @@ object Route {
 
 /** The sections the bottom bar, or on a wide screen the rail, switches between. */
 private enum class Section(val route: String, val label: String, val icon: ImageVector) {
-    LIVE(Route.CHANNELS, "Live TV", Icons.Filled.LiveTv),
+    LIVE(Route.TV_LIVE, "Live TV", Icons.Filled.LiveTv),
     FILMS(Route.FILMS, "Films", Icons.Filled.Movie),
     SERIES(Route.SERIES, "Series", Icons.Filled.VideoLibrary),
 }
@@ -115,7 +119,7 @@ fun AppNav(container: AppContainer) {
                 // every state change would look like it works and do nothing —
                 // the navigate calls below are what actually move us.
                 val start = remember {
-                    if (current is AccountState.SignedIn) Route.CHANNELS else Route.LOGIN
+                    if (current is AccountState.SignedIn) Route.TV_LIVE else Route.LOGIN
                 }
 
                 val backStack by nav.currentBackStackEntryAsState()
@@ -154,7 +158,9 @@ fun AppNav(container: AppContainer) {
                     // Scaffold adds that inset a second time and leaves a band of
                     // empty space above the bar.
                     Row(Modifier.padding(padding).consumeWindowInsets(padding)) {
-                        if (section != null && wide) {
+                        // Not over live television, which is the whole screen and has its own
+                        // way to the other sections, in its channel list.
+                        if (section != null && wide && section != Section.LIVE) {
                             NavigationRail(containerColor = Color.Transparent) {
                                 Spacer(Modifier.weight(1f))
                                 Section.entries.forEach { item ->
@@ -188,8 +194,21 @@ fun AppNav(container: AppContainer) {
                                 LoginScreen(
                                     container = container,
                                     onSignedIn = {
-                                        nav.navigate(Route.CHANNELS) {
+                                        nav.navigate(Route.TV_LIVE) {
                                             popUpTo(Route.LOGIN) { inclusive = true }
+                                        }
+                                    },
+                                )
+                            }
+
+                            composable(Route.TV_LIVE) {
+                                TvLiveScreen(
+                                    container = container,
+                                    onOpen = { destination ->
+                                        when (destination) {
+                                            TvDestination.Films -> nav.switchSection(Route.FILMS)
+                                            TvDestination.Series -> nav.switchSection(Route.SERIES)
+                                            TvDestination.Settings -> nav.navigate(Route.SETTINGS)
                                         }
                                     },
                                 )
@@ -352,16 +371,16 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
 /**
  * Moves between top-level sections without stacking them.
  *
- * Anchored on the channel list rather than on the graph's start destination:
+ * Anchored on live television rather than on the graph's start destination:
  * that is LOGIN for anyone who was signed out at launch, and it is no longer on
  * the back stack once they sign in, so popping to it would pop nothing and each
- * switch would push another screen on top. The channel list is always the root
- * of the signed-in stack. Saving and restoring state is what keeps the film
+ * switch would push another screen on top. Live television is always the root
+ * of the signed-in stack on the TV. Saving and restoring state is what keeps the film
  * library's loaded category and scroll position when switching away and back.
  */
 private fun NavController.switchSection(route: String) {
     navigate(route) {
-        popUpTo(Route.CHANNELS) { saveState = true }
+        popUpTo(Route.TV_LIVE) { saveState = true }
         launchSingleTop = true
         restoreState = true
     }
