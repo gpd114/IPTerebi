@@ -182,109 +182,188 @@ internal fun TvChannelGuide(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .focusRequester(gridFocus)
-                .focusable()
-                .onKeyEvent { e ->
-                    if (groupsOpen) return@onKeyEvent false
-                    // From the state as it is now, not as last drawn: a held
-                    // button sends keys faster than the grid redraws.
-                    val channel = channels.getOrNull(row)
-                    if (e.key in Select) {
-                        if (channel == null) return@onKeyEvent true
-                        when (e.type) {
-                            KeyEventType.KeyDown -> {
-                                val repeat = e.nativeKeyEvent.repeatCount
-                                if (repeat == 0) {
-                                    okHeld[0] = true
-                                } else if (okHeld[0]) {
-                                    okHeld[0] = false
-                                    note = if (state.isFavourite(channel.streamId)) {
-                                        "${channel.name} taken off Favourites"
-                                    } else {
-                                        "${channel.name} added to Favourites"
-                                    }
-                                    onFavourite(channel)
-                                }
-                            }
-                            KeyEventType.KeyUp -> if (okHeld[0]) {
-                                okHeld[0] = false
-                                onTune(channel, shown)
-                            }
-                        }
-                        return@onKeyEvent true
-                    }
-                    if (e.type != KeyEventType.KeyDown) return@onKeyEvent e.key in Arrows
-                    if (e.key == Key.Menu) {
-                        groupsOpen = true
-                        return@onKeyEvent true
-                    }
-                    if (channel == null) {
-                        if (e.key == Key.DirectionLeft) groupsOpen = true
-                        return@onKeyEvent e.key in Arrows
-                    }
-                    val here = slotAt(programmesOf(channel), anchor)
-                    when (e.key) {
-                        Key.DirectionUp, Key.ChannelUp -> {
-                            if (row > 0) {
-                                row--
-                                anchor = anchorOf(here, windowStart)
-                            }
-                            true
-                        }
-                        Key.DirectionDown, Key.ChannelDown -> {
-                            if (row < channels.lastIndex) {
-                                row++
-                                anchor = anchorOf(here, windowStart)
-                            }
-                            true
-                        }
-                        Key.DirectionRight -> {
-                            val next = nextSlot(programmesOf(channel), here)
-                            if (next.start < latest) {
-                                anchor = next.start
-                                windowStart = windowFor(windowStart, VISIBLE_SECONDS, next, floorToGuideStep(now))
-                            }
-                            true
-                        }
-                        Key.DirectionLeft -> {
-                            val previous = previousSlot(programmesOf(channel), here)
-                            if (previous.stop > now) {
-                                anchor = previous.start
-                                windowStart = windowFor(windowStart, VISIBLE_SECONDS, previous, floorToGuideStep(now))
-                            } else {
-                                // At what is on now: left is the way to the groups.
-                                groupsOpen = true
-                            }
-                            true
-                        }
-                        else -> false
-                    }
+    val scope = rememberCoroutineScope()
+    val railEntry = remember { FocusRequester() }
+    val categoryEntry = remember { FocusRequester() }
+    val shownIndex = groups.indexOf(shown).coerceAtLeast(0)
+    val categoryList = rememberLazyListState(initialFirstVisibleItemIndex = (shownIndex - 3).coerceAtLeast(0))
+    fun focusCategories() {
+        groupsOpen = true
+        scope.launch {
+            val index = groups.indexOf(shown).coerceAtLeast(0)
+            if (categoryList.layoutInfo.visibleItemsInfo.none { it.index == index }) {
+                categoryList.scrollToItem((index - 3).coerceAtLeast(0))
+            }
+            withFrameNanos { }
+            runCatching { categoryEntry.requestFocus() }
+        }
+    }
+    LaunchedEffect(Unit) { if (groupsOpen) focusCategories() }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().height(GuideTopHeight)) {
+            ProgrammeDetails(
+                channel = focusedChannel,
+                number = focusedChannel?.let { state.lineup?.numberOf(it.streamId) } ?: 0,
+                slot = currentSlot,
+                now = now,
+                zone = zone,
+                footer = note ?: if (groupsOpen) {
+                    "▶  Channels      ◀  Films, Series, Settings"
+                } else {
+                    "◀  Categories      OK  Watch      Hold OK  Favourite"
                 },
-        ) {
-            Row(Modifier.fillMaxWidth().height(GuideTopHeight)) {
-                ProgrammeDetails(
-                    channel = focusedChannel,
-                    number = focusedChannel?.let { state.lineup?.numberOf(it.streamId) } ?: 0,
-                    slot = currentSlot,
-                    now = now,
-                    zone = zone,
-                    footer = note ?: "◀  Groups      OK  Watch      Hold OK  Favourite",
-                    footerColour = if (note != null) TvPink else TvInkSoft,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .background(TvGround)
-                        .padding(start = 48.dp, top = 28.dp, end = 24.dp),
-                )
-                // Unpainted: the player shows through here.
-                Spacer(Modifier.width(GuidePreviewWidth + 48.dp))
+                footerColour = if (note != null) TvPink else TvInkSoft,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(TvGround)
+                    .padding(start = 48.dp, top = 28.dp, end = 24.dp),
+            )
+            // Unpainted: the player shows through here.
+            Spacer(Modifier.width(GuidePreviewWidth + 48.dp))
+        }
+
+        // The rail, the categories and the channels side by side on one page,
+        // the categories drawn as the channels' cells are, so the one runs on
+        // into the other: left from the programme on now steps into them and
+        // right steps back, with nothing sliding in over the top.
+        Row(Modifier.fillMaxSize().background(TvGround).padding(end = 32.dp)) {
+            Column(
+                Modifier
+                    .width(RailWidth)
+                    .fillMaxHeight()
+                    .onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight) { focusCategories(); true } else false
+                    },
+                verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                RailItem(Icons.Filled.LiveTv, "Live TV", selected = true, onClick = onClose, modifier = Modifier.focusRequester(railEntry))
+                TvDestination.entries.forEach { d -> RailItem(d.icon, d.label, selected = false, onClick = { onOpen(d) }) }
             }
 
-            Column(Modifier.fillMaxSize().background(TvGround).padding(start = 32.dp, end = 32.dp)) {
+            Column(
+                Modifier
+                    .width(CategoriesWidth)
+                    .fillMaxHeight()
+                    .padding(end = 6.dp)
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (e.key) {
+                            Key.DirectionRight -> { groupsOpen = false; true }
+                            Key.DirectionLeft -> { runCatching { railEntry.requestFocus() }; true }
+                            else -> false
+                        }
+                    },
+            ) {
+                Text(
+                    "Categories",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TvInkSoft,
+                    modifier = Modifier.height(34.dp).padding(start = 12.dp, top = 9.dp),
+                )
+                LazyColumn(state = categoryList, contentPadding = PaddingValues(bottom = 24.dp)) {
+                    itemsIndexed(groups, key = { _, g -> g.key }) { i, group ->
+                        CategoryRow(
+                            name = state.nameOf(group),
+                            count = state.channelsIn(group).size,
+                            selected = group == shown,
+                            zapping = group == zapGroup,
+                            onFocused = { shown = group },
+                            onClick = { groupsOpen = false },
+                            modifier = if (i == shownIndex) Modifier.focusRequester(categoryEntry) else Modifier,
+                        )
+                    }
+                    if (state.lineup == null) {
+                        item(key = "status") { LineupStatus(state, onRetry) }
+                    }
+                }
+            }
+
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .focusRequester(gridFocus)
+                    .focusable()
+                    .onKeyEvent { e ->
+                        if (groupsOpen) return@onKeyEvent false
+                        // From the state as it is now, not as last drawn: a held
+                        // button sends keys faster than the grid redraws.
+                        val channel = channels.getOrNull(row)
+                        if (e.key in Select) {
+                            if (channel == null) return@onKeyEvent true
+                            when (e.type) {
+                                KeyEventType.KeyDown -> {
+                                    val repeat = e.nativeKeyEvent.repeatCount
+                                    if (repeat == 0) {
+                                        okHeld[0] = true
+                                    } else if (okHeld[0]) {
+                                        okHeld[0] = false
+                                        note = if (state.isFavourite(channel.streamId)) {
+                                            "${channel.name} taken off Favourites"
+                                        } else {
+                                            "${channel.name} added to Favourites"
+                                        }
+                                        onFavourite(channel)
+                                    }
+                                }
+                                KeyEventType.KeyUp -> if (okHeld[0]) {
+                                    okHeld[0] = false
+                                    onTune(channel, shown)
+                                }
+                            }
+                            return@onKeyEvent true
+                        }
+                        if (e.type != KeyEventType.KeyDown) return@onKeyEvent e.key in Arrows
+                        if (e.key == Key.Menu) {
+                            focusCategories()
+                            return@onKeyEvent true
+                        }
+                        if (channel == null) {
+                            if (e.key == Key.DirectionLeft) focusCategories()
+                            return@onKeyEvent e.key in Arrows
+                        }
+                        val here = slotAt(programmesOf(channel), anchor)
+                        when (e.key) {
+                            Key.DirectionUp, Key.ChannelUp -> {
+                                if (row > 0) {
+                                    row--
+                                    anchor = anchorOf(here, windowStart)
+                                }
+                                true
+                            }
+                            Key.DirectionDown, Key.ChannelDown -> {
+                                if (row < channels.lastIndex) {
+                                    row++
+                                    anchor = anchorOf(here, windowStart)
+                                }
+                                true
+                            }
+                            Key.DirectionRight -> {
+                                val next = nextSlot(programmesOf(channel), here)
+                                if (next.start < latest) {
+                                    anchor = next.start
+                                    windowStart = windowFor(windowStart, VISIBLE_SECONDS, next, floorToGuideStep(now))
+                                }
+                                true
+                            }
+                            Key.DirectionLeft -> {
+                                val previous = previousSlot(programmesOf(channel), here)
+                                if (previous.stop > now) {
+                                    anchor = previous.start
+                                    windowStart = windowFor(windowStart, VISIBLE_SECONDS, previous, floorToGuideStep(now))
+                                } else {
+                                    // At what is on now: left is the way to the categories.
+                                    focusCategories()
+                                }
+                                true
+                            }
+                            else -> false
+                        }
+                    },
+            ) {
                 TimeHeader(state.nameOf(shown), windowStart, now, zone)
                 if (channels.isEmpty()) {
                     Text(
@@ -292,7 +371,7 @@ internal fun TvChannelGuide(
                             shown == TvGroup.Favourites -> "No favourites yet. Hold OK on any channel to add it."
                             shown == TvGroup.Recent -> "Channels you watch will appear here."
                             state.lineup == null -> "Loading channels…"
-                            else -> "No channels in this group."
+                            else -> "No channels in this category."
                         },
                         style = MaterialTheme.typography.bodyLarge,
                         color = TvInkSoft,
@@ -315,136 +394,65 @@ internal fun TvChannelGuide(
                 }
             }
         }
-
-        if (groupsOpen) {
-            GroupsPanel(
-                state = state,
-                groups = groups,
-                shown = shown,
-                zapGroup = zapGroup,
-                onShow = { shown = it },
-                onChoose = { groupsOpen = false },
-                onOpen = onOpen,
-                onClose = onClose,
-                onRetry = onRetry,
-                modifier = Modifier.align(Alignment.CenterStart),
-            )
-        }
     }
 }
 
+private val RailWidth = 72.dp
+private val CategoriesWidth = 220.dp
+
 /**
- * The groups, slid out over the guide's left side, with the rail beyond them.
- * Focus moving through them shows each group's channels behind at once, as
- * TiviMate does — clicking into a group to see inside it would be a press per
- * group for nothing.
+ * A category, drawn as a channel row's cell is — the same height, the same
+ * rounded fill — so the column reads as the start of the grid, not a menu
+ * beside it. The one whose channels are showing is lit; the one being zapped
+ * through is in the accent; the focused one is the focus pill.
  */
 @Composable
-private fun GroupsPanel(
-    state: TvLiveState,
-    groups: List<TvGroup>,
-    shown: TvGroup,
-    zapGroup: TvGroup,
-    onShow: (TvGroup) -> Unit,
-    onChoose: () -> Unit,
-    onOpen: (TvDestination) -> Unit,
-    onClose: () -> Unit,
-    onRetry: () -> Unit,
+private fun CategoryRow(
+    name: String,
+    count: Int,
+    selected: Boolean,
+    zapping: Boolean,
+    onFocused: () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val scope = rememberCoroutineScope()
-    val railEntry = remember { FocusRequester() }
-    val groupEntry = remember { FocusRequester() }
-    val shownIndex = groups.indexOf(shown).coerceAtLeast(0)
-    val list = rememberLazyListState(initialFirstVisibleItemIndex = (shownIndex - 4).coerceAtLeast(0))
-
-    fun focusGroups() {
-        scope.launch {
-            if (list.layoutInfo.visibleItemsInfo.none { it.index == shownIndex }) {
-                list.scrollToItem((shownIndex - 4).coerceAtLeast(0))
-            }
-            withFrameNanos { }
-            runCatching { groupEntry.requestFocus() }
-        }
-    }
-    LaunchedEffect(Unit) { focusGroups() }
-
-    Row(
-        modifier
-            .fillMaxHeight()
-            .background(Brush.horizontalGradient(0f to Color(0xF80B0C11), 0.85f to Color(0xF00B0C11), 1f to Color.Transparent))
-            .padding(start = 20.dp, end = 36.dp),
-    ) {
-        Column(
+    TvRow(
+        onClick = onClick,
+        onFocusChange = { if (it) onFocused() },
+        radius = 10.dp,
+        modifier = modifier.fillMaxWidth().height(GuideRowHeight).padding(vertical = 3.dp),
+    ) { focused ->
+        Row(
             Modifier
-                .width(72.dp)
-                .fillMaxHeight()
-                .onPreviewKeyEvent { e ->
-                    if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight) { focusGroups(); true } else false
-                },
-            verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            RailItem(Icons.Filled.LiveTv, "Live TV", selected = true, onClick = onClose, modifier = Modifier.focusRequester(railEntry))
-            TvDestination.entries.forEach { d -> RailItem(d.icon, d.label, selected = false, onClick = { onOpen(d) }) }
-        }
-
-        Column(
-            Modifier
-                .width(250.dp)
-                .fillMaxHeight()
-                .onPreviewKeyEvent { e ->
-                    if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when (e.key) {
-                        Key.DirectionRight -> { onChoose(); true }
-                        Key.DirectionLeft -> { runCatching { railEntry.requestFocus() }; true }
-                        else -> false
+                .fillMaxSize()
+                .background(
+                    when {
+                        focused -> Color.Transparent
+                        selected -> GuideCellNowFill
+                        else -> GuideCellFill
                     }
-                },
+                )
+                .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Groups",
-                style = MaterialTheme.typography.labelMedium,
-                color = TvInkSoft,
-                modifier = Modifier.padding(start = 12.dp, top = 24.dp, bottom = 8.dp),
+                name,
+                style = MaterialTheme.typography.labelLarge,
+                color = when {
+                    focused -> TvFocusInk
+                    zapping || selected -> TvAccent
+                    else -> TvInk
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
-            LazyColumn(state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
-                itemsIndexed(groups, key = { _, g -> g.key }) { i, group ->
-                    val count = state.channelsIn(group).size
-                    TvRow(
-                        onClick = onChoose,
-                        onFocusChange = { if (it) onShow(group) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .then(if (i == shownIndex) Modifier.focusRequester(groupEntry) else Modifier),
-                    ) { focused ->
-                        Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                state.nameOf(group),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = when {
-                                    focused -> TvFocusInk
-                                    group == zapGroup -> TvAccent
-                                    else -> TvInk
-                                },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
-                            )
-                            if (count > 0) {
-                                Text(
-                                    "$count",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = if (focused) TvFocusInk.copy(alpha = 0.6f) else TvInkSoft,
-                                )
-                            }
-                        }
-                    }
-                }
-                if (state.lineup == null) {
-                    item(key = "status") { LineupStatus(state, onRetry) }
-                }
+            if (count > 0) {
+                Text(
+                    "$count",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (focused) TvFocusInk.copy(alpha = 0.6f) else TvInkSoft,
+                )
             }
         }
     }
