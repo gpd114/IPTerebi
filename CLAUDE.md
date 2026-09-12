@@ -284,6 +284,17 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   here reads; the strings are kept for logs only. Note these want a Long, not an
   Int — a guide is the one thing routinely asked about the future, and unix
   seconds stop fitting in an Int in 2038.
+- **…and the timestamps can be wrong too.** The first real line wrote UK
+  wall-clock times into them as if they were UTC: Saturday Night Football,
+  listed `"18:00:00"` and on air at 18:00, had a timestamp for 19:00 UK time,
+  so in summer every programme was an hour late and "now" showed nothing.
+  `GuideClock` puts it right, but only on evidence: when nothing is on now and
+  moving by the gap between the strings (read in the device's zone) and the
+  timestamps puts the first programme on now — `get_short_epg` answers from
+  what the panel thinks is on. A panel with honest timestamps and strings in
+  its own zone has its programme on now already, and is left alone. The shift
+  is learned per line, since it is the panel's. The debug log prints each
+  programme's time against the device clock, which is how this was found.
 - **There is no guide call for a list.** `get_short_epg` takes one `stream_id`,
   and the only alternative is `xmltv.php`, which is the whole schedule for every
   channel on the line as XML. So the guide is a per-channel request made when a
