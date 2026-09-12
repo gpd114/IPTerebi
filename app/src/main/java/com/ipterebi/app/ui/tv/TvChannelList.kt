@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Settings
@@ -96,6 +97,8 @@ internal fun TvChannelList(
     onTune: (LiveStream, TvGroup) -> Unit,
     onFavourite: (LiveStream) -> Unit,
     onOpen: (TvDestination) -> Unit,
+    /** The TV guide, over the same picture. */
+    onGuide: () -> Unit,
     onClose: () -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -172,6 +175,7 @@ internal fun TvChannelList(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 RailItem(Icons.Filled.LiveTv, "Live TV", selected = true, onClick = onClose, modifier = Modifier.focusRequester(railEntry))
+                RailItem(Icons.Filled.GridView, "TV guide", selected = false, onClick = onGuide)
                 TvDestination.entries.forEach { d -> RailItem(d.icon, d.label, selected = false, onClick = { onOpen(d) }) }
             }
 

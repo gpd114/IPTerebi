@@ -160,6 +160,9 @@ private fun TvLive(
         ?: TvGroup.All
 
     var listOpen by remember { mutableStateOf(false) }
+    var guideOpen by remember { mutableStateOf(false) }
+    // Either covers the picture, and takes the remote.
+    val covered = listOpen || guideOpen
     var bannerAt by remember { mutableLongStateOf(0L) }
     var bannerShown by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
@@ -440,8 +443,8 @@ private fun TvLive(
     }
 
     val rootFocus = remember { FocusRequester() }
-    LaunchedEffect(listOpen, error, released) {
-        if (!listOpen && error == null && !released) runCatching { rootFocus.requestFocus() }
+    LaunchedEffect(covered, error, released) {
+        if (!covered && error == null && !released) runCatching { rootFocus.requestFocus() }
     }
 
     // Back, taken before focus sees it. Compose treats Back as "leave this
@@ -453,6 +456,7 @@ private fun TvLive(
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     fun onBack() {
         when {
+            guideOpen -> guideOpen = false
             listOpen -> listOpen = false
             bannerShown || typed.isNotEmpty() -> {
                 bannerShown = false
@@ -478,7 +482,7 @@ private fun TvLive(
                 true
             }
             .onKeyEvent { e ->
-                if (listOpen) return@onKeyEvent false
+                if (covered) return@onKeyEvent false
                 val down = e.type == KeyEventType.KeyDown
                 val digit = e.digit()
                 when {
@@ -493,7 +497,8 @@ private fun TvLive(
                         true
                     }
                     e.key == Key.DirectionRight || e.key == Key.Info -> {
-                        if (down) { if (bannerShown) bannerShown = false else showBanner() }
+                        // Once for the banner, again for the guide.
+                        if (down) { if (bannerShown) { bannerShown = false; guideOpen = true } else showBanner() }
                         true
                     }
                     // On release, not press: the list opens under the remote,
@@ -505,7 +510,8 @@ private fun TvLive(
                         // Left to a focused button — Try again — to press.
                         error == null && !released
                     }
-                    e.key == Key.Menu || e.key == Key.Guide -> { if (!down) listOpen = true; true }
+                    e.key == Key.Menu -> { if (!down) listOpen = true; true }
+                    e.key == Key.Guide -> { if (!down) guideOpen = true; true }
                     else -> false
                 }
             }
@@ -529,13 +535,22 @@ private fun TvLive(
                 view.player = player
                 // The player's own spinner, but not behind a message or the
                 // list: two things turning in one place reads as a fault.
-                val quiet = waitingForLine || error != null || released || listOpen
+                val quiet = waitingForLine || error != null || released || covered
                 view.setShowBuffering(if (quiet) PlayerView.SHOW_BUFFERING_NEVER else PlayerView.SHOW_BUFFERING_ALWAYS)
             },
-            modifier = Modifier.fillMaxSize(),
+            // In the guide, the same player in the corner it leaves for it:
+            // one stream, never a second for a preview.
+            modifier = if (guideOpen) {
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = GuideTopHeight - GuidePreviewHeight - 12.dp, end = 32.dp)
+                    .size(GuidePreviewWidth, GuidePreviewHeight)
+            } else {
+                Modifier.fillMaxSize()
+            },
         )
 
-        if (reconnecting && error == null && !listOpen) {
+        if (reconnecting && error == null && !covered) {
             Text(
                 "Reconnecting…",
                 color = TvInk,
@@ -549,7 +564,7 @@ private fun TvLive(
             )
         }
 
-        if (waitingForLine && error == null && !listOpen) {
+        if (waitingForLine && error == null && !covered) {
             TvMessage(Modifier.align(Alignment.Center)) {
                 CircularProgressIndicator(color = TvAccent, strokeWidth = 3.dp, modifier = Modifier.size(36.dp))
                 Spacer(Modifier.height(16.dp))
@@ -567,7 +582,7 @@ private fun TvLive(
         }
 
         // With nothing tuned: the list could not be had, or the line is empty.
-        if (tunedId == 0 && state.recentsRead && !state.loading && !listOpen &&
+        if (tunedId == 0 && state.recentsRead && !state.loading && !covered &&
             (state.error != null || state.lineup?.all?.isEmpty() == true)
         ) {
             TvMessage(Modifier.align(Alignment.Center)) {
@@ -587,7 +602,7 @@ private fun TvLive(
             }
         }
 
-        error?.takeIf { !listOpen }?.let { message ->
+        error?.takeIf { !covered }?.let { message ->
             TvMessage(Modifier.align(Alignment.Center)) {
                 Text(tuned?.name ?: "This channel", style = MaterialTheme.typography.titleMedium, color = TvInkSoft)
                 Spacer(Modifier.height(6.dp))
@@ -601,7 +616,7 @@ private fun TvLive(
             }
         }
 
-        if (released && !listOpen) {
+        if (released && !covered) {
             TvMessage(Modifier.align(Alignment.Center)) {
                 Text("Stopped", style = MaterialTheme.typography.titleLarge, color = TvInk)
                 Spacer(Modifier.height(6.dp))
@@ -615,7 +630,7 @@ private fun TvLive(
 
         AnimatedVisibility(
             // Not under a message, which names the channel itself.
-            visible = bannerShown && !listOpen && tuned != null && error == null && !waitingForLine && !released,
+            visible = bannerShown && !covered && tuned != null && error == null && !waitingForLine && !released,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -659,6 +674,19 @@ private fun TvLive(
             )
         }
 
+        if (guideOpen) {
+            TvGuide(
+                container = container,
+                account = account,
+                channels = state.channelsIn(group),
+                groupName = state.nameOf(group),
+                numberOf = { state.lineup?.numberOf(it) ?: 0 },
+                tunedId = tunedId,
+                onTune = { channel -> tune(channel) },
+                onFullScreen = { guideOpen = false },
+            )
+        }
+
         if (listOpen) {
             TvChannelList(
                 state = state,
@@ -674,6 +702,7 @@ private fun TvLive(
                 },
                 onFavourite = model::toggleFavourite,
                 onOpen = { listOpen = false; onOpen(it) },
+                onGuide = { listOpen = false; guideOpen = true },
                 onClose = { listOpen = false },
                 onRetry = model::retry,
             )
@@ -778,7 +807,7 @@ private fun InfoBanner(
 
         Spacer(Modifier.height(12.dp))
         Text(
-            "▲ ▼  Channels     OK  Channel list     ◀  Previous channel     ▶  Info     0–9  Number",
+            "▲ ▼  Channels     OK  Channel list     ◀  Previous channel     ▶  Info, ▶ again for the guide",
             style = MaterialTheme.typography.labelSmall,
             color = TvInkSoft,
         )

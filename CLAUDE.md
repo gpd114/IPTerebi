@@ -59,6 +59,28 @@ leaves. Films, Series and Settings are still the phone's screens.
   out the fifteen seconds the panel keeps counting it. Not on 403 — that is
   also a refused user agent. The fake panel's **Line busy for 15 s** tests it.
 
+### The guide (`ui/tv/TvGuide.kt`)
+
+Right twice from full screen (once for the banner, again for the guide), the
+Guide key, or "TV guide" on the channel list's rail. Channels of the group
+being zapped down the side, two hours across, the focused programme described
+at the top, and the tuned channel still playing top right — the *same*
+player, resized into a corner the guide leaves unpainted, so the guide never
+opens a second stream. OK on another channel tunes it into that corner; OK on
+the tuned one goes full screen; Back closes.
+
+- **A cursor, not focusable cells.** Thousands of cells of different widths
+  would put focus wherever geometry says. One focusable handles the keys and
+  the rules are `GuideGrid` in `core/`, tested: left/right programme by
+  programme, up/down keeping the point in time (the window's edge when a
+  programme began before it), empty stretches stepped in half-hours, the
+  window moving only when the focus nears its edge.
+- **From the full guide on the device only.** Rows are loaded from
+  `GuideStore` as they come near the focus; a channel it does not cover is a
+  row of empty half-hours, not a `get_short_epg` request per row.
+- On the emulator, check its clock against the PC's first (`adb shell date`):
+  one had drifted an hour and a half, and a right guide looked wrong.
+
 ## Layout
 
 - `core/` — the panel client. URL normalisation, JSON models, HTTP, stream-URL
