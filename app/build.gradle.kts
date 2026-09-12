@@ -9,7 +9,12 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.ipterebi.app"
+        // The TV app, built from the tv branch. Its own id, so it installs
+        // beside the phone app and is published apart from it — the pattern of
+        // the owner's Debritsu, whose TV app is com.debritsu.tv on its own
+        // branch. The namespace (the code's package) stays com.ipterebi.app, so
+        // merging main into tv does not touch every file.
+        applicationId = "com.ipterebi.tv"
         // 26 rather than 21: below it, cleartext HTTP needs a network security
         // config and Media3 drops several codecs. Almost every Xtream panel is
         // plain HTTP, so that is not a corner worth supporting.
@@ -22,7 +27,8 @@ android {
         versionCode = 1
         // Taken from the tag when CI is building one, so a published APK can
         // never report a version that disagrees with its own tag.
-        versionName = (System.getenv("RELEASE_TAG")?.removePrefix("v"))
+        // TV releases are tagged tv-v*, to keep them apart from the phone's v*.
+        versionName = (System.getenv("RELEASE_TAG")?.removePrefix("tv-v"))
             ?.takeIf { it.isNotBlank() }
             ?: "0.1.0"
     }
@@ -76,4 +82,8 @@ dependencies {
     implementation("androidx.media3:media3-session:1.4.1")
 
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Compose for the TV: focus-aware surfaces, cards and lists made for a
+    // remote. The version Debritsu's TV app uses.
+    implementation("androidx.tv:tv-material:1.0.1")
 }

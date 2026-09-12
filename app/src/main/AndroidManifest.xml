@@ -15,12 +15,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <!--
-      Television. Both are required="false", so the same APK installs on phones,
-      tablets and TVs. Without the touchscreen line a TV is treated as unable to
-      run the app, because declaring nothing implies a touchscreen is required —
-      and televisions do not have one.
-    -->
-    <!--
       "Open in another player" asks whether any video player is installed
       before it stops the stream here. From Android 11 other apps are hidden
       unless declared, and this is the declaration: apps that view video, and
@@ -37,7 +31,13 @@
         </intent>
     </queries>
 
-    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <!--
+      The TV app (this is the tv branch): leanback required, so stores offer it
+      to televisions only — the phone app is a separate app from main. The
+      touchscreen line is still needed: declaring nothing implies a touchscreen
+      is required, and televisions do not have one.
+    -->
+    <uses-feature android:name="android.software.leanback" android:required="true" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application

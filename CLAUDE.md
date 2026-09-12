@@ -6,6 +6,28 @@ landscape for playback. The same APK also runs on Android TV and works with a
 D-pad remote, but TV is secondary: put phone and tablet first, and flag any
 change that alters the tablet layout.
 
+## This is the tv branch
+
+**The TV app is built from here, not from main.** Its own app id,
+`com.ipterebi.tv`, so it installs beside the phone app; leanback required, so
+stores offer it to televisions only; releases tagged `tv-v*`. The pattern is the
+owner's Debritsu, whose TV app lives the same way on its own `tv` branch.
+
+- **Main is merged into tv, never the other way.** Panel fixes, `core/` and
+  the shared player machinery arrive from main; TV-only code stays here. Keep
+  the namespace `com.ipterebi.app` and keep TV screens in `ui/tv/` so those
+  merges stay small.
+- **The bar is TiviMate** — the Android TV IPTV player people call the gold
+  standard: it opens on live TV, up/down changes channel, OK brings the channel
+  list up over the picture, it has a real guide grid and catch-up. The plan, in
+  phases, is: set-top-box live TV; the guide; catch-up; films, series and own
+  lists; then recording if wanted. Multi-view is out on a one-connection line.
+- **Where to beat it:** its users report constant 458s and buffering; ours are
+  handled (see the connection-limit notes below), everything is free, and the
+  phone and TV apps are one family.
+- **Test on real Android TV**: the `googletv34` AVD (Google TV, Android 14).
+  The owner's own box is a Mi Box (Android TV 9); "any Google TV box" is the aim.
+
 ## Layout
 
 - `core/` — the panel client. URL normalisation, JSON models, HTTP, stream-URL
