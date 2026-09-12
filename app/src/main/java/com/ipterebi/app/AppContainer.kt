@@ -6,6 +6,7 @@ import com.ipterebi.app.data.ChannelListStore
 import com.ipterebi.app.data.MediaRepository
 import com.ipterebi.app.data.CredentialStore
 import com.ipterebi.app.data.EpisodeListing
+import com.ipterebi.core.GuideClock
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.Series
 import com.ipterebi.core.VodStream
@@ -38,6 +39,9 @@ class AppContainer(context: Context) {
 
     /** Starred and recently watched channels, per line. */
     val channelLists = ChannelListStore(context.applicationContext)
+
+    /** Each line's guide clock error, once learned. See GuideClock. */
+    val guideClock = GuideClock()
 }
 
 /** Every panel request and its result, credentials stripped. Debug only. */

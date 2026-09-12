@@ -230,7 +230,20 @@ class XtreamClient(
 
         return try {
             json.decodeFromString(ShortEpgResponse.serializer(), body).listings
-                .also { log("  parsed ${it.size} programmes for stream $streamId") }
+                .also { listings ->
+                    log("  parsed ${listings.size} programmes for stream $streamId")
+                    // When each one is, against this device's clock — so a guide
+                    // whose times are off (a panel counting its wall clock as
+                    // UTC, say) shows up as an offset rather than as "nothing on".
+                    val now = System.currentTimeMillis() / 1000
+                    listings.forEach { p ->
+                        log(
+                            "    starts ${(p.startTimestamp - now) / 60} min from now, lasts " +
+                                "${(p.stopTimestamp - p.startTimestamp) / 60} min; panel says " +
+                                "\"${p.start}\"–\"${p.end}\": ${p.titleText.take(40)}"
+                        )
+                    }
+                }
         } catch (e: SerializationException) {
             log("  unreadable guide for stream $streamId, body starts: ${body.take(120)}")
             emptyList()
