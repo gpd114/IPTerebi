@@ -76,10 +76,10 @@ fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
             chips.forEach { chip ->
                 key(chip.key) {
                     val bringIntoView = remember { BringIntoViewRequester() }
-                    // Night set: the category you are in is the set's glossy
-                    // white; the rest are lighter pills with a thin outline, so
-                    // they stand off the cobalt glow behind them; the app's own
-                    // shelves are picked out in pink.
+                    // White pills with dark ink, so they stand off the cobalt
+                    // glow behind them — see Night.button for the two rounds of
+                    // navy that did not. The category you are in is cobalt, like
+                    // the tab you are on; the app's own shelves are in pink.
                     FilterChip(
                         modifier = Modifier
                             .bringIntoViewRequester(bringIntoView)
@@ -96,18 +96,12 @@ fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
                         },
                         shape = ChipShape,
                         colors = FilterChipDefaults.filterChipColors(
-                            containerColor = Night.control,
-                            labelColor = if (chip.special) Night.pink else Night.chipInk,
-                            selectedContainerColor = Night.glossy,
-                            selectedLabelColor = Night.ground,
+                            containerColor = Night.button,
+                            labelColor = if (chip.special) Night.pinkOnButton else Night.onButton,
+                            selectedContainerColor = Night.cobalt,
+                            selectedLabelColor = Color.White,
                         ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = chip.selected,
-                            borderColor = Night.controlEdge,
-                            selectedBorderColor = Color.Transparent,
-                            borderWidth = 1.dp,
-                        ),
+                        border = null,
                         elevation = FilterChipDefaults.filterChipElevation(elevation = 0.dp),
                     )
                     if (chip.selected) {
