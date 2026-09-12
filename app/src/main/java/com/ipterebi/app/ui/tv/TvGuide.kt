@@ -65,7 +65,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 /** Two hours across: enough to plan an evening on a 960dp screen, big enough to read. */
-private const val VISIBLE_SECONDS = 2 * 3600L
+internal const val VISIBLE_SECONDS = 2 * 3600L
 private val ChannelColumn = 210.dp
 private val RowHeight = 46.dp
 /** Where the parent draws the live picture: the guide leaves this corner unpainted. */
@@ -73,185 +73,23 @@ internal val GuidePreviewWidth = 336.dp
 internal val GuidePreviewHeight = 189.dp
 internal val GuideTopHeight = 213.dp
 
-/**
- * The TV guide: channels down, time across, the focused programme described
- * at the top, and whatever is tuned still playing in the top right — the same
- * player as full screen, shrunk into the corner, so the guide never costs a
- * second connection.
- *
- * Up and down move between channels, left and right between programmes, and
- * the window follows (see [slotAt] and friends in `core/`). OK on something on
- * now tunes it into the preview; OK again on the channel already tuned goes
- * back to full screen. Programmes come from the full guide on the device; a
- * channel it does not cover is a row of empty half-hours.
- */
-@Composable
-internal fun TvGuide(
-    container: AppContainer,
-    account: XtreamAccount,
-    channels: List<LiveStream>,
-    groupName: String,
-    numberOf: (Int) -> Int,
-    tunedId: Int,
-    onTune: (LiveStream) -> Unit,
-    onFullScreen: () -> Unit,
-) {
-    val zone = remember { ZoneId.systemDefault() }
-    var now by remember { mutableLongStateOf(Instant.now().epochSecond) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(30_000)
-            now = Instant.now().epochSecond
-        }
-    }
-    val earliest = remember { floorToGuideStep(now) - 2 * 3600 }
-    val latest = remember { now + 4 * 24 * 3600 }
-
-    // Each row's programmes, loaded as rows come into view and kept.
-    val guideVersion by container.guide.version.collectAsStateWithLifecycle()
-    val schedules = remember(guideVersion) { mutableStateMapOf<String, List<XmltvProgramme>>() }
-    fun programmesOf(channel: LiveStream) = schedules[channel.epgChannelId].orEmpty()
-
-    var row by remember { mutableIntStateOf(channels.indexOfFirst { it.streamId == tunedId }.coerceAtLeast(0)) }
-    var windowStart by remember { mutableLongStateOf(floorToGuideStep(now)) }
-    // The point in time focused. The slot is worked out from it each time,
-    // so a row whose programmes arrive after the cursor lands on it still
-    // shows the programme on then rather than an empty block.
-    var anchor by remember { mutableLongStateOf(now) }
-    val focusedChannel = channels.getOrNull(row)
-    val currentSlot = focusedChannel?.let { slotAt(programmesOf(it), anchor) }
-
-    val list = rememberLazyListState(initialFirstVisibleItemIndex = (row - 2).coerceAtLeast(0))
-    LaunchedEffect(row) {
-        val visible = list.layoutInfo.visibleItemsInfo
-        val first = visible.firstOrNull()?.index ?: 0
-        val last = visible.lastOrNull()?.index ?: 0
-        if (row <= first || row >= last) list.animateScrollToItem((row - 2).coerceAtLeast(0))
-    }
-
-    // Rows near the focus are loaded; a line's guide is on the device, so each
-    // is a quick local query rather than a request.
-    val from = earliest
-    val to = latest
-    LaunchedEffect(row, guideVersion, channels) {
-        val range = (row - 8).coerceAtLeast(0)..(row + 12).coerceAtMost(channels.lastIndex)
-        for (i in range) {
-            val channel = channels[i]
-            if (channel.epgChannelId.isBlank() || schedules.containsKey(channel.epgChannelId)) continue
-            schedules[channel.epgChannelId] = container.guide.schedule(account, channel.epgChannelId, from, to)
-        }
-    }
-
-    fun move(to: GuideSlot) {
-        anchor = to.start
-        windowStart = windowFor(windowStart, VISIBLE_SECONDS, to, earliest)
-    }
-
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .focusRequester(focus)
-            .focusable()
-            .onKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown) return@onKeyEvent e.key in GuideKeys
-                // From the state as it is now, not as last drawn: a held
-                // button sends keys faster than the grid redraws, and each
-                // must step on from where the last one left the cursor.
-                val channel = channels.getOrNull(row) ?: return@onKeyEvent false
-                val here = slotAt(programmesOf(channel), anchor)
-                when (e.key) {
-                    Key.DirectionUp, Key.ChannelUp -> {
-                        if (row > 0) {
-                            row--
-                            anchor = anchorOf(here, windowStart)
-                        }
-                        true
-                    }
-                    Key.DirectionDown, Key.ChannelDown -> {
-                        if (row < channels.lastIndex) {
-                            row++
-                            anchor = anchorOf(here, windowStart)
-                        }
-                        true
-                    }
-                    Key.DirectionRight -> {
-                        val next = nextSlot(programmesOf(channel), here)
-                        if (next.start < latest) move(next)
-                        true
-                    }
-                    Key.DirectionLeft -> {
-                        val previous = previousSlot(programmesOf(channel), here)
-                        if (previous.stop > earliest) move(previous)
-                        true
-                    }
-                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                        // The channel, whatever programme is focused: it is on
-                        // something now, and reminders and catch-up are to come.
-                        if (channel.streamId == tunedId) onFullScreen() else onTune(channel)
-                        true
-                    }
-                    else -> false
-                }
-            },
-    ) {
-        // The top: what is focused, and room for the picture.
-        Row(Modifier.fillMaxWidth().height(GuideTopHeight)) {
-            ProgrammeDetails(
-                channel = focusedChannel,
-                number = focusedChannel?.let { numberOf(it.streamId) } ?: 0,
-                slot = currentSlot,
-                now = now,
-                zone = zone,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(TvGround)
-                    .padding(start = 48.dp, top = 28.dp, end = 24.dp),
-            )
-            // Unpainted: the player shows through here.
-            Spacer(Modifier.width(GuidePreviewWidth + 48.dp))
-        }
-
-        Column(Modifier.fillMaxSize().background(TvGround).padding(start = 32.dp, end = 32.dp)) {
-            TimeHeader(groupName, windowStart, now, zone)
-            LazyColumn(state = list, modifier = Modifier.fillMaxSize()) {
-                itemsIndexed(channels, key = { _, c -> c.streamId }) { i, channel ->
-                    GuideRow(
-                        channel = channel,
-                        number = numberOf(channel.streamId),
-                        programmes = programmesOf(channel),
-                        windowStart = windowStart,
-                        now = now,
-                        focusedSlot = if (i == row) currentSlot else null,
-                        tuned = channel.streamId == tunedId,
-                    )
-                }
-            }
-        }
-    }
-}
-
-private val GuideKeys = setOf(
-    Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
-    Key.ChannelUp, Key.ChannelDown, Key.DirectionCenter, Key.Enter, Key.NumPadEnter,
-)
 
 /** Behind the guide: the same near-black as the panels, but solid — it is a page, not an overlay. */
-private val TvGround = Color(0xFF0B0C11)
+internal val TvGround = Color(0xFF0B0C11)
 private val CellFill = Color(0xFF191B23)
 private val CellNowFill = Color(0xFF20263A)
 
 @Composable
-private fun ProgrammeDetails(
+internal fun ProgrammeDetails(
     channel: LiveStream?,
     number: Int,
     slot: GuideSlot?,
     now: Long,
     zone: ZoneId,
     modifier: Modifier,
+    /** A line along the bottom: the keys, or what a key just did. */
+    footer: String? = null,
+    footerColour: Color = TvInkSoft,
 ) {
     Column(modifier) {
         Text(
@@ -291,9 +129,19 @@ private fun ProgrammeDetails(
                 it,
                 style = MaterialTheme.typography.bodySmall,
                 color = TvInkSoft,
-                maxLines = 3,
+                maxLines = if (footer != null) 2 else 3,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 10.dp),
+            )
+        }
+        if (footer != null) {
+            Spacer(Modifier.weight(1f))
+            Text(
+                footer,
+                style = MaterialTheme.typography.labelSmall,
+                color = footerColour,
+                maxLines = 1,
+                modifier = Modifier.padding(bottom = 10.dp),
             )
         }
     }
@@ -320,7 +168,7 @@ private fun slotTime(slot: GuideSlot, now: Long, zone: ZoneId): String {
 }
 
 @Composable
-private fun TimeHeader(groupName: String, windowStart: Long, now: Long, zone: ZoneId) {
+internal fun TimeHeader(groupName: String, windowStart: Long, now: Long, zone: ZoneId) {
     val clock = remember { DateTimeFormatter.ofPattern("HH:mm") }
     Row(Modifier.fillMaxWidth().height(34.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
@@ -371,7 +219,7 @@ private fun FractionOffset(fraction: Float, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun GuideRow(
+internal fun GuideRow(
     channel: LiveStream,
     number: Int,
     programmes: List<XmltvProgramme>,
@@ -379,6 +227,7 @@ private fun GuideRow(
     now: Long,
     focusedSlot: GuideSlot?,
     tuned: Boolean,
+    favourite: Boolean = false,
 ) {
     val windowEnd = windowStart + VISIBLE_SECONDS
     Row(Modifier.fillMaxWidth().height(RowHeight).padding(vertical = 3.dp)) {
@@ -406,7 +255,12 @@ private fun GuideRow(
                 color = if (tuned) TvAccent else TvInk,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
             )
+            if (favourite) {
+                Spacer(Modifier.width(4.dp))
+                Text("★", style = MaterialTheme.typography.labelMedium, color = TvPink)
+            }
         }
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().clipToBounds()) {
             val width = maxWidth
