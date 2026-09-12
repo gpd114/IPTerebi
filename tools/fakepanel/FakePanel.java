@@ -61,7 +61,17 @@ public class FakePanel {
         Map<String, String> q = query(ex.getRequestURI().getRawQuery());
         String ua = ex.getRequestHeaders().getFirst("User-Agent");
         try {
-            if (path.equals("/player_api.php")) {
+            if (path.equals("/xmltv.php")) {
+                log("GUIDE xmltv.php  ua=" + ua);
+                if (!"demo".equals(q.get("username")) || !"demo".equals(q.get("password"))) {
+                    status(ex, 403);
+                    return;
+                }
+                byte[] body = xmltv().getBytes(StandardCharsets.UTF_8);
+                ex.getResponseHeaders().set("Content-Type", "application/xml; charset=utf-8");
+                ex.sendResponseHeaders(200, body.length);
+                try (OutputStream out = ex.getResponseBody()) { out.write(body); }
+            } else if (path.equals("/player_api.php")) {
                 String action = q.getOrDefault("action", "");
                 log("API " + (action.isEmpty() ? "(sign-in)" : action) + " "
                     + q.getOrDefault("category_id", q.getOrDefault("stream_id", q.getOrDefault("series_id", "")))
@@ -187,7 +197,7 @@ public class FakePanel {
                     "{\"num\":8,\"name\":\"Line busy for 15 s\",\"stream_id\":106,\"category_id\":\"1\"}," +
                     "{\"num\":4,\"name\":\"No stream id A\",\"category_id\":\"1\"}," +
                     "{\"num\":5,\"name\":\"No stream id B\",\"category_id\":\"1\"}";
-                String sport = "{\"num\":\"1\",\"name\":\"Sport One\",\"stream_id\":\"201\",\"category_id\":\"2\",\"stream_icon\":null}";
+                String sport = "{\"num\":\"1\",\"name\":\"Sport One\",\"stream_id\":\"201\",\"category_id\":\"2\",\"stream_icon\":null,\"epg_channel_id\":\"sport.test\"}";
                 String category = q.get("category_id");
                 // No category means every channel on the line, as on a real
                 // panel — which is what searching every channel asks for.
@@ -266,6 +276,40 @@ public class FakePanel {
      * and a bare stop one, and start/end strings that are deliberately wrong —
      * the app must read the timestamps and ignore the strings.
      */
+    /**
+     * The whole line's guide, as xmltv.php sends it: a channel the short guide
+     * also covers (news.test, with the same programmes, so the two can be
+     * compared), one only this has (sport.test — Sport One has no short guide),
+     * one no stream uses, which the app should not keep, and the things panels
+     * get wrong: an entity, CDATA, a second title in another language, and a
+     * programme whose times cannot be read.
+     */
+    static String xmltv() {
+        long now = Instant.now().getEpochSecond();
+        long start = now - 20 * 60, mid = now + 40 * 60, end = mid + 30 * 60;
+        java.time.format.DateTimeFormatter f = java.time.format.DateTimeFormatter
+            .ofPattern("yyyyMMddHHmmss Z").withZone(java.time.ZoneId.of("Europe/London"));
+        java.util.function.LongFunction<String> t = s -> f.format(Instant.ofEpochSecond(s));
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE tv SYSTEM \"xmltv.dtd\">\n" +
+            "<tv generator-info-name=\"fake panel\">\n" +
+            "<channel id=\"news.test\"><display-name>Test News</display-name></channel>\n" +
+            "<channel id=\"sport.test\"><display-name>Sport One</display-name></channel>\n" +
+            "<channel id=\"elsewhere.test\"><display-name>Not on this line</display-name></channel>\n" +
+            "<programme start=\"" + t.apply(start) + "\" stop=\"" + t.apply(mid) + "\" channel=\"news.test\">" +
+            "<title lang=\"en\">Evening News</title><title lang=\"fr\">Journal du soir</title>" +
+            "<desc>The day&apos;s headlines.</desc></programme>\n" +
+            "<programme start=\"" + t.apply(mid) + "\" stop=\"" + t.apply(end) + "\" channel=\"news.test\">" +
+            "<title>Weather Tonight</title><desc><![CDATA[Rain, probably.]]></desc></programme>\n" +
+            "<programme start=\"" + t.apply(now - 3600) + "\" stop=\"" + t.apply(now + 3600) + "\" channel=\"sport.test\">" +
+            "<title>Live: Rovers &amp; United</title></programme>\n" +
+            "<programme start=\"" + t.apply(now + 3600) + "\" stop=\"" + t.apply(now + 7200) + "\" channel=\"sport.test\">" +
+            "<title>Match of the Evening</title></programme>\n" +
+            "<programme start=\"whenever\" stop=\"" + t.apply(now) + "\" channel=\"sport.test\"><title>Unreadable</title></programme>\n" +
+            "<programme start=\"" + t.apply(start) + "\" stop=\"" + t.apply(end) + "\" channel=\"elsewhere.test\">" +
+            "<title>Nobody's channel</title></programme>\n" +
+            "</tv>\n";
+    }
+
     static String listing(String id, String title, String desc, long start, long stop) {
         Base64.Encoder b = Base64.getEncoder();
         return "{\"id\":\"" + id + "\",\"epg_id\":\"news.test\",\"title\":\"" +

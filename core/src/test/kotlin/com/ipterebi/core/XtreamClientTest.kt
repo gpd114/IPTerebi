@@ -186,4 +186,34 @@ class XtreamClientTest {
         assertTrue(lines.isNotEmpty())
         assertTrue(lines.none { it.contains("s3cret") }, "credentials leaked into the log: $lines")
     }
+
+    @Test
+    fun `the full guide is streamed from xmltv php, programme by programme`() = runBlocking {
+        server.enqueue(
+            MockResponse().setBody(
+                """<?xml version="1.0"?><tv><channel id="a"><display-name>A</display-name></channel>""" +
+                    """<programme start="20260912170000 +0000" stop="20260912180000 +0000" channel="a">""" +
+                    """<title>News</title></programme></tv>"""
+            )
+        )
+        val lines = mutableListOf<String>()
+        val programmes = mutableListOf<XmltvProgramme>()
+        val summary = XtreamClient(log = { lines += it }).xmltv(account, onProgramme = programmes::add)
+
+        assertEquals("/xmltv.php?username=alice&password=s3cret", server.takeRequest().path)
+        assertEquals(listOf("News"), programmes.map { it.title })
+        assertEquals(1, summary.channels)
+        assertEquals(1, summary.programmes)
+        assertTrue(summary.bytes > 0)
+        assertTrue(lines.none { it.contains("s3cret") }, "credentials leaked into the log: $lines")
+    }
+
+    @Test
+    fun `a guide that is a web page, or refused, throws rather than reading as empty`() = runBlocking {
+        server.enqueue(MockResponse().setBody("<html><body>Not here</body></html>"))
+        assertFailsWith<XtreamException> { client.xmltv(account, onProgramme = {}) }
+        server.enqueue(MockResponse().setResponseCode(404))
+        assertFailsWith<XtreamException> { client.xmltv(account, onProgramme = {}) }
+        Unit
+    }
 }

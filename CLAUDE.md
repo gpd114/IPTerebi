@@ -337,21 +337,33 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   here reads; the strings are kept for logs only. Note these want a Long, not an
   Int — a guide is the one thing routinely asked about the future, and unix
   seconds stop fitting in an Int in 2038.
-- **…and the timestamps can be wrong too.** The first real line wrote UK
-  wall-clock times into them as if they were UTC: Saturday Night Football,
-  listed `"18:00:00"` and on air at 18:00, had a timestamp for 19:00 UK time,
-  so in summer every programme was an hour late and "now" showed nothing.
-  `GuideClock` puts it right, but only on evidence: when nothing is on now and
-  moving by the gap between the strings (read in the device's zone) and the
-  timestamps puts the first programme on now — `get_short_epg` answers from
-  what the panel thinks is on. A panel with honest timestamps and strings in
-  its own zone has its programme on now already, and is left alone. The shift
-  is learned per line, since it is the panel's. The debug log prints each
-  programme's time against the device clock, which is how this was found.
-- **There is no guide call for a list.** `get_short_epg` takes one `stream_id`,
-  and the only alternative is `xmltv.php`, which is the whole schedule for every
-  channel on the line as XML. So the guide is a per-channel request made when a
-  channel is opened, and the channel list deliberately has none.
+- **…and `get_short_epg`'s timestamps can be wrong too — by hours.** On the
+  first real line Saturday Night Football ran 17:00–20:00 UK time (kick-off
+  17:30, confirmed by the viewer; `xmltv.php` agreed), but `get_short_epg` sent
+  it as `"18:00:00"` with a timestamp for 19:00: the panel's wall clock was two
+  hours ahead of UTC, written into the timestamps as if it were UTC. So "now"
+  showed nothing. A first fix read the strings in the device's zone, took the
+  gap — an hour — and *looked* right, because a three-hour programme covers
+  either start; it was still an hour out. The strings are in the panel's zone,
+  which is unknown, and prove nothing. `GuideClock` now learns the error from
+  evidence: exactly, from a programme found both there and in the full guide
+  (same title, same length); or, lacking that, from what `get_short_epg`
+  answers from — the programme the panel thinks is on now — once two channels
+  agree. The debug log prints each programme's time against the device clock,
+  which is how this was found. Test on the device's clock, too: an emulator
+  that had drifted an hour and a half made a correct guide look wrong.
+- **The full guide is `xmltv.php`, and it is the one to trust.** It is the
+  whole schedule for every channel the provider has, as XMLTV, with each time's
+  offset stated. On the first real line it was 76 MB, 228,709 programmes across
+  8,350 channels — 1,569 of them the line's — about four days ahead, and it
+  covered channels `get_short_epg` answered nothing for. It took a phone 13 s
+  and the TV box 52 s. So it is fetched in the background, at most every twelve
+  hours (on the phone only off metered networks), streamed through `readXmltv`
+  a programme at a time — never held whole — and only the line's channels are
+  kept, in `GuideStore` (17 MB on the phone). It is matched on each channel's
+  `epg_channel_id`, which several streams can share. `Guide` answers "what is
+  on" from it first and from `get_short_epg`, put right, only for channels it
+  lacks.
 - **A missing guide is the normal case, not an error.** Lines carry no EPG,
   channels are missing from guides that exist, and some forks answer `false`.
   All of it arrives as an empty list.
