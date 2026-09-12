@@ -75,9 +75,13 @@ import com.ipterebi.app.BuildConfig
 import com.ipterebi.app.MainActivity
 import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.app.data.AccountState
+import com.ipterebi.app.ui.PrimaryButton
 import com.ipterebi.app.ui.focusRing
-import com.ipterebi.app.ui.nightCard
 import com.ipterebi.app.ui.theme.Night
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.draw.clip
 import com.ipterebi.core.playerMimeType
 import com.ipterebi.core.StreamReconnect
 import com.ipterebi.core.StreamFormat
@@ -836,34 +840,28 @@ private fun PlayerContent(
         if (reconnecting && error == null && !inPictureInPicture) {
             Text(
                 text = "Reconnecting…",
-                color = Color.White,
-                style = MaterialTheme.typography.bodyMedium,
+                color = Night.ink,
+                style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .padding(top = 96.dp)
-                    .background(Color(0x99000000))
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Night.veil.copy(alpha = 0.92f))
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
             )
         }
 
         if (handedOff && !inPictureInPicture) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(24.dp)
-                    .nightCard(RoundedCornerShape(20.dp))
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
+            OverVideoPanel(Modifier.align(Alignment.Center)) {
                 Icon(
                     Icons.AutoMirrored.Filled.OpenInNew,
                     contentDescription = null,
-                    tint = Night.cobaltLight,
+                    tint = Night.accent,
                 )
                 Text(
                     text = "Playing in another app",
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = Night.ink,
                     modifier = Modifier.padding(top = 12.dp),
                 )
                 Text(
@@ -872,7 +870,7 @@ private fun PlayerContent(
                     color = Night.inkSoft,
                     modifier = Modifier.padding(top = 4.dp),
                 )
-                Button(
+                PrimaryButton(
                     onClick = {
                         handedOff = false
                         reconnect.reset()
@@ -884,29 +882,22 @@ private fun PlayerContent(
                         player.play()
                     },
                     modifier = Modifier
-                        .padding(top = 16.dp)
-                        .focusRequester(retryFocus)
-                        .focusRing(),
-                ) { Text("Play here") }
+                        .padding(top = 18.dp)
+                        .focusRequester(retryFocus),
+                ) { Text("Play here", style = MaterialTheme.typography.labelLarge) }
             }
             LaunchedEffect(Unit) { retryFocus.requestFocus() }
         }
 
         error?.takeIf { !inPictureInPicture }?.let { message ->
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .background(Color(0xCC000000))
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
+            OverVideoPanel(Modifier.align(Alignment.Center)) {
                 Text(
                     text = message,
-                    color = Color.White,
+                    color = Night.ink,
                     style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center,
                 )
-                Button(
+                PrimaryButton(
                     onClick = {
                         error = null
                         reconnect.reset()
@@ -928,10 +919,9 @@ private fun PlayerContent(
                         // them the remote, back — see showingError above.
                     },
                     modifier = Modifier
-                        .padding(top = 16.dp)
-                        .focusRequester(retryFocus)
-                        .focusRing(),
-                ) { Text("Try again") }
+                        .padding(top = 18.dp)
+                        .focusRequester(retryFocus),
+                ) { Text("Try again", style = MaterialTheme.typography.labelLarge) }
             }
             // Focus to the button when the error appears, so on a remote OK
             // means "try again".
@@ -948,6 +938,24 @@ private fun PlayerContent(
  * which Android starts winding down a backgrounded app's services.
  */
 private const val PAUSED_AWAY_GRACE_MS = 30_000L
+
+/**
+ * A message over the video — an error, "playing in another app" — as a panel
+ * in the page's colours, centred and no wider than it needs to be read.
+ */
+@Composable
+private fun OverVideoPanel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = modifier
+            .padding(24.dp)
+            .widthIn(max = 420.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(Night.veil.copy(alpha = 0.96f))
+            .padding(22.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        content = content,
+    )
+}
 
 private fun Playable.logName(): String = when (this) {
     is Playable.Channel -> "channel $id"

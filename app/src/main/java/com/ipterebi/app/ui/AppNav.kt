@@ -37,7 +37,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -139,11 +138,11 @@ fun AppNav(container: AppContainer) {
                     // insets, so this Scaffold claims none of them — see the
                     // consumeWindowInsets below for the bottom.
                     contentWindowInsets = WindowInsets(0, 0, 0, 0),
-                    // Night blue lit cobalt from the top, drawn once here for all
-                    // three sections; their own Scaffolds are transparent over it.
-                    // The screens that are not sections paint their own ground.
+                    // The flat dark-blue page, under all three sections; their own
+                    // Scaffolds are transparent over it. Flat on purpose — see
+                    // Night for the cobalt glow that made every button blue on blue.
                     containerColor = Color.Transparent,
-                    modifier = Modifier.background(Night.backdrop),
+                    modifier = Modifier.background(Night.ground),
                     bottomBar = {
                         if (section != null && !wide) {
                             FloatingTabBar(current = section, onSelect = { nav.switchSection(it.route) })
@@ -317,9 +316,8 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
             .navigationBarsPadding()
             .padding(horizontal = 14.dp, vertical = 10.dp)
             .fillMaxWidth()
-            .shadow(14.dp, bar)
             .nightCard(bar)
-            .border(1.dp, Night.controlEdge, bar)
+            .border(1.dp, Night.hairline, bar)
             .height(62.dp)
             .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.SpaceAround,

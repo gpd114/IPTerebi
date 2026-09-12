@@ -20,23 +20,35 @@ class belongs in `core/`, because that is the half that can be proven.
 
 ## The look
 
-"Night set", taken from the launcher icon (Terebi-kun): night blue lit cobalt
-from the top, cobalt for where you are and what you can act on, glossy white
-for what is selected, pink for favourites and along the one edge that matters.
-No yellow in the app — its owner asked for it out; the icon keeps it. Buttons
-(category chips, the settings button) are `Night.button`, white with dark ink,
-and the chip you are on is cobalt like the tab you are on. Two rounds of navy
-came first — the cards' own, then a lighter one with an outline — and on the
-phone both were still blue on blue against the glow behind them; do not drift
-back. The search field is frosted white for the same reason. The palette is
-`Night` in `ui/theme/Theme.kt`; the shared pieces — `SectionTopBar`,
-`nightCard`, the search field's shape and colours — are in `ui/NightParts.kt`.
-Use those rather than new literals, or the app drifts back to stock Material.
-It stays dark-only, for the reason given in `Theme.kt`.
+Modelled on the owner's other app, Debritsu (`../Debritsu`, see its
+`ui/Theme.kt` and `ui/Components.kt`), on IPTerebi's own dark blue — which is
+what keeps it this app and not that one. Flat throughout: no gradients, glows,
+rims or sheen, and each role one colour. The page is `Night.ground`, cards and
+panels `veil` a step up, text-field wells `field` a step down. What you press
+is told apart by fill: quiet white-tinted pills (`quiet`) for choices not
+chosen, solid cobalt for the one chosen and for the main button, white-tinted
+glass for icon and secondary buttons. Pink, from the icon's smile, is for
+favourites. No yellow in the app — its owner asked for it out; the icon keeps it.
 
-The typeface is M PLUS Rounded 1c, bundled in `res/font` (three weights, about
-10 MB — it carries Japanese). It is under the SIL Open Font License, which
-allows bundling on condition the licence travels with it: that is
+This was reached the hard way, and is worth not undoing: an earlier look lit
+the page cobalt from the top, and navy buttons on it read as blue on blue —
+first in the cards' navy, then lighter and outlined, then white, and the owner
+was not happy with any of them. The flat page is what made the pills read.
+
+The palette is `Night` in `ui/theme/Theme.kt`; the pieces — `SectionTopBar`,
+`ScreenTopBar`, `Panel`, `PrimaryButton`, `SecondaryButton`,
+`SquareIconButton`, `ChoiceRow`, `QuietPill`, `nightCard`, `fieldColours` —
+are in `ui/NightParts.kt`, named after Debritsu's where they match. Use those
+rather than new literals or Material's own buttons and chips, or the app
+drifts back to stock Material. It stays dark-only, for the reason given in
+`Theme.kt`.
+
+The typeface is M PLUS Rounded 1c, bundled in `res/font` as Latin-only cuts —
+the same files Debritsu ships, about 50 KB a weight; the full font carried
+every kanji and added ten megabytes. Anything outside the cut (a channel named
+in Japanese or Arabic) falls back to the system font on its own. The font is
+under the SIL Open Font License, which allows bundling and cutting on
+condition the licence travels with it: that is
 `assets/licenses/mplus_rounded_1c_OFL.txt`, and it must stay.
 
 ## Building

@@ -39,9 +39,17 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.Image
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.res.painterResource
 import com.ipterebi.app.AppContainer
+import com.ipterebi.app.R
+import com.ipterebi.app.ui.ChoiceRow
 import com.ipterebi.app.ui.DpadTextField
+import com.ipterebi.app.ui.PrimaryButton
+import com.ipterebi.app.ui.fieldColours
 import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.StreamFormat
 
 @Composable
@@ -64,13 +72,22 @@ fun LoginScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
     ) {
-        Text("IPTerebi", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(4.dp))
-        Text(
-            "Sign in to an Xtream Codes line.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = painterResource(R.drawable.ic_mascot),
+                contentDescription = null,
+                modifier = Modifier.size(56.dp),
+            )
+            Spacer(Modifier.size(14.dp))
+            Column {
+                Text("IPTerebi", style = MaterialTheme.typography.displaySmall, color = Night.ink)
+                Text(
+                    "Sign in to an Xtream Codes line.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Night.inkSoft,
+                )
+            }
+        }
 
         Spacer(Modifier.height(24.dp))
 
@@ -88,6 +105,8 @@ fun LoginScreen(
                     keyboardType = KeyboardType.Uri,
                     imeAction = ImeAction.Next,
                 ),
+                colors = fieldColours(),
+                shape = MaterialTheme.shapes.large,
                 modifier = fieldModifier.fillMaxWidth(),
             )
         }
@@ -101,6 +120,8 @@ fun LoginScreen(
                 label = { Text("Username") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                colors = fieldColours(),
+                shape = MaterialTheme.shapes.large,
                 modifier = fieldModifier.fillMaxWidth(),
             )
         }
@@ -128,25 +149,22 @@ fun LoginScreen(
                         )
                     }
                 },
+                colors = fieldColours(),
+                shape = MaterialTheme.shapes.large,
                 modifier = fieldModifier.fillMaxWidth(),
             )
         }
 
         Spacer(Modifier.height(20.dp))
 
-        Text("Stream format", style = MaterialTheme.typography.labelLarge)
+        Text("Stream format", style = MaterialTheme.typography.titleMedium, color = Night.ink)
         Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            StreamFormat.entries.forEach { format ->
-                FilterChip(
-                    modifier = Modifier.focusRing(FilterChipDefaults.shape),
-                    selected = state.format == format,
-                    onClick = { viewModel.onFormatChange(format) },
-                    label = { Text(format.label) },
-                )
-            }
-        }
-        Spacer(Modifier.height(4.dp))
+        ChoiceRow(
+            options = StreamFormat.entries.map { it to it.label },
+            isSelected = { it == state.format },
+            onSelect = viewModel::onFormatChange,
+        )
+        Spacer(Modifier.height(6.dp))
         Text(
             "MPEG-TS works on nearly every panel. Try HLS if channels stutter.",
             style = MaterialTheme.typography.bodySmall,
@@ -164,7 +182,7 @@ fun LoginScreen(
 
         Spacer(Modifier.height(24.dp))
 
-        Button(
+        PrimaryButton(
             onClick = viewModel::signIn,
             enabled = !state.busy,
             modifier = Modifier.fillMaxWidth(),
@@ -173,11 +191,11 @@ fun LoginScreen(
                 CircularProgressIndicator(
                     modifier = Modifier.size(18.dp),
                     strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = LocalContentColor.current,
                 )
                 Spacer(Modifier.size(12.dp))
             }
-            Text(if (state.busy) "Checking…" else "Sign in")
+            Text(if (state.busy) "Checking…" else "Sign in", style = MaterialTheme.typography.labelLarge)
         }
 
         Spacer(Modifier.height(24.dp))

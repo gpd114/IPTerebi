@@ -49,8 +49,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import com.ipterebi.app.AppContainer
+import com.ipterebi.app.ui.ScreenTopBar
 import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.nightCard
+import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.library.ErrorPanel
 import com.ipterebi.core.EpisodeEntry
 import com.ipterebi.core.SeriesDetail
@@ -71,16 +77,8 @@ fun SeriesDetailScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(state.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to series")
-                    }
-                },
-            )
-        },
+        topBar = { ScreenTopBar(state.name, onBack) },
+        containerColor = Night.ground,
     ) { padding ->
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
             val detail = state.detail
@@ -124,11 +122,21 @@ private fun SeriesContent(
                     modifier = Modifier.padding(vertical = 8.dp),
                 ) {
                     itemsIndexed(detail.seasons, key = { _, it -> it.number }) { index, entry ->
+                        // As the category chips: quiet, the chosen one cobalt.
+                        val shape = RoundedCornerShape(12.dp)
                         FilterChip(
-                            modifier = Modifier.focusRing(FilterChipDefaults.shape),
+                            modifier = Modifier.focusRing(shape),
                             selected = index == selectedSeason,
                             onClick = { onSeason(index) },
-                            label = { Text(entry.name) },
+                            label = { Text(entry.name, fontWeight = FontWeight.Bold) },
+                            shape = shape,
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = Night.quiet,
+                                labelColor = Night.quietText,
+                                selectedContainerColor = Night.cobalt,
+                                selectedLabelColor = Color.White,
+                            ),
+                            border = null,
                         )
                     }
                 }
@@ -149,8 +157,8 @@ private fun SeriesContent(
             // unique within the season.
             items(season.episodes, key = { it.episode.id }) { entry ->
                 EpisodeRow(entry = entry, seriesName = detail.name, onClick = { onEpisode(entry) })
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }
+            item { Spacer(Modifier.height(16.dp)) }
         }
     }
 }
@@ -168,8 +176,9 @@ private fun Header(detail: SeriesDetail) {
                 modifier = Modifier
                     .width(96.dp)
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Night.veil)
+                    .border(1.dp, Night.hairline, RoundedCornerShape(14.dp)),
             )
             Spacer(Modifier.width(16.dp))
         }
@@ -198,12 +207,15 @@ private fun Header(detail: SeriesDetail) {
 
 @Composable
 private fun EpisodeRow(entry: EpisodeEntry, seriesName: String, onClick: () -> Unit) {
+    val card = RoundedCornerShape(18.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .focusRing()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .nightCard(card)
+            .focusRing(card)
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // A still from the episode when the panel has one; a play mark when not.
@@ -211,8 +223,8 @@ private fun EpisodeRow(entry: EpisodeEntry, seriesName: String, onClick: () -> U
             modifier = Modifier
                 .width(112.dp)
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .clip(RoundedCornerShape(12.dp))
+                .background(Night.quiet),
             contentAlignment = Alignment.Center,
         ) {
             Icon(

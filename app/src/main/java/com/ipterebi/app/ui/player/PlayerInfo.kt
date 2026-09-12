@@ -151,8 +151,9 @@ fun ChannelInfoOverlay(
     Column(
         modifier = modifier
             .widthIn(max = 420.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color(0x99000000))
+            .clip(RoundedCornerShape(18.dp))
+            // The page's panel colour, a little see-through over the picture.
+            .background(com.ipterebi.app.ui.theme.Night.veil.copy(alpha = 0.85f))
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
