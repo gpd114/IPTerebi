@@ -35,6 +35,10 @@ import com.ipterebi.app.ui.ScreenTopBar
 import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.fieldColours
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.ipterebi.app.playback.ActivePlayback
 import com.ipterebi.app.ui.theme.Appearance
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.StreamFormat
@@ -74,6 +78,8 @@ fun SettingsScreen(
         ) {
             val account = state.account
             val context = LocalContext.current
+            // What "Free the line" did, said under it until the screen is left.
+            var freed by remember { mutableStateOf<String?>(null) }
 
             // First, as in Debritsu: the one setting that changes everything
             // else on the screen as it is pressed.
@@ -154,25 +160,50 @@ fun SettingsScreen(
 
             Panel {
                 SectionTitle("Check the line")
-                Hint("Asks the panel what it thinks of this account right now.")
-                PrimaryButton(
-                    onClick = viewModel::recheck,
-                    enabled = !state.checking,
-                    height = 46.dp,
-                ) {
-                    if (state.checking) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                            color = LocalContentColor.current,
+                Hint(
+                    "Asks the panel what it thinks of this account right now. Free the " +
+                        "line first to stop anything IPTerebi is playing — before " +
+                        "watching on another device, such as a TV.",
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PrimaryButton(
+                        onClick = viewModel::recheck,
+                        enabled = !state.checking,
+                        height = 46.dp,
+                    ) {
+                        if (state.checking) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = LocalContentColor.current,
+                            )
+                            Spacer(Modifier.size(10.dp))
+                        }
+                        Text(
+                            if (state.checking) "Checking…" else "Check now",
+                            style = MaterialTheme.typography.labelLarge,
                         )
-                        Spacer(Modifier.size(10.dp))
                     }
-                    Text(
-                        if (state.checking) "Checking…" else "Check now",
-                        style = MaterialTheme.typography.labelLarge,
+                    SecondaryButton(
+                        text = "Free the line",
+                        height = 46.dp,
+                        enabled = !state.checking,
+                        onClick = {
+                            freed = if (ActivePlayback.stop()) {
+                                "Stopped. Your provider may count the connection for " +
+                                    "about 15 seconds more — wait that long before " +
+                                    "starting the other device."
+                            } else {
+                                "Nothing was playing in IPTerebi. If the line is still " +
+                                    "busy, another device is using it."
+                            }
+                            // What the panel says now, so "Connections" below shows
+                            // whether the line really is free.
+                            viewModel.recheck()
+                        },
                     )
                 }
+                freed?.let { Hint(it) }
 
                 state.info?.let { info ->
                     Column {

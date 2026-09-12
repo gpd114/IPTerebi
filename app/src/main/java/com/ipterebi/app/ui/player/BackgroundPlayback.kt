@@ -5,7 +5,16 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Bundle
 import android.os.IBinder
+import androidx.media3.session.CommandButton
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
+import com.ipterebi.app.R
+import com.ipterebi.app.playback.ActivePlayback
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
@@ -44,6 +53,18 @@ fun MediaSessionFor(player: Player, live: Boolean) {
                 )
             )
             .setCallback(SessionCommands(live))
+            // Stop, beside play/pause in the notification and on the lock
+            // screen: the way to give the line up for another device without
+            // unlocking the phone and finding the app. See ActivePlayback.
+            .setCustomLayout(
+                ImmutableList.of(
+                    CommandButton.Builder()
+                        .setDisplayName("Stop")
+                        .setIconResId(R.drawable.ic_stop)
+                        .setSessionCommand(STOP)
+                        .build()
+                )
+            )
             .build()
 
         var attachment: PlaybackService.Attachment? = null
@@ -103,9 +124,26 @@ private class SessionCommands(private val live: Boolean) : MediaSession.Callback
                 }
             }
             .build()
-        return MediaSession.ConnectionResult.accept(offered.availableSessionCommands, commands)
+        val sessionCommands = offered.availableSessionCommands.buildUpon().add(STOP).build()
+        return MediaSession.ConnectionResult.accept(sessionCommands, commands)
+    }
+
+    override fun onCustomCommand(
+        session: MediaSession,
+        controller: MediaSession.ControllerInfo,
+        customCommand: SessionCommand,
+        args: Bundle,
+    ): ListenableFuture<SessionResult> {
+        if (customCommand == STOP) {
+            ActivePlayback.stop()
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+        return super.onCustomCommand(session, controller, customCommand, args)
     }
 }
+
+/** The notification's Stop. */
+private val STOP = SessionCommand("com.ipterebi.app.STOP", Bundle.EMPTY)
 
 /**
  * A channel as the session sees it: resuming from stopped rejoins the broadcast

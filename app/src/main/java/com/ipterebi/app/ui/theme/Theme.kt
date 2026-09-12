@@ -126,6 +126,8 @@ object OverVideo {
     val ink = Color.White
     val inkSoft = Color(0xB3FFFFFF)
     val accent = Color(0xFF9DB5FF)
+    /** The main button over video: bright enough on the dark panel in either theme. */
+    val button = Color(0xFF2F5FE0)
 }
 
 /** Which theme is chosen, kept in plain preferences so it can be read before the first frame. */

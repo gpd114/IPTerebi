@@ -51,6 +51,11 @@ video app — VLC, MX Player, or a casting app — and stops it here first, so a
 line that allows one connection has it free. Coming back shows "Play here"
 rather than taking the line back on its own.
 
+Moving to the TV? Press Stop in the notification or on the lock screen, or
+"Free the line" in Settings, which also shows how many connections the line
+has in use. Give the provider about fifteen seconds to notice before starting
+the TV.
+
 Turning the screen off while something plays keeps it playing as sound, with
 controls on the lock screen, in the notification and on headphone buttons.
 Pulling headphones out pauses it rather than switching to the speaker, and a

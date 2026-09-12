@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -75,6 +76,7 @@ import com.ipterebi.app.BuildConfig
 import com.ipterebi.app.MainActivity
 import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.app.data.AccountState
+import com.ipterebi.app.playback.ActivePlayback
 import com.ipterebi.app.ui.PrimaryButton
 import com.ipterebi.app.ui.focusRing
 import com.ipterebi.app.ui.theme.Night
@@ -216,10 +218,11 @@ private fun PlayerContent(
     val reconnectDelay = remember(url) { AtomicLong(0) }
     var reconnecting by remember(url) { mutableStateOf(false) }
 
-    // Handed to another player: this one is stopped, and stays stopped until
-    // asked — coming back here must not take the line from the other app,
-    // which may well still be playing in the background.
-    var handedOff by remember(url) { mutableStateOf(false) }
+    // Let go of the line on purpose — handed to another player, or stopped from
+    // the notification or Settings so another device can have it. Either way
+    // this player stays stopped until asked: coming back here must not take the
+    // line from whatever took it over, which may well still be playing.
+    var released by remember(url) { mutableStateOf<Released?>(null) }
 
     val player = remember(url) {
         val httpFactory = DefaultHttpDataSource.Factory()
@@ -288,6 +291,15 @@ private fun PlayerContent(
                         .setMediaMetadata(
                             MediaMetadata.Builder()
                                 .setTitle(title)
+                                // The line under the title. Left unset, the lock
+                                // screen read it out as "Test News HD by null".
+                                .setArtist(
+                                    when (playable) {
+                                        is Playable.Channel -> "Live TV"
+                                        is Playable.Film -> "Film"
+                                        is Playable.Episode -> "Series"
+                                    }
+                                )
                                 .setArtworkUri(artwork?.toUri())
                                 .build()
                         )
@@ -519,7 +531,7 @@ private fun PlayerContent(
                     mainThread.removeCallbacks(letGo)
                     // Back from the player this was handed to. It may still
                     // hold the line; "Play here" is the way back in.
-                    if (handedOff) return@LifecycleEventObserver
+                    if (released != null) return@LifecycleEventObserver
                     // Played on through the screen being off, and still is.
                     if (player.playWhenReady && player.playbackState != Player.STATE_IDLE) {
                         return@LifecycleEventObserver
@@ -566,7 +578,24 @@ private fun PlayerContent(
     }
 
     val activity = remember(context) { context.findActivity() }
-    val inPictureInPicture = rememberPictureInPicture(activity, videoAspect, offered = !handedOff)
+    val inPictureInPicture = rememberPictureInPicture(activity, videoAspect, offered = released == null)
+
+    // The notification's Stop and Settings' "Free the line" reach this player
+    // through ActivePlayback: stopped as when handed to another app, so the line
+    // is let go at once and coming back does not take it again.
+    DisposableEffect(player) {
+        val unregister = ActivePlayback.register {
+            val wasPlaying = player.playbackState != Player.STATE_IDLE
+            if (released == null) released = Released.ByYou
+            error = null
+            reconnecting = false
+            (activity as? MainActivity)?.pictureInPicture = null
+            if (onDemand) player.pause()
+            player.stop()
+            wasPlaying
+        }
+        onDispose { unregister() }
+    }
 
     /**
      * Stops here and opens the stream in another player. Stopped first, and
@@ -598,7 +627,7 @@ private fun PlayerContent(
             ).show()
             return@openElsewhere
         }
-        handedOff = true
+        released = Released.ToAnotherApp
         error = null
         reconnecting = false
         // Withdrawn now rather than when the state above recomposes, which is
@@ -759,10 +788,10 @@ private fun PlayerContent(
         // Also while an error is up: the controls are switched off then, and
         // the way out and the name of what failed should not go with them. Never
         // in picture-in-picture, where the window is the size of a stamp.
-        if ((controlsVisible || error != null || handedOff) && !inPictureInPicture) {
+        if ((controlsVisible || error != null || released != null) && !inPictureInPicture) {
             // Opposite the back button, and like it a tap target only: see
             // there for why nothing over the video may take a remote's focus.
-            if (!handedOff) {
+            if (released == null) {
                 IconButton(
                     onClick = openElsewhere,
                     modifier = Modifier
@@ -827,7 +856,7 @@ private fun PlayerContent(
         //
         // Off in picture-in-picture too, where the system draws its own.
         val showingError = error != null
-        val controlsWanted = !showingError && !handedOff && !inPictureInPicture
+        val controlsWanted = !showingError && released == null && !inPictureInPicture
         LaunchedEffect(controlsWanted) {
             playerView.value?.apply {
                 useController = controlsWanted
@@ -852,28 +881,39 @@ private fun PlayerContent(
             )
         }
 
-        if (handedOff && !inPictureInPicture) {
+        released?.takeIf { !inPictureInPicture }?.let { why ->
             OverVideoPanel(Modifier.align(Alignment.Center)) {
                 Icon(
-                    Icons.AutoMirrored.Filled.OpenInNew,
+                    when (why) {
+                        Released.ToAnotherApp -> Icons.AutoMirrored.Filled.OpenInNew
+                        Released.ByYou -> Icons.Filled.Stop
+                    },
                     contentDescription = null,
                     tint = OverVideo.accent,
                 )
                 Text(
-                    text = "Playing in another app",
+                    text = when (why) {
+                        Released.ToAnotherApp -> "Playing in another app"
+                        Released.ByYou -> "Stopped"
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     color = OverVideo.ink,
                     modifier = Modifier.padding(top = 12.dp),
                 )
                 Text(
-                    text = "Stopped here, so your line is free for it.",
+                    text = when (why) {
+                        Released.ToAnotherApp -> "Stopped here, so your line is free for it."
+                        Released.ByYou -> "Your line is free for another device."
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = OverVideo.inkSoft,
+                    textAlign = TextAlign.Center,
                     modifier = Modifier.padding(top = 4.dp),
                 )
                 PrimaryButton(
+                    fill = OverVideo.button,
                     onClick = {
-                        handedOff = false
+                        released = null
                         reconnect.reset()
                         reconnectDelay.set(0)
                         // As Try again: a channel rejoins the broadcast, a film
@@ -899,6 +939,7 @@ private fun PlayerContent(
                     textAlign = TextAlign.Center,
                 )
                 PrimaryButton(
+                    fill = OverVideo.button,
                     onClick = {
                         error = null
                         reconnect.reset()
@@ -992,3 +1033,11 @@ private fun Context.findActivity(): Activity? {
 
 /** Holds a view created inside an AndroidView factory, for calls made outside it. */
 private class ViewRef<T : View>(var value: T? = null)
+
+/** Why a player let go of the line on purpose; see `released` in PlayerContent. */
+private enum class Released {
+    /** Handed to another player on the phone. */
+    ToAnotherApp,
+    /** Stopped from the notification or Settings, to free the line for another device. */
+    ByYou,
+}

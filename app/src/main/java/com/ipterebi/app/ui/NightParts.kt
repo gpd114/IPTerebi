@@ -81,6 +81,8 @@ fun PrimaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     height: Dp = 52.dp,
+    /** The fill; the theme's accent unless the button sits somewhere the theme does not reach. */
+    fill: Color = Night.cobalt,
     content: @Composable RowScope.() -> Unit,
 ) {
     val shape = RoundedCornerShape(height / 2)
@@ -88,7 +90,7 @@ fun PrimaryButton(
         modifier
             .height(height)
             .clip(shape)
-            .background(if (enabled) Night.cobalt else Night.quiet)
+            .background(if (enabled) fill else Night.quiet)
             .focusRing(shape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 22.dp),

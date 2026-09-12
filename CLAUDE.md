@@ -195,6 +195,14 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   is then stopped, which also ends the notification. A play key after that
   still works: Android lets a media key start a foreground service from the
   background, and the session's `LivePlayer` rejoins at the live edge.
+
+  Moving to another device — the phone to a TV — is the case the one
+  connection makes awkward, so there are two ways to let go on purpose: Stop in
+  the media notification (a session custom command) and "Free the line" in
+  Settings, which then re-checks the line to show the connections in use. Both
+  go through `ActivePlayback`, which the player screen registers with; it stops
+  as "open in another player" does, and coming back shows "Stopped · Play here"
+  rather than taking the line back from the TV.
 - **Live streams drop, and a clean hang-up looks like the end of the stream.**
   A panel restarting a channel closes the connection normally, and ExoPlayer
   reports `ENDED` — for live, never true. A phone leaving Wi-Fi fails the read
