@@ -136,6 +136,24 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
             }
         }
 
+    /**
+     * [channel]'s programmes on [line] that overlap [from]..[to] (unix
+     * seconds), in order. For a guide grid, which shows a stretch of time.
+     */
+    fun between(line: String, channel: String, from: Long, to: Long): List<XmltvProgramme> =
+        readableDatabase.rawQuery(
+            "SELECT p.start, p.stop, p.title, p.description FROM programme p JOIN guide g " +
+                "ON p.line = g.line AND p.gen = g.gen " +
+                "WHERE p.line = ? AND p.channel = ? AND p.stop > ? AND p.start < ? ORDER BY p.start",
+            arrayOf(line, channel, from.toString(), to.toString()),
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    add(XmltvProgramme(channel, c.getLong(0), c.getLong(1), c.getString(2), c.getString(3)))
+                }
+            }
+        }
+
     /** Forgets [line]'s guide, when it is signed out of. */
     fun clear(line: String) {
         val db = writableDatabase

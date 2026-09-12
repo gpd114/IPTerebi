@@ -105,6 +105,16 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
             clock.correct(line, "$streamId", xtream.shortEpg(account, streamId), at)
         }
 
+    /**
+     * [epgChannelId]'s programmes from the full guide across [from]..[to], for
+     * a guide grid. Empty when the full guide does not have the channel — the
+     * grid does not ask `get_short_epg` row by row, which would be a request
+     * per channel on screen.
+     */
+    suspend fun schedule(account: XtreamAccount, epgChannelId: String, from: Long, to: Long): List<XmltvProgramme> =
+        if (epgChannelId.isBlank()) emptyList()
+        else withContext(Dispatchers.IO) { store.between(account.lineKey, epgChannelId, from, to) }
+
     private suspend fun learnFrom(account: XtreamAccount, streamId: Int, full: List<XmltvProgramme>) {
         val short = xtream.shortEpg(account, streamId)
         if (short.isNotEmpty()) clock.learnFrom(account.lineKey, short, full)
