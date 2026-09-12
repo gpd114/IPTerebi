@@ -158,6 +158,10 @@ class TvLiveViewModel(private val container: AppContainer, context: Context) : V
                     Lineup(channels, categories.await())
                 }
                 _state.update { it.copy(lineup = lineup, loading = false) }
+                // The full guide, in the background, for the channels just
+                // loaded — whatever the network: a television on the mains is
+                // what a guide grid is for, and it has nowhere else to get one.
+                container.guide.refreshIfStale(account, lineup.all.map { it.epgChannelId }, onMetered = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
