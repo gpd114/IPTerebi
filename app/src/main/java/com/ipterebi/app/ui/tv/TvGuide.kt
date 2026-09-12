@@ -64,10 +64,10 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-/** An hour and a half across, beside the categories: room to read titles on a 960dp screen. */
-internal const val VISIBLE_SECONDS = 90 * 60L
-private val ChannelColumn = 180.dp
-internal val GuideRowHeight = 46.dp
+/** Two hours across: enough to plan an evening on a 960dp screen, big enough to read. */
+internal const val VISIBLE_SECONDS = 2 * 3600L
+private val ChannelColumn = 210.dp
+private val RowHeight = 46.dp
 /** Where the parent draws the live picture: the guide leaves this corner unpainted. */
 internal val GuidePreviewWidth = 336.dp
 internal val GuidePreviewHeight = 189.dp
@@ -76,8 +76,8 @@ internal val GuideTopHeight = 213.dp
 
 /** Behind the guide: the same near-black as the panels, but solid — it is a page, not an overlay. */
 internal val TvGround = Color(0xFF0B0C11)
-internal val GuideCellFill = Color(0xFF191B23)
-internal val GuideCellNowFill = Color(0xFF20263A)
+private val CellFill = Color(0xFF191B23)
+private val CellNowFill = Color(0xFF20263A)
 
 @Composable
 internal fun ProgrammeDetails(
@@ -230,14 +230,14 @@ internal fun GuideRow(
     favourite: Boolean = false,
 ) {
     val windowEnd = windowStart + VISIBLE_SECONDS
-    Row(Modifier.fillMaxWidth().height(GuideRowHeight).padding(vertical = 3.dp)) {
+    Row(Modifier.fillMaxWidth().height(RowHeight).padding(vertical = 3.dp)) {
         Row(
             Modifier
                 .width(ChannelColumn)
                 .fillMaxHeight()
                 .padding(end = 6.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(if (focusedSlot != null) GuideCellNowFill else GuideCellFill)
+                .background(if (focusedSlot != null) CellNowFill else CellFill)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -304,8 +304,8 @@ private fun Cell(title: String, left: Dp, width: Dp, focused: Boolean, onNow: Bo
             .background(
                 when {
                     focused -> TvFocusFill
-                    onNow -> GuideCellNowFill
-                    else -> GuideCellFill
+                    onNow -> CellNowFill
+                    else -> CellFill
                 }
             )
             .then(if (focused) Modifier.border(2.dp, TvFocusFill, RoundedCornerShape(8.dp)) else Modifier)
