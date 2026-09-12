@@ -11,6 +11,7 @@ import com.ipterebi.core.NameIndex
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.XtreamCategory
 import com.ipterebi.core.XtreamException
+import com.ipterebi.core.XmltvProgramme
 import com.ipterebi.core.holds
 import com.ipterebi.core.searchByName
 import kotlinx.coroutines.CancellationException
@@ -83,6 +84,17 @@ data class ChannelsUiState(
         }
 
     val searching: Boolean get() = query.isNotBlank()
+
+    /** What the list on screen is, in words: the TV guide is headed with it. */
+    val listTitle: String
+        get() = when {
+            searching -> "Search: $query"
+            shelf == Shelf.Favourites -> "Favourites"
+            shelf == Shelf.Recent -> "Recently watched"
+            shelf is Shelf.Panel && shelf.categoryId == null -> "All channels"
+            shelf is Shelf.Panel -> categories.firstOrNull { it.id == shelf.categoryId }?.name ?: "Channels"
+            else -> "Channels"
+        }
 
     /**
      * What is on screen. While searching that is [results], which cover every
@@ -188,6 +200,9 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             _state.map { it.visibleChannels }.distinctUntilChanged().collect(container.channels::publish)
         }
+        viewModelScope.launch {
+            _state.map { it.listTitle }.distinctUntilChanged().collect { container.channelsTitle.value = it }
+        }
     }
 
     fun onQueryChange(value: String) {
@@ -252,6 +267,13 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
         _state.update { it.copy(shelf = shelf, query = "", error = null, offerFullLoad = false) }
         if (shelf is Shelf.Panel) startLoad { loadChannels(shelf.categoryId) }
     }
+
+    /** Moves on when the full guide is refreshed, so rows look again. */
+    val guideVersion = container.guide.version
+
+    /** What is on [channel] at [at] (unix seconds), from the full guide on the device. */
+    suspend fun onNow(channel: LiveStream, at: Long): XmltvProgramme? =
+        account?.let { container.guide.onNow(it, channel.epgChannelId, at) }
 
     fun toggleFavourite(channel: LiveStream) {
         val account = account ?: return
