@@ -65,16 +65,22 @@ you click in to view the channels, this is where it will be a channel list as
 well as an EPG". An earlier version had both, and a "TV guide" rail item and
 Right-twice to reach the second; they are gone.
 
-The group being zapped, its channels down the side, two hours across, the
-focused programme described at the top, and the tuned channel still playing
+The focused programme described at the top, the tuned channel still playing
 top right — the *same* player, resized into a corner the screen leaves
-unpainted, so it never opens a second stream. Up/down move between channels,
-right looks ahead; **left from the programme on now slides the groups out**,
-with the rail (Live TV, Films, Series, Settings) beyond them, and moving
-through the groups changes the rows at once — OK or right goes back in. OK
-watches the focused channel full screen; holding OK toggles it in
-Favourites (acted on at key-up, so a first repeat can mean "held"); Back
-closes.
+unpainted, so it never opens a second stream — and below, side by side on one
+page: the rail (Live TV, Films, Series, Settings), the **categories**, and the
+chosen category's channels with an hour and a half of programmes across.
+Up/down move between channels, right looks ahead; **left from the programme on
+now steps into the categories**, and moving through them changes the channels
+at once — OK or right steps back. Left again reaches the rail. OK watches the
+focused channel full screen; holding OK toggles it in Favourites (acted on at
+key-up, so a first repeat can mean "held"); Back closes.
+
+The categories are a column of the page, drawn as the channel cells are —
+same height, same rounded fill — because the owner wanted them to flow into
+the channels, not look separate. They began as a panel slid over the grid,
+and a strip that slid sideways to reveal them was considered and dropped;
+the grid gave up half an hour of width for it instead.
 
 - **A cursor, not focusable cells.** Thousands of cells of different widths
   would put focus wherever geometry says. One focusable handles the keys and
