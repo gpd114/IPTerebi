@@ -107,7 +107,7 @@ import kotlinx.coroutines.launch
  * coming from it will reach for:
  *
  * - **Up / Down** (and Channel +/−): the next or previous channel in the group.
- * - **OK**: the channel list over the picture.
+ * - **OK**: the channels with their guide, the picture still on in a corner.
  * - **Left**: back to the channel before — the flip between two.
  * - **Right**: what is on, and next.
  * - **Number keys**: straight to a channel.
@@ -160,9 +160,8 @@ private fun TvLive(
         ?: TvGroup.All
 
     var listOpen by remember { mutableStateOf(false) }
-    var guideOpen by remember { mutableStateOf(false) }
-    // Either covers the picture, and takes the remote.
-    val covered = listOpen || guideOpen
+    // It covers the picture (bar the corner it plays in), and takes the remote.
+    val covered = listOpen
     var bannerAt by remember { mutableLongStateOf(0L) }
     var bannerShown by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
@@ -456,7 +455,6 @@ private fun TvLive(
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     fun onBack() {
         when {
-            guideOpen -> guideOpen = false
             listOpen -> listOpen = false
             bannerShown || typed.isNotEmpty() -> {
                 bannerShown = false
@@ -497,8 +495,8 @@ private fun TvLive(
                         true
                     }
                     e.key == Key.DirectionRight || e.key == Key.Info -> {
-                        // Once for the banner, again for the guide.
-                        if (down) { if (bannerShown) { bannerShown = false; guideOpen = true } else showBanner() }
+                        // The banner, and again to put it away.
+                        if (down) { if (bannerShown) bannerShown = false else showBanner() }
                         true
                     }
                     // On release, not press: the list opens under the remote,
@@ -511,7 +509,7 @@ private fun TvLive(
                         error == null && !released
                     }
                     e.key == Key.Menu -> { if (!down) listOpen = true; true }
-                    e.key == Key.Guide -> { if (!down) guideOpen = true; true }
+                    e.key == Key.Guide -> { if (!down) listOpen = true; true }
                     else -> false
                 }
             }
@@ -538,9 +536,9 @@ private fun TvLive(
                 val quiet = waitingForLine || error != null || released || covered
                 view.setShowBuffering(if (quiet) PlayerView.SHOW_BUFFERING_NEVER else PlayerView.SHOW_BUFFERING_ALWAYS)
             },
-            // In the guide, the same player in the corner it leaves for it:
+            // Under the channel guide, the same player in the corner it leaves:
             // one stream, never a second for a preview.
-            modifier = if (guideOpen) {
+            modifier = if (listOpen) {
                 Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = GuideTopHeight - GuidePreviewHeight - 12.dp, end = 32.dp)
@@ -674,21 +672,8 @@ private fun TvLive(
             )
         }
 
-        if (guideOpen) {
-            TvGuide(
-                container = container,
-                account = account,
-                channels = state.channelsIn(group),
-                groupName = state.nameOf(group),
-                numberOf = { state.lineup?.numberOf(it) ?: 0 },
-                tunedId = tunedId,
-                onTune = { channel -> tune(channel) },
-                onFullScreen = { guideOpen = false },
-            )
-        }
-
         if (listOpen) {
-            TvChannelList(
+            TvChannelGuide(
                 state = state,
                 container = container,
                 account = account,
@@ -702,7 +687,6 @@ private fun TvLive(
                 },
                 onFavourite = model::toggleFavourite,
                 onOpen = { listOpen = false; onOpen(it) },
-                onGuide = { listOpen = false; guideOpen = true },
                 onClose = { listOpen = false },
                 onRetry = model::retry,
             )
@@ -807,7 +791,7 @@ private fun InfoBanner(
 
         Spacer(Modifier.height(12.dp))
         Text(
-            "▲ ▼  Channels     OK  Channel list     ◀  Previous channel     ▶  Info, ▶ again for the guide",
+            "▲ ▼  Channels     OK  Channels and guide     ◀  Previous channel     ▶  Info     0–9  Number",
             style = MaterialTheme.typography.labelSmall,
             color = TvInkSoft,
         )

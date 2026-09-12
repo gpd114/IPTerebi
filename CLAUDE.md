@@ -39,11 +39,9 @@ owner's Debritsu, whose TV app lives the same way on its own `tv` branch.
 
 The home screen once signed in: the channel left on last time (the newest
 recent — recorded when a channel *plays*, not when it is chosen), full screen,
-playing. Up/down zap through the group it was chosen in; OK opens
-`TvChannelList` over the picture — a rail (Live TV, Films, Series, Settings),
-groups, channels, and the focused channel's programme; Left flips to the
-previous channel; Right shows the banner; digits jump by number; Back twice
-leaves. Films, Series and Settings are still the phone's screens.
+playing. Up/down zap through the group it was chosen in; OK opens the
+channels with their guide (below); Left flips to the previous channel;
+Right shows the banner; digits jump by number; Back twice leaves. Films, Series and Settings are still the phone's screens.
 
 - **One ExoPlayer for the screen.** A change of channel stops the stream at
   once and asks for the next 300 ms later; another press inside that cancels
@@ -59,24 +57,35 @@ leaves. Films, Series and Settings are still the phone's screens.
   out the fifteen seconds the panel keeps counting it. Not on 403 — that is
   also a refused user agent. The fake panel's **Line busy for 15 s** tests it.
 
-### The guide (`ui/tv/TvGuide.kt`)
+### The channels, with their guide (`ui/tv/TvChannelGuide.kt`)
 
-Right twice from full screen (once for the banner, again for the guide), the
-Guide key, or "TV guide" on the channel list's rail. Channels of the group
-being zapped down the side, two hours across, the focused programme described
-at the top, and the tuned channel still playing top right — the *same*
-player, resized into a corner the guide leaves unpainted, so the guide never
-opens a second stream. OK on another channel tunes it into that corner; OK on
-the tuned one goes full screen; Back closes.
+OK (or the Guide or Menu key) from full screen. **One screen, not a channel
+list and a separate guide** — the owner's call: "you have a category and when
+you click in to view the channels, this is where it will be a channel list as
+well as an EPG". An earlier version had both, and a "TV guide" rail item and
+Right-twice to reach the second; they are gone.
+
+The group being zapped, its channels down the side, two hours across, the
+focused programme described at the top, and the tuned channel still playing
+top right — the *same* player, resized into a corner the screen leaves
+unpainted, so it never opens a second stream. Up/down move between channels,
+right looks ahead; **left from the programme on now slides the groups out**,
+with the rail (Live TV, Films, Series, Settings) beyond them, and moving
+through the groups changes the rows at once — OK or right goes back in. OK
+watches the focused channel full screen; holding OK toggles it in
+Favourites (acted on at key-up, so a first repeat can mean "held"); Back
+closes.
 
 - **A cursor, not focusable cells.** Thousands of cells of different widths
   would put focus wherever geometry says. One focusable handles the keys and
   the rules are `GuideGrid` in `core/`, tested: left/right programme by
-  programme, up/down keeping the point in time (the window's edge when a
-  programme began before it), empty stretches stepped in half-hours, the
-  window moving only when the focus nears its edge.
+  programme, up/down keeping the point in time, empty stretches stepped in
+  half-hours, the window following. Keys are worked out from the live cursor,
+  not the last frame: bursts sent to the real box landed wrong until they were.
+- **Left stops at now**, which is what makes it the way to the groups. When
+  catch-up arrives the past needs another way in.
 - **From the full guide on the device only.** Rows are loaded from
-  `GuideStore` as they come near the focus; a channel it does not cover is a
+  `GuideStore` as they come near the cursor; a channel it does not cover is a
   row of empty half-hours, not a `get_short_epg` request per row.
 - On the emulator, check its clock against the PC's first (`adb shell date`):
   one had drifted an hour and a half, and a right guide looked wrong.
