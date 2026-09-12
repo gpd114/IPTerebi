@@ -442,7 +442,7 @@ private fun ProgrammeCard(
     number: Int,
     modifier: Modifier = Modifier,
 ) {
-    val guide = rememberProgrammeGuide(container, account, channel.streamId)
+    val guide = rememberProgrammeGuide(container, account, channel.streamId, channel.epgChannelId)
     val now = guide.now ?: return
     Column(
         modifier

@@ -355,7 +355,11 @@ private fun TvLive(
 
     // The tuned channel's guide, for the banner: asked for once a change of
     // channel has settled, not for every channel passed on the way.
-    val guide = if (guideFor != 0) rememberProgrammeGuide(container, account, guideFor) else ProgrammeGuide()
+    val guide = if (guideFor != 0) {
+        rememberProgrammeGuide(container, account, guideFor, state.find(guideFor)?.epgChannelId)
+    } else {
+        ProgrammeGuide()
+    }
 
     // Stop from the session, or Free the line in Settings: stopped until asked.
     DisposableEffect(player) {

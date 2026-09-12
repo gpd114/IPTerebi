@@ -181,7 +181,7 @@ private fun PlayerContent(
     // A film has no guide, and asking the panel for one by a film's id would
     // spend a request on an answer that cannot exist.
     val guide = if (playable is Playable.Channel) {
-        rememberProgrammeGuide(container, account, playable.id)
+        rememberProgrammeGuide(container, account, playable.id, channel?.epgChannelId)
     } else {
         ProgrammeGuide()
     }
