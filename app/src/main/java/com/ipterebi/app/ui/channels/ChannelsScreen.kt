@@ -345,7 +345,7 @@ private val TileColours = listOf(
     Color(0xFF8A3F9E),
 )
 
-private fun tileColour(name: String): Color = TileColours[Math.floorMod(name.hashCode(), TileColours.size)]
+internal fun tileColour(name: String): Color = TileColours[Math.floorMod(name.hashCode(), TileColours.size)]
 
 /**
  * What is being searched, so a short list of results is not mistaken for the

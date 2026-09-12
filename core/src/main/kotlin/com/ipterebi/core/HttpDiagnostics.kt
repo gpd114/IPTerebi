@@ -18,6 +18,9 @@ package com.ipterebi.core
  */
 private val CONNECTION_LIMIT_CODES = setOf(456, 458)
 
+/** A stream refused with one of the codes panels keep for the connection limit. */
+fun isConnectionLimit(code: Int): Boolean = code in CONNECTION_LIMIT_CODES
+
 private const val AT_CONNECTION_LIMIT = "The line has hit its connection limit. If " +
     "nothing else is playing, the panel may still be counting a connection that " +
     "just dropped — try again in a few seconds."

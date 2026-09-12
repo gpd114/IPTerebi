@@ -80,6 +80,8 @@ public class FakePanel {
                     status(ex, 403);
                 } else if (file.startsWith("104.") || file.startsWith("105.")) {
                     streamDropping(ex, file.substring(0, 3));
+                } else if (file.startsWith("106.")) {
+                    streamAfterHandover(ex);
                 } else if (file.endsWith(".ts")) {
                     streamLive(ex);
                 } else {
@@ -182,6 +184,7 @@ public class FakePanel {
                     "{\"num\":3,\"name\":\"Refused (connection limit)\",\"stream_id\":103,\"category_id\":\"1\"}," +
                     "{\"num\":6,\"name\":\"Drops every 20 s\",\"stream_id\":104,\"category_id\":\"1\"}," +
                     "{\"num\":7,\"name\":\"Drops, then off air\",\"stream_id\":105,\"category_id\":\"1\"}," +
+                    "{\"num\":8,\"name\":\"Line busy for 15 s\",\"stream_id\":106,\"category_id\":\"1\"}," +
                     "{\"num\":4,\"name\":\"No stream id A\",\"category_id\":\"1\"}," +
                     "{\"num\":5,\"name\":\"No stream id B\",\"category_id\":\"1\"}";
                 String sport = "{\"num\":\"1\",\"name\":\"Sport One\",\"stream_id\":\"201\",\"category_id\":\"2\",\"stream_icon\":null}";
@@ -337,6 +340,27 @@ public class FakePanel {
         droppedAt.put(id, System.currentTimeMillis());
         if (id.equals("105")) offAirUntil = System.currentTimeMillis() + 45_000;
         log("   (" + id + " hung up after 20 s, as planned)");
+    }
+
+    /** When 106's line started being "still counted"; see streamAfterHandover. */
+    static volatile long busyFrom = 0;
+
+    /**
+     * A line another device has only just let go of: the first ask after a
+     * minute's quiet starts fifteen seconds of 458 — what a real line answered
+     * for about that long after a phone dropped off it — and then it plays.
+     * For the TV's "Waiting for your line", which should ride it out.
+     */
+    static void streamAfterHandover(HttpExchange ex) throws IOException {
+        long now = System.currentTimeMillis();
+        if (now - busyFrom > 60_000) busyFrom = now;
+        long left = busyFrom + 15_000 - now;
+        if (left > 0) {
+            log("   (106 refused: line still counted for " + (left + 999) / 1000 + " s more)");
+            status(ex, 458);
+            return;
+        }
+        streamLive(ex);
     }
 
     static void streamLive(HttpExchange ex) throws IOException {

@@ -27,6 +27,33 @@ owner's Debritsu, whose TV app lives the same way on its own `tv` branch.
   phone and TV apps are one family.
 - **Test on real Android TV**: the `googletv34` AVD (Google TV, Android 14).
   The owner's own box is a Mi Box (Android TV 9); "any Google TV box" is the aim.
+  Its remote has a D-pad, OK and Back and nothing else a TV app can use — no
+  number keys, no channel keys — so everything must work from those; digits
+  and channel keys are extras for remotes that have them.
+
+### Live TV (`ui/tv/TvLiveScreen.kt`)
+
+The home screen once signed in: the channel left on last time (the newest
+recent — recorded when a channel *plays*, not when it is chosen), full screen,
+playing. Up/down zap through the group it was chosen in; OK opens
+`TvChannelList` over the picture — a rail (Live TV, Films, Series, Settings),
+groups, channels, and the focused channel's programme; Left flips to the
+previous channel; Right shows the banner; digits jump by number; Back twice
+leaves. Films, Series and Settings are still the phone's screens.
+
+- **One ExoPlayer for the screen.** A change of channel stops the stream at
+  once and asks for the next 300 ms later; another press inside that cancels
+  it. The fake panel's log shows each close before the next open, and holding
+  channel-up through ten channels opens one stream.
+- **The whole line is loaded once** (`Lineup` in `core/`), decoded off the main
+  thread — it is megabytes on a big line. Numbers are the provider's where each
+  names one channel, else positions; see `Lineup`.
+- **Waiting for the line** (`LineWait` in `core/`): refused with 456/458 before
+  anything played, it asks again every 3 s for 30 s under "Waiting for your
+  line to free up", then says the line is in use elsewhere and how to free
+  it. This is what makes phone-to-TV work: Stop on the phone, and the TV rides
+  out the fifteen seconds the panel keeps counting it. Not on 403 — that is
+  also a refused user agent. The fake panel's **Line busy for 15 s** tests it.
 
 ## Layout
 
@@ -361,6 +388,11 @@ survived until something was pressed.
   Read `LocalInputModeManager` inside `focusProperties`.
 - **Material's focus indication is invisible from a sofa.** Anything selectable
   gets `focusRing()`, placed before `clickable` so it sees that element's focus.
+- **Back is also a focus key.** Compose turns an unused Back into "leave this
+  focus group": pressed on a row of the TV channel list, it moved focus out to
+  the screen and was used up doing it, so the list stayed open and Back did
+  nothing visible until pressed again. A `BackHandler` never sees that press.
+  The TV live screen takes Back in `onPreviewKeyEvent`, before focus does.
 - **Anything focusable over the video steals OK.** The overlay back button was
   the first focusable a remote reached, so the first press of OK — the one
   everyone uses to pause — left the film. It is `canFocus = false`; the remote
