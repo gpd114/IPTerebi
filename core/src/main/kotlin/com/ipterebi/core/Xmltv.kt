@@ -405,3 +405,13 @@ internal fun decodeEntities(text: CharSequence): String {
     }
     return out.toString()
 }
+
+/** A full-guide programme in the shape the screens read. Its times are already right. */
+fun XmltvProgramme.asListing(): EpgListing = EpgListing(
+    epgId = channel,
+    title = title,
+    description = description,
+    startTimestamp = start,
+    stopTimestamp = stop,
+    plainText = true,
+)

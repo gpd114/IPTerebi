@@ -18,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,7 +35,7 @@ import com.ipterebi.core.lineKey
 import com.ipterebi.core.nowAndNext
 import kotlinx.coroutines.delay
 import java.time.Instant
-import java.time.ZoneId
+
 
 /**
  * How often the clock advances. Only the progress bar reads it, and a bar two
@@ -73,44 +74,47 @@ data class ProgrammeGuide(
 }
 
 /**
- * The guide for one channel.
+ * The guide for one channel: from the full guide kept on the device when it
+ * has the channel, else `get_short_epg` put on the right clock — see Guide.
  *
- * Asked for once when the channel is opened — there is no call that returns a
- * guide for a whole list — and re-asked only when the clock runs past the last
- * programme we were handed. Sitting on one channel all evening should not query
- * the panel every thirty seconds; the ticker moves the bar, it does not fetch.
+ * Looked up once when the channel is opened, again whenever the full guide is
+ * refreshed, and again only when the clock runs past the last programme we
+ * were handed. Sitting on one channel all evening should not query the panel
+ * every thirty seconds; the ticker moves the bar, it does not fetch.
  */
 @Composable
 fun rememberProgrammeGuide(
     container: AppContainer,
     account: XtreamAccount,
     streamId: Int,
+    /** The channel's `epg_channel_id`, which is what the full guide is keyed on. */
+    epgChannelId: String?,
 ): ProgrammeGuide {
     // Keyed on the line as well as the channel: changing the user agent in
     // settings rebuilds the account, and the guide belongs to the line.
     val key = Triple(streamId, account.base, account.username)
+    val guideVersion by container.guide.version.collectAsStateWithLifecycle()
 
     var listings by remember(key) { mutableStateOf<List<EpgListing>>(emptyList()) }
     var now by remember { mutableStateOf(Instant.now()) }
     var reloads by remember(key) { mutableStateOf(0) }
     var lastFetched by remember(key) { mutableStateOf(Instant.EPOCH) }
 
-    LaunchedEffect(key, reloads) {
+    LaunchedEffect(key, reloads, guideVersion) {
         // Never throws: a line with no guide, a channel missing from one, a fork
         // answering `false` and a panel with no get_short_epg at all all arrive
         // as an empty list, because none of them is a fault worth a message.
-        listings = container.xtream.shortEpg(account, streamId)
-        lastFetched = Instant.now()
+        val at = Instant.now()
+        listings = container.guide.listings(account, streamId, epgChannelId, at)
+        lastFetched = at
         if (BuildConfig.DEBUG) {
-            val at = Instant.now()
-            val current = container.guideClock
-                .correct(account.lineKey, listings, at, ZoneId.systemDefault()).nowAndNext(at).now
-            val shift = container.guideClock.shiftFor(account.lineKey)
+            val shift = container.guide.clock.shiftFor(account.lineKey)
             Log.d(
                 TAG_PLAY,
-                "stream $streamId guide: ${listings.size} programmes, " +
-                    "now ${current?.titleText ?: "(nothing listed)"}" +
-                    (if (shift != 0L) ", panel's clock put right by ${shift / 60} min" else ""),
+                "stream $streamId guide: ${listings.size} programmes " +
+                    "(${if (listings.firstOrNull()?.plainText == true) "full guide" else "short answer"}), " +
+                    "now ${listings.nowAndNext(at).now?.titleText ?: "(nothing listed)"}" +
+                    (if (shift != 0L) ", short answers put right by ${shift / 60} min" else ""),
             )
         }
     }
@@ -126,21 +130,14 @@ fun rememberProgrammeGuide(
     // ask for. Guarded twice over: on having been given anything at all, so a
     // channel with no guide does not re-ask forever, and on [MIN_REFETCH_SECONDS],
     // so one whose guide has stopped being updated does not either.
-    // On the corrected clock, or a guide an hour out would run dry an hour
-    // before being asked again.
-    val lastKnownEnd = remember(listings, now) {
-        listings.maxOfOrNull { it.stopTimestamp }?.plus(container.guideClock.shiftFor(account.lineKey)) ?: 0L
-    }
+    val lastKnownEnd = remember(listings) { listings.maxOfOrNull { it.stopTimestamp } ?: 0L }
     LaunchedEffect(now, lastKnownEnd) {
         val runOut = lastKnownEnd > 0L && now.epochSecond >= lastKnownEnd
         val cooledDown = now.epochSecond - lastFetched.epochSecond >= MIN_REFETCH_SECONDS
         if (runOut && cooledDown) reloads++
     }
 
-    // Put right first when the panel's clock is out; see GuideClock.
-    val (current, upNext) = remember(listings, now) {
-        container.guideClock.correct(account.lineKey, listings, now, ZoneId.systemDefault()).nowAndNext(now)
-    }
+    val (current, upNext) = remember(listings, now) { listings.nowAndNext(now) }
     return ProgrammeGuide(now = current, next = upNext, at = now)
 }
 

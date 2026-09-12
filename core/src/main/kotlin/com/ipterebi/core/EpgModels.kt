@@ -3,6 +3,7 @@ package com.ipterebi.core
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
@@ -94,10 +95,18 @@ data class EpgListing(
     @SerialName("has_archive")
     @Serializable(with = FlexibleIntSerializer::class)
     val hasArchive: Int = 0,
-) {
-    val titleText: String get() = title.decodeEpgText()
 
-    val descriptionText: String get() = description.decodeEpgText()
+    /**
+     * True for a programme from the full guide (`xmltv.php`), whose text is
+     * plain: decoding it as base64 would turn a title that happens to be valid
+     * base64 into noise. Never sent by a panel.
+     */
+    @Transient
+    val plainText: Boolean = false,
+) {
+    val titleText: String get() = if (plainText) title else title.decodeEpgText()
+
+    val descriptionText: String get() = if (plainText) description else description.decodeEpgText()
 
     /**
      * Whether both ends of the programme are known and the right way round. A
