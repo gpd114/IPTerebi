@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
@@ -27,14 +28,18 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,16 +60,19 @@ import com.ipterebi.app.ui.CategoryShelf
 import com.ipterebi.app.ui.DpadTextField
 import com.ipterebi.app.ui.PrimaryButton
 import com.ipterebi.app.ui.QuietPill
-import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.SearchFieldShape
+import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.SectionTopBar
 import com.ipterebi.app.ui.ShelfChip
+import com.ipterebi.app.ui.SquareIconButton
+import com.ipterebi.app.ui.fieldColours
 import com.ipterebi.app.ui.focusRing
 import com.ipterebi.app.ui.nightCard
-import com.ipterebi.app.ui.fieldColours
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.LiveStream
+import com.ipterebi.core.XmltvProgramme
 import com.ipterebi.core.channelInitials
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,12 +80,28 @@ fun ChannelsScreen(
     container: AppContainer,
     onChannel: (Int) -> Unit,
     onSettings: () -> Unit,
+    /** The TV guide, for the channels on screen. */
+    onGuide: () -> Unit,
     viewModel: ChannelsViewModel = viewModel(factory = ChannelsViewModel.factory(container)),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val guideVersion by viewModel.guideVersion.collectAsStateWithLifecycle()
+    // The minute, so what is on moves on while the list is open.
+    var minute by remember { mutableLongStateOf(System.currentTimeMillis() / 60_000) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L - System.currentTimeMillis() % 60_000L)
+            minute = System.currentTimeMillis() / 60_000
+        }
+    }
 
     Scaffold(
-        topBar = { SectionTopBar(title = "Live TV", onSettings = onSettings) },
+        topBar = {
+            SectionTopBar(title = "Live TV", onSettings = onSettings) {
+                SquareIconButton(Icons.Filled.GridView, "TV guide", onGuide)
+                Spacer(Modifier.size(8.dp))
+            }
+        },
         // The page is drawn once, under the NavHost.
         containerColor = Color.Transparent,
     ) { padding ->
@@ -146,7 +170,14 @@ fun ChannelsScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(state.visibleChannels, key = { it.streamId }) { channel ->
+                            // From the full guide on the device: a quick local
+                            // lookup per row, never a request to the panel.
+                            val onNow by produceState<XmltvProgramme?>(null, channel.epgChannelId, guideVersion, minute) {
+                                value = viewModel.onNow(channel, minute * 60)
+                            }
                             ChannelRow(
+                                onNow = onNow,
+                                nowSeconds = minute * 60,
                                 channel = channel,
                                 // Worth saying on favourites, recents, All and
                                 // search results; inside the category, it would
@@ -248,6 +279,9 @@ private fun ChannelRow(
     starred: Boolean,
     onClick: () -> Unit,
     onStar: () -> Unit,
+    /** What is on now, when the full guide knows. */
+    onNow: XmltvProgramme? = null,
+    nowSeconds: Long = 0,
 ) {
     Row(
         modifier = Modifier
@@ -277,6 +311,26 @@ private fun ChannelRow(
                     color = Night.inkSoft,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+            onNow?.takeIf { it.title.isNotBlank() }?.let { programme ->
+                Text(
+                    text = programme.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Night.ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 1.dp),
+                )
+                LinearProgressIndicator(
+                    progress = {
+                        ((nowSeconds - programme.start).toFloat() / (programme.stop - programme.start)).coerceIn(0f, 1f)
+                    },
+                    modifier = Modifier.padding(top = 4.dp, end = 12.dp).fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
+                    color = Night.accent,
+                    trackColor = Night.quiet,
+                    drawStopIndicator = {},
+                    gapSize = 0.dp,
                 )
             }
         }

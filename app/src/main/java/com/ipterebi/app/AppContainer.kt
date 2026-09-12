@@ -12,6 +12,7 @@ import com.ipterebi.core.Series
 import com.ipterebi.core.VodStream
 import com.ipterebi.core.XtreamClient
 import com.ipterebi.core.defaultXtreamHttpClient
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Everything with a lifetime longer than a screen, built once in
@@ -29,6 +30,9 @@ class AppContainer(context: Context) {
     )
 
     val channels = MediaRepository<Int, LiveStream> { it.streamId }
+
+    /** What [channels] is, in words — "News", "Favourites" — for the TV guide to be headed with. */
+    val channelsTitle = MutableStateFlow("Channels")
 
     val films = MediaRepository<Int, VodStream> { it.streamId }
 

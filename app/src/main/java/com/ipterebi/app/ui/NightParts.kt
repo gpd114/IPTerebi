@@ -214,7 +214,12 @@ fun <T> ChoiceRow(
  * the settings button. No app-bar strip — the page runs up behind it.
  */
 @Composable
-fun SectionTopBar(title: String, onSettings: () -> Unit) {
+fun SectionTopBar(
+    title: String,
+    onSettings: () -> Unit,
+    /** Buttons before the settings one — Live TV's guide. */
+    actions: @Composable RowScope.() -> Unit = {},
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -234,6 +239,7 @@ fun SectionTopBar(title: String, onSettings: () -> Unit) {
             color = Night.ink,
             modifier = Modifier.weight(1f),
         )
+        actions()
         SquareIconButton(Icons.Filled.Settings, "Settings", onSettings)
     }
 }
