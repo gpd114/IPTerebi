@@ -152,8 +152,8 @@ fun ChannelInfoOverlay(
         modifier = modifier
             .widthIn(max = 420.dp)
             .clip(RoundedCornerShape(18.dp))
-            // The page's panel colour, a little see-through over the picture.
-            .background(com.ipterebi.app.ui.theme.Night.veil.copy(alpha = 0.85f))
+            // A dark panel whichever theme: it sits over the picture.
+            .background(com.ipterebi.app.ui.theme.OverVideo.panel)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

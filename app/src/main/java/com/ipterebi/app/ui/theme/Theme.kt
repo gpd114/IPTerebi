@@ -1,9 +1,14 @@
 package com.ipterebi.app.ui.theme
 
+import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -13,82 +18,132 @@ import androidx.compose.ui.unit.sp
 import com.ipterebi.app.R
 
 /**
- * IPTerebi's colours, by role, on the pattern of the owner's other app,
- * Debritsu: flat throughout — no gradients, rims or sheen — so each role is one
- * colour, and what you press is told apart by fill, not by decoration.
+ * Everything a theme colours, by role, on the pattern of the owner's other app,
+ * Debritsu (its `ui/Theme.kt`): flat throughout — no gradients, rims or sheen —
+ * so each role is one colour, and what you press is told apart by fill.
  *
- * The page is IPTerebi's own dark blue, which is what makes it this app rather
- * than that one. Cobalt is the accent: solid where it is a fill (the thing
- * selected, the main button), lifted to [accent] where it is text or a small
- * mark, which in full cobalt would sink into the page. Pink, from the icon's
- * smile, is for favourites. No yellow: the owner asked for it out.
+ * Two themes, as Debritsu has: [Light], the default — a pale page with white
+ * cards and IPTerebi's dark blue as the accent, where Debritsu's Pastel has its
+ * dark purple — and [Dark], near-black with neutral cards and the blue only as
+ * an accent. Switched in Settings, held by [Appearance].
  *
- * Earlier versions lit the page cobalt from the top and set navy buttons on
- * it, and on the phone every button was blue on blue however it was outlined.
- * A flat page and white-tinted pills are what fixed that; keep them.
- *
- * Dark only, and not because a light scheme would be hard: the app is a frame
- * around moving video, and a light chrome around a dark picture is unpleasant
- * to sit in front of.
+ * How it got here, so it is not undone: the app was dark-only, and its page was
+ * navy lit cobalt from the top. Every button on it read as blue on blue —
+ * in navy, in lighter navy with an outline, in white, and once flat — and the
+ * owner asked for Debritsu's look instead. Blue is the accent now, never the
+ * page and the buttons at once. The player stays dark in both: it frames video.
+ */
+data class Palette(
+    val dark: Boolean,
+    /** The page. */
+    val ground: Color,
+    /** Cards, panels, poster placeholders. */
+    val veil: Color,
+    /** Dividers, inactive tracks, text-field rims. */
+    val edge: Color,
+    /** Faint rims — a poster's edge against the page. */
+    val hairline: Color,
+    /** Quiet pills — categories you are not in, choices not chosen. */
+    val quiet: Color,
+    val quietText: Color,
+    /** Secondary and icon buttons. */
+    val glass: Color,
+    /** Icons on [glass]. */
+    val glassIcon: Color,
+    /** Text-field wells. */
+    val field: Color,
+    /** The accent as a fill: what is selected, the main button. White goes on it. */
+    val cobalt: Color,
+    /** The accent as text or a small mark on the page. */
+    val accent: Color,
+    /** Primary text. */
+    val ink: Color,
+    /** Muted text. */
+    val inkSoft: Color,
+    /** Favourites: the pink of Terebi-kun's smile, deep enough to read on the page. */
+    val pink: Color,
+    /** The translucent score pill over posters. White goes on it. */
+    val badge: Color,
+)
+
+/** Pale, with IPTerebi's dark blue as the accent. The default, as Debritsu's Pastel is. */
+val Light = Palette(
+    dark = false,
+    ground = Color(0xFFF2F4FA), veil = Color(0xFFFFFFFF), edge = Color(0xFFDDE3F0),
+    hairline = Color(0xFFE6EAF4), quiet = Color(0xFFE6EBF7), quietText = Color(0xFF34436A),
+    glass = Color(0xFFE3E9F7), glassIcon = Color(0xFF1B3478), field = Color(0xFFFFFFFF),
+    cobalt = Color(0xFF1B3478), accent = Color(0xFF1B3478),
+    ink = Color(0xFF141A30), inkSoft = Color(0xFF6A7494),
+    pink = Color(0xFFC2456B), badge = Color(0xB3142A66),
+)
+
+/**
+ * Near-black with neutral cards and pills — no blue page under blue buttons —
+ * and the blue as a fill where something is chosen, lifted for text, which in
+ * the dark blue would be unreadable on a page this dark.
+ */
+val Dark = Palette(
+    dark = true,
+    ground = Color(0xFF0B0C11), veil = Color(0xFF17191F), edge = Color(0xFF2A2D36),
+    hairline = Color(0x14FFFFFF), quiet = Color(0x1AFFFFFF), quietText = Color(0xFFDADDE6),
+    glass = Color(0x1FFFFFFF), glassIcon = Color(0xFFE6E9F2), field = Color(0xFF121419),
+    cobalt = Color(0xFF2F5FE0), accent = Color(0xFF9DB5FF),
+    ink = Color(0xFFF1F3F8), inkSoft = Color(0xFFA3A8B8),
+    pink = Color(0xFFFF8FA3), badge = Color(0xB31F3C8C),
+)
+
+/**
+ * The colours in use, read from the current [Palette], which is held as state:
+ * switching theme recolours everything that has read one, without any screen
+ * having to pass a palette about. Named `Night` from when the app had only one.
  */
 object Night {
-    /** The page. IPTerebi's dark blue. */
-    val ground = Color(0xFF0B1122)
-    /** Cards, panels, poster placeholders: one step up from the page. */
-    val veil = Color(0xFF151D38)
-    /** Dividers, inactive tracks, text-field rims. */
-    val edge = Color(0xFF26305A)
-    /** Faint rims — a poster's edge against the page. */
-    val hairline = Color(0x14FFFFFF)
-    /** Quiet pills — the categories you are not in, choices not chosen. */
-    val quiet = Color(0x1AFFFFFF)
-    val quietText = Color(0xFFD6DEF7)
-    /** Secondary and icon buttons. */
-    val glass = Color(0x1FFFFFFF)
-    /** Text-field wells: a step *below* the panel they sit in. */
-    val field = Color(0xFF0E1530)
-    /** The accent as a fill: what is selected, the main button. */
-    val cobalt = Color(0xFF2F6BFF)
-    /** The accent as text or a small mark on the dark page. */
-    val accent = Color(0xFF8FB4FF)
-    val ink = Color(0xFFEEF2FF)
-    /** Muted text. */
-    val inkSoft = Color(0xFF9AA6CA)
-    /** Favourites: the pink of Terebi-kun's smile. */
-    val pink = Color(0xFFFF8FA3)
-    /** The translucent score pill over posters. */
-    val badge = Color(0xB31F3C8C)
+    var palette by mutableStateOf(Light)
+
+    val ground get() = palette.ground
+    val veil get() = palette.veil
+    val edge get() = palette.edge
+    val hairline get() = palette.hairline
+    val quiet get() = palette.quiet
+    val quietText get() = palette.quietText
+    val glass get() = palette.glass
+    val glassIcon get() = palette.glassIcon
+    val field get() = palette.field
+    val cobalt get() = palette.cobalt
+    val accent get() = palette.accent
+    val ink get() = palette.ink
+    val inkSoft get() = palette.inkSoft
+    val pink get() = palette.pink
+    val badge get() = palette.badge
 }
 
-private val ColorScheme = darkColorScheme(
-    primary = Night.cobalt,
-    onPrimary = Color.White,
-    primaryContainer = Night.cobalt,
-    onPrimaryContainer = Color.White,
-    secondary = Night.accent,
-    onSecondary = Night.ground,
-    secondaryContainer = Night.cobalt,
-    onSecondaryContainer = Color.White,
-    tertiary = Night.pink,
-    onTertiary = Color(0xFF2A0F1A),
-    background = Night.ground,
-    onBackground = Night.ink,
-    surface = Night.ground,
-    onSurface = Night.ink,
-    surfaceVariant = Night.edge,
-    onSurfaceVariant = Night.inkSoft,
-    // Sheets, dialogs and menus draw from these; left unset they are
-    // Material's baseline greys, which never looked like they belonged here.
-    surfaceContainerLowest = Night.ground,
-    surfaceContainerLow = Night.veil,
-    surfaceContainer = Night.veil,
-    surfaceContainerHigh = Color(0xFF1B2444),
-    surfaceContainerHighest = Color(0xFF222C50),
-    outline = Night.edge,
-    outlineVariant = Night.hairline,
-    error = Color(0xFFFF8A80),
-    onError = Color(0xFF1A0A08),
-)
+/**
+ * Colours over video, which are the same whichever theme: the picture is dark,
+ * and a white panel over it would glare.
+ */
+object OverVideo {
+    val panel = Color(0xEB15171F)
+    val ink = Color.White
+    val inkSoft = Color(0xB3FFFFFF)
+    val accent = Color(0xFF9DB5FF)
+}
+
+/** Which theme is chosen, kept in plain preferences so it can be read before the first frame. */
+object Appearance {
+    private const val FILE = "appearance"
+    private const val KEY = "theme"
+
+    fun load(context: Context) {
+        Night.palette = if (prefs(context).getString(KEY, null) == "dark") Dark else Light
+    }
+
+    fun set(context: Context, dark: Boolean) {
+        prefs(context).edit().putString(KEY, if (dark) "dark" else "light").apply()
+        Night.palette = if (dark) Dark else Light
+    }
+
+    private fun prefs(context: Context) = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+}
 
 /**
  * M PLUS Rounded 1c — soft like the mascot — in Latin-only cuts, about 50 KB a
@@ -102,6 +157,37 @@ private val Rounded = FontFamily(
     Font(R.font.mplus_rounded_bold, FontWeight.SemiBold),
     Font(R.font.mplus_rounded_bold, FontWeight.Bold),
     Font(R.font.mplus_rounded_extrabold, FontWeight.ExtraBold),
+)
+
+/** Material's colours, from the palette, for the components still drawn by Material. */
+private fun scheme(p: Palette) = if (p.dark) darkColorScheme(
+    primary = p.cobalt, onPrimary = Color.White,
+    primaryContainer = p.cobalt, onPrimaryContainer = Color.White,
+    secondary = p.accent, onSecondary = p.ground,
+    secondaryContainer = p.cobalt, onSecondaryContainer = Color.White,
+    tertiary = p.pink,
+    background = p.ground, onBackground = p.ink,
+    surface = p.ground, onSurface = p.ink,
+    surfaceVariant = p.edge, onSurfaceVariant = p.inkSoft,
+    // Sheets, dialogs and menus draw from these; left unset they are
+    // Material's baseline greys, which never looked like they belonged here.
+    surfaceContainerLowest = p.ground, surfaceContainerLow = p.veil, surfaceContainer = p.veil,
+    surfaceContainerHigh = p.veil, surfaceContainerHighest = p.edge,
+    outline = p.edge, outlineVariant = p.hairline,
+    error = Color(0xFFFF8A80), onError = Color(0xFF1A0A08),
+) else lightColorScheme(
+    primary = p.cobalt, onPrimary = Color.White,
+    primaryContainer = p.quiet, onPrimaryContainer = p.ink,
+    secondary = p.accent, onSecondary = Color.White,
+    secondaryContainer = p.cobalt, onSecondaryContainer = Color.White,
+    tertiary = p.pink,
+    background = p.ground, onBackground = p.ink,
+    surface = p.ground, onSurface = p.ink,
+    surfaceVariant = p.edge, onSurfaceVariant = p.inkSoft,
+    surfaceContainerLowest = p.veil, surfaceContainerLow = p.veil, surfaceContainer = p.veil,
+    surfaceContainerHigh = p.quiet, surfaceContainerHighest = p.edge,
+    outline = p.edge, outlineVariant = p.hairline,
+    error = Color(0xFFB3261E), onError = Color.White,
 )
 
 /** One rounded face throughout, in three weights; Debritsu's scale. */
@@ -122,5 +208,5 @@ private val Type = Typography(
 
 @Composable
 fun IPTerebiTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = ColorScheme, typography = Type, content = content)
+    MaterialTheme(colorScheme = scheme(Night.palette), typography = Type, content = content)
 }

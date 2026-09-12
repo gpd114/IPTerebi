@@ -34,6 +34,8 @@ import com.ipterebi.app.ui.PrimaryButton
 import com.ipterebi.app.ui.ScreenTopBar
 import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.fieldColours
+import androidx.compose.ui.platform.LocalContext
+import com.ipterebi.app.ui.theme.Appearance
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.UserAgents
@@ -71,6 +73,22 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             val account = state.account
+            val context = LocalContext.current
+
+            // First, as in Debritsu: the one setting that changes everything
+            // else on the screen as it is pressed.
+            Panel {
+                SectionTitle("Appearance")
+                ChoiceRow(
+                    options = listOf(false to "Light", true to "Dark"),
+                    isSelected = { it == Night.palette.dark },
+                    onSelect = { dark -> Appearance.set(context, dark) },
+                )
+                Hint(
+                    "Light is pale with a dark blue accent; Dark is near-black with the " +
+                        "same blue. The player is dark in both.",
+                )
+            }
 
             Panel {
                 SectionTitle("Line")

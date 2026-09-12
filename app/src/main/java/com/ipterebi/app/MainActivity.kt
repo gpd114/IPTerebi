@@ -6,17 +6,52 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import android.graphics.drawable.ColorDrawable
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.toArgb
+import androidx.core.view.WindowCompat
 import com.ipterebi.app.ui.AppNav
+import com.ipterebi.app.ui.theme.Appearance
 import com.ipterebi.app.ui.theme.IPTerebiTheme
+import com.ipterebi.app.ui.theme.Night
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val container = (application as IPTerebiApp).container
+        // Before the first frame, so a Dark choice does not open on the Light page.
+        Appearance.load(this)
         setContent {
             IPTerebiTheme {
+                SystemBarsFollowTheme()
                 AppNav(container)
+            }
+        }
+    }
+
+    /**
+     * The status and navigation bars in the page's colour, with icons that read
+     * on it: dark on the Light theme, light on Dark. Left alone they are the
+     * platform's black, which over the Light page is a black stripe across the
+     * top. The window behind the content follows too, so nothing flashes the
+     * other theme's colour.
+     */
+    @Composable
+    private fun SystemBarsFollowTheme() {
+        val palette = Night.palette
+        SideEffect {
+            val ground = palette.ground.toArgb()
+            @Suppress("DEPRECATION") // Their replacement is edge-to-edge; this app targets 34.
+            run {
+                window.statusBarColor = ground
+                window.navigationBarColor = ground
+            }
+            window.setBackgroundDrawable(ColorDrawable(ground))
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                isAppearanceLightStatusBars = !palette.dark
+                isAppearanceLightNavigationBars = !palette.dark
             }
         }
     }

@@ -21,27 +21,36 @@ class belongs in `core/`, because that is the half that can be proven.
 ## The look
 
 Modelled on the owner's other app, Debritsu (`../Debritsu`, see its
-`ui/Theme.kt` and `ui/Components.kt`), on IPTerebi's own dark blue — which is
-what keeps it this app and not that one. Flat throughout: no gradients, glows,
-rims or sheen, and each role one colour. The page is `Night.ground`, cards and
-panels `veil` a step up, text-field wells `field` a step down. What you press
-is told apart by fill: quiet white-tinted pills (`quiet`) for choices not
-chosen, solid cobalt for the one chosen and for the main button, white-tinted
-glass for icon and secondary buttons. Pink, from the icon's smile, is for
-favourites. No yellow in the app — its owner asked for it out; the icon keeps it.
+`ui/Theme.kt` and `ui/Components.kt`), with IPTerebi's dark blue as the accent
+where Debritsu has purple. Two themes, as Debritsu has, switched under
+Settings → Appearance: **Light**, the default — a pale page, white cards, the
+dark blue for what is selected and the main button, like Debritsu's Pastel —
+and **Dark**, near-black with neutral cards and the blue as the accent. The
+player is dark in both (`OverVideo`); it frames video.
 
-This was reached the hard way, and is worth not undoing: an earlier look lit
-the page cobalt from the top, and navy buttons on it read as blue on blue —
-first in the cards' navy, then lighter and outlined, then white, and the owner
-was not happy with any of them. The flat page is what made the pills read.
+Flat throughout: no gradients, glows, rims or sheen, and each role one colour.
+Colours are roles in a `Palette` (`Light`, `Dark`), read through `Night.*`,
+which holds the current palette as state — switching recolours everything that
+read one. What you press is told apart by fill: quiet pills for choices not
+chosen, the accent solid for the one chosen and for the main button, glass for
+icon and secondary buttons. Pink, from the icon's smile, is for favourites. No
+yellow in the app — its owner asked for it out; the icon keeps it. The choice
+is kept by `Appearance` in plain preferences, read before the first frame; the
+launch splash is the Light page, so on Dark it shows light for that moment.
 
-The palette is `Night` in `ui/theme/Theme.kt`; the pieces — `SectionTopBar`,
+This was reached the hard way, and is worth not undoing. The app was
+dark-only, on a navy page lit cobalt from the top, and every button on it read
+as blue on blue — in navy, in lighter navy with an outline, in white, and once
+flat on the navy — and the owner was not happy with any of them. What they
+wanted was Debritsu's look: blue as the accent, never the page and the buttons
+at once.
+
+The palettes are in `ui/theme/Theme.kt`; the pieces — `SectionTopBar`,
 `ScreenTopBar`, `Panel`, `PrimaryButton`, `SecondaryButton`,
 `SquareIconButton`, `ChoiceRow`, `QuietPill`, `nightCard`, `fieldColours` —
 are in `ui/NightParts.kt`, named after Debritsu's where they match. Use those
-rather than new literals or Material's own buttons and chips, or the app
-drifts back to stock Material. It stays dark-only, for the reason given in
-`Theme.kt`.
+rather than new literals or Material's own buttons and chips, and never a
+colour that only works in one theme.
 
 The typeface is M PLUS Rounded 1c, bundled in `res/font` as Latin-only cuts —
 the same files Debritsu ships, about 50 KB a weight; the full font carried

@@ -7,6 +7,6 @@
       parent this style would add a dependency nothing else uses.
     -->
     <style name="Theme.IPTerebi" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#101418</item>
+        <item name="android:windowBackground">#F2F4FA</item>
     </style>
 </resources>

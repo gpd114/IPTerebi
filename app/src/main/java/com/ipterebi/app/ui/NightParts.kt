@@ -152,7 +152,7 @@ fun SquareIconButton(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = Night.ink, modifier = Modifier.size(21.dp))
+        Icon(icon, contentDescription = contentDescription, tint = Night.glassIcon, modifier = Modifier.size(21.dp))
     }
 }
 
