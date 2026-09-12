@@ -385,7 +385,13 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   kept, in `GuideStore` (17 MB on the phone). It is matched on each channel's
   `epg_channel_id`, which several streams can share. `Guide` answers "what is
   on" from it first and from `get_short_epg`, put right, only for channels it
-  lacks.
+  lacks. Because it is on the device, the channel list shows what is on under
+  each channel and there is a TV guide (the grid button on Live TV,
+  `ui/guide/GuideScreen.kt`) for whatever list was on screen — both local
+  queries, never a request per row. The guide is dragged sideways through
+  time with a fling, like any list; the grid's time rules are `GuideGrid` in
+  `core/`. Until the phone has the full guide it says so, and offers to fetch
+  it now over mobile data.
 - **A missing guide is the normal case, not an error.** Lines carry no EPG,
   channels are missing from guides that exist, and some forks answer `false`.
   All of it arrives as an empty list.

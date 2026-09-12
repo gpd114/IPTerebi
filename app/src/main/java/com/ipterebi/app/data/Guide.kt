@@ -54,15 +54,32 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
      * [channels] are the line's `epg_channel_id`s, to keep only those; when not
      * given, the channel list is fetched to find them.
      */
-    fun refreshIfStale(account: XtreamAccount, channels: Collection<String>? = null, onMetered: Boolean = false) {
+    fun refreshIfStale(account: XtreamAccount, channels: Collection<String>? = null, onMetered: Boolean = false) =
+        refresh(account, channels, onMetered, asked = false)
+
+    /**
+     * Fetches [account]'s full guide now, because someone asked: whatever the
+     * network, however recent the last one, and whatever the last failure.
+     */
+    fun refreshNow(account: XtreamAccount) = refresh(account, null, onMetered = true, asked = true)
+
+    private val _downloading = MutableStateFlow(false)
+
+    /** A refresh is under way, for a screen that offered one. */
+    val downloading: StateFlow<Boolean> = _downloading.asStateFlow()
+
+    private fun refresh(account: XtreamAccount, channels: Collection<String>?, onMetered: Boolean, asked: Boolean) {
         scope.launch {
             val line = account.lineKey
             val now = System.currentTimeMillis()
-            val fetched = store.fetchedAt(line)
-            if (fetched != null && now - fetched < STALE_AFTER_MS) return@launch
-            if ((failedAt[line] ?: 0L) > now - RETRY_AFTER_MS) return@launch
+            if (!asked) {
+                val fetched = store.fetchedAt(line)
+                if (fetched != null && now - fetched < STALE_AFTER_MS) return@launch
+                if ((failedAt[line] ?: 0L) > now - RETRY_AFTER_MS) return@launch
+            }
             if (!onMetered && connectivity?.isActiveNetworkMetered != false) return@launch
             if (!refreshing.compareAndSet(false, true)) return@launch
+            _downloading.value = true
             try {
                 val wanted = (channels ?: xtream.liveStreams(account).map { it.epgChannelId })
                     .filter { it.isNotBlank() }
@@ -80,6 +97,7 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
                 log("  guide not refreshed: ${e.message}")
             } finally {
                 refreshing.set(false)
+                _downloading.value = false
             }
         }
     }
@@ -114,6 +132,19 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
     suspend fun schedule(account: XtreamAccount, epgChannelId: String, from: Long, to: Long): List<XmltvProgramme> =
         if (epgChannelId.isBlank()) emptyList()
         else withContext(Dispatchers.IO) { store.between(account.lineKey, epgChannelId, from, to) }
+
+    /**
+     * What is on [epgChannelId] at [at], from the full guide only — for a row
+     * in a list of channels, where a request per row is out of the question.
+     */
+    suspend fun onNow(account: XtreamAccount, epgChannelId: String, at: Long): XmltvProgramme? =
+        if (epgChannelId.isBlank()) null
+        else withContext(Dispatchers.IO) {
+            store.programmes(account.lineKey, epgChannelId, after = at, limit = 1).firstOrNull()?.takeIf { it.start <= at }
+        }
+
+    /** When [account]'s full guide was last fetched, in epoch millis; null when it never has been. */
+    suspend fun fetchedAt(account: XtreamAccount): Long? = withContext(Dispatchers.IO) { store.fetchedAt(account.lineKey) }
 
     private suspend fun learnFrom(account: XtreamAccount, streamId: Int, full: List<XmltvProgramme>) {
         val short = xtream.shortEpg(account, streamId)
