@@ -96,14 +96,7 @@ object Route {
     fun playEpisode(id: String, extension: String) =
         "player/episode/${Uri.encode(id)}/${Uri.encode(extension)}"
 }
-<<<<<<< HEAD
 
-/** The sections the bottom bar, or on a wide screen the rail, switches between. */
-private enum class Section(val route: String, val label: String, val icon: ImageVector) {
-    LIVE(Route.TV_LIVE, "Live TV", Icons.Filled.LiveTv),
-    FILMS(Route.FILMS, "Films", Icons.Filled.Movie),
-    SERIES(Route.SERIES, "Series", Icons.Filled.VideoLibrary),
-=======
 /**
  * The sections the bottom bar, or on a wide screen the rail, switches between.
  *
@@ -112,12 +105,13 @@ private enum class Section(val route: String, val label: String, val icon: Image
  * nothing in particular here; these three share one 24 grid, one stroke and
  * one set of joins, so they read as a family — a screen with a signal on it, a
  * strip of film, a run of episodes.
+ *
+ * Live TV goes to the TV build's own home, not the phone's channel list.
  */
 private enum class Section(val route: String, val label: String, @DrawableRes val icon: Int) {
-    LIVE(Route.CHANNELS, "Live TV", R.drawable.ic_nav_live),
+    LIVE(Route.TV_LIVE, "Live TV", R.drawable.ic_nav_live),
     FILMS(Route.FILMS, "Films", R.drawable.ic_nav_films),
     SERIES(Route.SERIES, "Series", R.drawable.ic_nav_series),
->>>>>>> main
 }
 
 @Composable
