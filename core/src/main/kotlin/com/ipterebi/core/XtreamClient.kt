@@ -16,9 +16,28 @@ import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
+/**
+ * How long a call that is only asking whether the line is alive may take, in
+ * total — connecting, the DNS behind it, and every route OkHttp tries.
+ *
+ * Without it a dead provider took about a minute to say so. The connect
+ * timeout is per *route*, and a host behind a CDN has several addresses, so
+ * the old 15 seconds was spent once per address with a retry on top, and the
+ * sign-in screen simply sat there. Someone waiting that long concludes the app
+ * has hung, not that their provider is down.
+ *
+ * Only the short calls get it. Asking for a whole channel list is a different
+ * matter — panels on cheap hosting really do take half a minute to assemble
+ * one — and the TV guide is 76 MB, so neither may be cut off at fifteen
+ * seconds.
+ */
+const val QUICK_CALL_SECONDS = 15L
 
 fun defaultXtreamHttpClient(): OkHttpClient = OkHttpClient.Builder()
-    .connectTimeout(15, TimeUnit.SECONDS)
+    // A TCP connection that has not been made in eight seconds is not going to
+    // be. This is per route, which is why the short calls are bounded as a
+    // whole by QUICK_CALL_SECONDS as well.
+    .connectTimeout(8, TimeUnit.SECONDS)
     // Panels on cheap hosting take their time assembling a full channel list;
     // ten seconds is not enough and produces a timeout that looks like a dead
     // server.
@@ -40,13 +59,21 @@ class XtreamClient(
 ) {
 
     /**
+     * The same client, bounded as a whole: shares its connection pool and
+     * threads with [http], so this costs nothing but the timeout.
+     */
+    private val quick: OkHttpClient by lazy {
+        http.newBuilder().callTimeout(QUICK_CALL_SECONDS, TimeUnit.SECONDS).build()
+    }
+
+    /**
      * Confirms the line exists and is usable, and returns what the panel says
      * about it. Note that a rejected login is HTTP 200 with `auth: 0` in the
      * body — never a 401 — so the status code alone tells you nothing.
      */
     suspend fun authenticate(account: XtreamAccount): UserInfo {
         val info = decode(
-            body = get(account),
+            body = get(account, quick = true),
             deserializer = AuthResponse.serializer(),
             what = "the sign-in response",
         ).userInfo
@@ -281,7 +308,7 @@ class XtreamClient(
         val response = try {
             http.newCall(request).execute()
         } catch (e: IOException) {
-            throw XtreamException("Could not reach ${base.host}: ${e.message ?: "no response"}.", e)
+            throw XtreamException(describeNetworkFailure(e, base.host), e)
         }
         response.use {
             if (!it.isSuccessful) throw XtreamException(describeApiHttpError(it.code, base.host))
@@ -365,6 +392,8 @@ class XtreamClient(
         account: XtreamAccount,
         action: String? = null,
         params: Map<String, String> = emptyMap(),
+        /** Whether this is a short call, bounded by [QUICK_CALL_SECONDS] in total. */
+        quick: Boolean = false,
     ): String = withContext(Dispatchers.IO) {
         val base = requireBase(account)
         val url = base.newBuilder()
@@ -385,10 +414,10 @@ class XtreamClient(
             .build()
 
         val response = try {
-            http.newCall(request).execute()
+            (if (quick) this@XtreamClient.quick else http).newCall(request).execute()
         } catch (e: IOException) {
             throw XtreamException(
-                "Could not reach ${base.host}: ${e.message ?: "no response"}.",
+                describeNetworkFailure(e, base.host),
                 e,
             )
         }
