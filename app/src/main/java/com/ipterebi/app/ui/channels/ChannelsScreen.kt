@@ -68,6 +68,7 @@ import com.ipterebi.app.ui.SquareIconButton
 import com.ipterebi.app.ui.fieldColours
 import com.ipterebi.app.ui.focusRing
 import com.ipterebi.app.ui.nightCard
+import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XmltvProgramme
@@ -233,7 +234,7 @@ private fun ShelfChips(state: ChannelsUiState, onSelect: (Shelf) -> Unit) {
 private fun ResumeBar(channel: LiveStream, onClick: () -> Unit) {
     // A panel with the one solid-cobalt button on the screen: carrying on is
     // the most likely thing anyone opening the app wants.
-    val shape = RoundedCornerShape(22.dp)
+    val shape = Corners.panel
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -287,7 +288,7 @@ private fun ChannelRow(
         modifier = Modifier
             .fillMaxWidth()
             .nightCard()
-            .focusRing(RoundedCornerShape(16.dp))
+            .focusRing(Corners.card)
             .clickable(onClick = onClick)
             .padding(start = 9.dp, end = 2.dp, top = 9.dp, bottom = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -300,7 +301,7 @@ private fun ChannelRow(
             Text(
                 text = channel.name,
                 style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.SemiBold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -363,7 +364,7 @@ private fun ChannelRow(
 private fun ChannelLogo(channel: LiveStream) {
     var failed by remember(channel.icon) { mutableStateOf(false) }
     val showLogo = channel.icon.isNotBlank() && !failed
-    val tile = RoundedCornerShape(13.dp)
+    val tile = Corners.tag
     Box(
         modifier = Modifier
             .size(46.dp)
@@ -382,7 +383,7 @@ private fun ChannelLogo(channel: LiveStream) {
             Text(
                 text = channelInitials(channel.name),
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.ExtraBold,
+                fontWeight = FontWeight.SemiBold,
                 color = Color.White,
             )
         }

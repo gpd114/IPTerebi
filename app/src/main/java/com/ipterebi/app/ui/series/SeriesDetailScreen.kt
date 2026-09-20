@@ -56,6 +56,7 @@ import com.ipterebi.app.AppContainer
 import com.ipterebi.app.ui.ScreenTopBar
 import com.ipterebi.app.ui.focusRing
 import com.ipterebi.app.ui.nightCard
+import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.library.ErrorPanel
 import com.ipterebi.core.EpisodeEntry
@@ -123,12 +124,12 @@ private fun SeriesContent(
                 ) {
                     itemsIndexed(detail.seasons, key = { _, it -> it.number }) { index, entry ->
                         // As the category chips: quiet, the chosen one cobalt.
-                        val shape = RoundedCornerShape(12.dp)
+                        val shape = Corners.control
                         FilterChip(
                             modifier = Modifier.focusRing(shape),
                             selected = index == selectedSeason,
                             onClick = { onSeason(index) },
-                            label = { Text(entry.name, fontWeight = FontWeight.Bold) },
+                            label = { Text(entry.name, fontWeight = FontWeight.Medium) },
                             shape = shape,
                             colors = FilterChipDefaults.filterChipColors(
                                 containerColor = Night.quiet,
@@ -176,9 +177,9 @@ private fun Header(detail: SeriesDetail) {
                 modifier = Modifier
                     .width(96.dp)
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(Corners.card)
                     .background(Night.veil)
-                    .border(1.dp, Night.hairline, RoundedCornerShape(14.dp)),
+                    .border(1.dp, Night.hairline, Corners.card),
             )
             Spacer(Modifier.width(16.dp))
         }
@@ -207,7 +208,7 @@ private fun Header(detail: SeriesDetail) {
 
 @Composable
 private fun EpisodeRow(entry: EpisodeEntry, seriesName: String, onClick: () -> Unit) {
-    val card = RoundedCornerShape(18.dp)
+    val card = Corners.card
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -223,7 +224,7 @@ private fun EpisodeRow(entry: EpisodeEntry, seriesName: String, onClick: () -> U
             modifier = Modifier
                 .width(112.dp)
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(Corners.tag)
                 .background(Night.quiet),
             contentAlignment = Alignment.Center,
         ) {
