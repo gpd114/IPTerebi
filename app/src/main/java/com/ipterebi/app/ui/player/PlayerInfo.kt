@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.BuildConfig
 import com.ipterebi.app.TAG_PLAY
+import com.ipterebi.app.ui.theme.Corners
+import com.ipterebi.app.ui.theme.tabular
 import com.ipterebi.core.EpgListing
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.lineKey
@@ -161,7 +163,7 @@ fun ChannelInfoOverlay(
     Column(
         modifier = modifier
             .widthIn(max = 420.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(Corners.panel)
             // A dark panel whichever theme: it sits over the picture.
             .background(com.ipterebi.app.ui.theme.OverVideo.panel)
             .padding(horizontal = 16.dp, vertical = 10.dp),
@@ -196,7 +198,7 @@ fun ChannelInfoOverlay(
                 Text(
                     text = time,
                     color = Color.White.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.tabular(),
                 )
             }
         }

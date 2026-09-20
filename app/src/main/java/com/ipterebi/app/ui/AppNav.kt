@@ -62,6 +62,7 @@ import com.ipterebi.app.ui.player.PlayerScreen
 import com.ipterebi.app.ui.series.SeriesDetailScreen
 import com.ipterebi.app.ui.series.SeriesScreen
 import com.ipterebi.app.ui.settings.SettingsScreen
+import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 
 object Route {
@@ -320,8 +321,8 @@ fun AppNav(container: AppContainer) {
  */
 @Composable
 private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
-    val bar = RoundedCornerShape(31.dp)
-    val tab = RoundedCornerShape(21.dp)
+    val bar = Corners.panel
+    val tab = Corners.control
     Row(
         modifier = Modifier
             .navigationBarsPadding()
@@ -352,7 +353,7 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
                 Text(
                     item.label,
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.SemiBold,
                     color = tint,
                 )
             }

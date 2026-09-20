@@ -79,6 +79,7 @@ import com.ipterebi.app.data.AccountState
 import com.ipterebi.app.playback.ActivePlayback
 import com.ipterebi.app.ui.PrimaryButton
 import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.theme.OverVideo
 import androidx.compose.foundation.layout.ColumnScope
@@ -875,7 +876,7 @@ private fun PlayerContent(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .padding(top = 96.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(Corners.card)
                     .background(OverVideo.panel)
                     .padding(horizontal = 14.dp, vertical = 7.dp),
             )
@@ -991,7 +992,7 @@ private fun OverVideoPanel(modifier: Modifier = Modifier, content: @Composable C
         modifier = modifier
             .padding(24.dp)
             .widthIn(max = 420.dp)
-            .clip(RoundedCornerShape(22.dp))
+            .clip(Corners.panel)
             .background(OverVideo.panel)
             .padding(22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,

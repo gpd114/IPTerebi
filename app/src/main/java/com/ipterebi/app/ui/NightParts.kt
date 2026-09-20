@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
@@ -40,7 +39,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ipterebi.app.R
+import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
+import com.ipterebi.app.ui.theme.tabular
 
 /*
  * The pieces every screen is built from, on the pattern of Debritsu's
@@ -49,7 +50,7 @@ import com.ipterebi.app.ui.theme.Night
  */
 
 /** A card: a channel row, the carry-on card. Flat, one step up from the page. */
-fun Modifier.nightCard(shape: Shape = RoundedCornerShape(18.dp), colour: Color = Night.veil): Modifier =
+fun Modifier.nightCard(shape: Shape = Corners.card, colour: Color = Night.veil): Modifier =
     clip(shape).background(colour)
 
 /**
@@ -59,14 +60,14 @@ fun Modifier.nightCard(shape: Shape = RoundedCornerShape(18.dp), colour: Color =
 @Composable
 fun Panel(
     modifier: Modifier = Modifier,
-    padding: Dp = 18.dp,
+    padding: Dp = 16.dp,
     spacing: Dp = 12.dp,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
         modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
+            .clip(Corners.panel)
             .background(Night.veil)
             .padding(padding),
         verticalArrangement = Arrangement.spacedBy(spacing),
@@ -85,7 +86,7 @@ fun PrimaryButton(
     fill: Color = Night.cobalt,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(height / 2)
+    val shape = Corners.control
     Row(
         modifier
             .height(height)
@@ -93,7 +94,7 @@ fun PrimaryButton(
             .background(if (enabled) fill else Night.quiet)
             .focusRing(shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 22.dp),
+            .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
@@ -116,7 +117,7 @@ fun SecondaryButton(
     height: Dp = 48.dp,
     colour: Color = Night.accent,
 ) {
-    val shape = RoundedCornerShape(height / 2)
+    val shape = Corners.control
     Box(
         modifier
             .height(height)
@@ -124,7 +125,7 @@ fun SecondaryButton(
             .background(Night.glass)
             .focusRing(shape)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 22.dp),
+            .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -144,7 +145,7 @@ fun SquareIconButton(
     modifier: Modifier = Modifier,
     size: Dp = 42.dp,
 ) {
-    val shape = RoundedCornerShape(size * 0.34f)
+    val shape = Corners.control
     Box(
         modifier
             .size(size)
@@ -163,11 +164,11 @@ fun SquareIconButton(
 fun QuietPill(text: String, modifier: Modifier = Modifier, fill: Color = Night.quiet, colour: Color = Night.quietText) {
     Box(
         modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(Corners.tag)
             .background(fill)
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = colour, maxLines = 1)
+        Text(text, style = MaterialTheme.typography.labelSmall.tabular(), color = colour, maxLines = 1)
     }
 }
 
@@ -186,7 +187,7 @@ fun <T> ChoiceRow(
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (value, label) ->
             val on = isSelected(value)
-            val shape = RoundedCornerShape(14.dp)
+            val shape = Corners.control
             Box(
                 Modifier
                     .weight(1f)
@@ -225,7 +226,7 @@ fun SectionTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
     ) {
         Image(
             painter = painterResource(R.drawable.ic_mascot),
@@ -235,7 +236,7 @@ fun SectionTopBar(
         Spacer(Modifier.width(12.dp))
         Text(
             title,
-            style = MaterialTheme.typography.displaySmall.copy(fontSize = 28.sp),
+            style = MaterialTheme.typography.displaySmall,
             color = Night.ink,
             modifier = Modifier.weight(1f),
         )
@@ -252,13 +253,13 @@ fun ScreenTopBar(title: String, onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
     ) {
         SquareIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
         Spacer(Modifier.width(14.dp))
         Text(
             title,
-            style = MaterialTheme.typography.displaySmall.copy(fontSize = 26.sp),
+            style = MaterialTheme.typography.headlineMedium,
             color = Night.ink,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -267,7 +268,7 @@ fun ScreenTopBar(title: String, onBack: () -> Unit) {
 }
 
 /** The search field's shape: a rounded well. */
-val SearchFieldShape = RoundedCornerShape(24.dp)
+val SearchFieldShape = Corners.control
 
 /** Text fields: a well a step below the page, with a faint rim that turns cobalt while typing. */
 @Composable

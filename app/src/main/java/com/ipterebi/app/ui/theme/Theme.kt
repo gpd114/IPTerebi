@@ -1,6 +1,7 @@
 package com.ipterebi.app.ui.theme
 
 import android.content.Context
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -14,6 +15,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ipterebi.app.R
 
@@ -22,10 +24,11 @@ import com.ipterebi.app.R
  * Debritsu (its `ui/Theme.kt`): flat throughout — no gradients, rims or sheen —
  * so each role is one colour, and what you press is told apart by fill.
  *
- * Two themes, as Debritsu has: [Light], the default — a pale page with white
- * cards and IPTerebi's dark blue as the accent, where Debritsu's Pastel has its
- * dark purple — and [Dark], near-black with neutral cards and the blue only as
- * an accent. Switched in Settings, held by [Appearance].
+ * Two themes, as Debritsu has: [Dark], the default — the TV guide's colours,
+ * near-black with dark cells and the blue only as an accent — and [Light], a
+ * pale page with white cards and IPTerebi's dark blue as the accent, where
+ * Debritsu's Pastel has its dark purple. Switched in Settings on the phone,
+ * held by [Appearance]; the TV has Dark alone.
  *
  * How it got here, so it is not undone: the app was dark-only, and its page was
  * navy lit cobalt from the top. Every button on it read as blue on blue —
@@ -66,7 +69,7 @@ data class Palette(
     val badge: Color,
 )
 
-/** Pale, with IPTerebi's dark blue as the accent. The default, as Debritsu's Pastel is. */
+/** Pale, with IPTerebi's dark blue as the accent. The default until the app took the guide's look. */
 val Light = Palette(
     dark = false,
     ground = Color(0xFFF2F4FA), veil = Color(0xFFFFFFFF), edge = Color(0xFFDDE3F0),
@@ -78,15 +81,19 @@ val Light = Palette(
 )
 
 /**
- * Near-black with neutral cards and pills — no blue page under blue buttons —
- * and the blue as a fill where something is chosen, lifted for text, which in
+ * The TV guide's colours: its near-black page, its dark cells for cards and
+ * quiet fills, the soft blue for what is marked, pink for favourites. The
+ * owner asked for the whole app to look like the guide, so this is the
+ * default; the TV app has nothing else (see [Appearance.SWITCHABLE]).
+ *
+ * The blue is a fill where something is chosen and lifted for text, which in
  * the dark blue would be unreadable on a page this dark.
  */
 val Dark = Palette(
     dark = true,
-    ground = Color(0xFF0B0C11), veil = Color(0xFF17191F), edge = Color(0xFF2A2D36),
-    hairline = Color(0x14FFFFFF), quiet = Color(0x1AFFFFFF), quietText = Color(0xFFDADDE6),
-    glass = Color(0x1FFFFFFF), glassIcon = Color(0xFFE6E9F2), field = Color(0xFF121419),
+    ground = Color(0xFF0B0C11), veil = Color(0xFF191B23), edge = Color(0xFF2A2D36),
+    hairline = Color(0x14FFFFFF), quiet = Color(0xFF20263A), quietText = Color(0xFFDADDE6),
+    glass = Color(0xFF20263A), glassIcon = Color(0xFFE6E9F2), field = Color(0xFF121419),
     cobalt = Color(0xFF2F5FE0), accent = Color(0xFF9DB5FF),
     ink = Color(0xFFF1F3F8), inkSoft = Color(0xFFA3A8B8),
     pink = Color(0xFFFF8FA3), badge = Color(0xB31F3C8C),
@@ -98,7 +105,7 @@ val Dark = Palette(
  * having to pass a palette about. Named `Night` from when the app had only one.
  */
 object Night {
-    var palette by mutableStateOf(Light)
+    var palette by mutableStateOf(Dark)
 
     val ground get() = palette.ground
     val veil get() = palette.veil
@@ -130,13 +137,23 @@ object OverVideo {
     val button = Color(0xFF2F5FE0)
 }
 
-/** Which theme is chosen, kept in plain preferences so it can be read before the first frame. */
+/**
+ * Which theme is chosen, kept in plain preferences so it can be read before the
+ * first frame. [Dark], the guide's look, unless Light has been chosen.
+ */
 object Appearance {
     private const val FILE = "appearance"
-    private const val KEY = "theme"
+
+    // A new key, not "theme": when the guide's colours became the default,
+    // a Light chosen back when Light was the default should not keep anyone
+    // from seeing them. Light is one tap away in Settings.
+    private const val KEY = "theme.guide"
+
+    /** Whether Settings offers Light as well. The TV app sets this false. */
+    const val SWITCHABLE = true
 
     fun load(context: Context) {
-        Night.palette = if (prefs(context).getString(KEY, null) == "dark") Dark else Light
+        Night.palette = if (SWITCHABLE && prefs(context).getString(KEY, null) == "light") Light else Dark
     }
 
     fun set(context: Context, dark: Boolean) {
@@ -148,17 +165,27 @@ object Appearance {
 }
 
 /**
- * M PLUS Rounded 1c — soft like the mascot — in Latin-only cuts, about 50 KB a
- * weight, the same cuts Debritsu ships. The full font carries every kanji and
- * added ten megabytes; a channel named in Japanese or Arabic falls back to the
- * system font on its own. Its licence ships in assets/licenses.
+ * Inter, in Latin-only cuts of about 50 KB a weight.
+ *
+ * The app wore M PLUS Rounded 1c, which came over from Debritsu along with the
+ * rest of that app's look. It suits a soft little library; over a guide grid it
+ * reads as a toy — the round terminals close up the counters at cell sizes and
+ * the digits go pudgy, so a clock down the edge of a schedule never quite
+ * lines up. Inter was drawn for screen interfaces at small sizes and is
+ * deliberately characterless, which is what a page full of channel names and
+ * times wants: it gets out of the way.
+ *
+ * The cut is the same treatment as before — Latin only, because the full font
+ * carries every script and costs megabytes, and a channel named in Japanese or
+ * Arabic falls back to the system font on its own. Inter is under the SIL Open
+ * Font License, which allows bundling and subsetting on condition the licence
+ * travels with it: assets/licenses/inter_OFL.txt, and it must stay.
  */
-private val Rounded = FontFamily(
-    Font(R.font.mplus_rounded_medium, FontWeight.Normal),
-    Font(R.font.mplus_rounded_medium, FontWeight.Medium),
-    Font(R.font.mplus_rounded_bold, FontWeight.SemiBold),
-    Font(R.font.mplus_rounded_bold, FontWeight.Bold),
-    Font(R.font.mplus_rounded_extrabold, FontWeight.ExtraBold),
+private val Ui = FontFamily(
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+    Font(R.font.inter_bold, FontWeight.Bold),
 )
 
 /** Material's colours, from the palette, for the components still drawn by Material. */
@@ -192,21 +219,57 @@ private fun scheme(p: Palette) = if (p.dark) darkColorScheme(
     error = Color(0xFFB3261E), onError = Color.White,
 )
 
-/** One rounded face throughout, in three weights; Debritsu's scale. */
+/**
+ * The scale. One face, four weights, and the hierarchy carried by size and
+ * colour rather than by weight: everything titled used to be ExtraBold, which
+ * is what made the app read young. Bold is kept for the one thing on a screen
+ * that matters, and body text sits at Regular.
+ *
+ * Times, channel numbers, durations and bitrates all stack in columns, so
+ * anything showing digits takes [tabular] — see the note there.
+ */
 private val Type = Typography(
-    displaySmall = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.ExtraBold, fontSize = 30.sp, letterSpacing = (-0.6).sp),
-    headlineMedium = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, letterSpacing = (-0.4).sp),
-    headlineSmall = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.ExtraBold, fontSize = 22.sp, letterSpacing = (-0.3).sp),
-    titleLarge = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp, letterSpacing = (-0.2).sp),
-    titleMedium = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.Bold, fontSize = 16.sp),
-    titleSmall = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.Bold, fontSize = 14.sp),
-    bodyLarge = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 22.sp),
-    bodyMedium = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 21.sp),
-    bodySmall = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.Medium, fontSize = 12.5.sp, lineHeight = 19.sp),
-    labelLarge = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp),
-    labelMedium = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.Bold, fontSize = 12.sp),
-    labelSmall = TextStyle(fontFamily = Rounded, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.2.sp),
+    displaySmall = TextStyle(fontFamily = Ui, fontWeight = FontWeight.Bold, fontSize = 28.sp, letterSpacing = (-0.5).sp),
+    headlineMedium = TextStyle(fontFamily = Ui, fontWeight = FontWeight.Bold, fontSize = 24.sp, letterSpacing = (-0.4).sp),
+    headlineSmall = TextStyle(fontFamily = Ui, fontWeight = FontWeight.Bold, fontSize = 21.sp, letterSpacing = (-0.3).sp),
+    titleLarge = TextStyle(fontFamily = Ui, fontWeight = FontWeight.SemiBold, fontSize = 18.sp, letterSpacing = (-0.2).sp),
+    titleMedium = TextStyle(fontFamily = Ui, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, letterSpacing = (-0.1).sp),
+    titleSmall = TextStyle(fontFamily = Ui, fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
+    bodyLarge = TextStyle(fontFamily = Ui, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 22.sp),
+    bodyMedium = TextStyle(fontFamily = Ui, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
+    bodySmall = TextStyle(fontFamily = Ui, fontWeight = FontWeight.Normal, fontSize = 12.5.sp, lineHeight = 18.sp),
+    labelLarge = TextStyle(fontFamily = Ui, fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
+    labelMedium = TextStyle(fontFamily = Ui, fontWeight = FontWeight.Medium, fontSize = 12.5.sp),
+    labelSmall = TextStyle(fontFamily = Ui, fontWeight = FontWeight.Medium, fontSize = 11.sp, letterSpacing = 0.2.sp),
 )
+
+/**
+ * Digits that line up in a column: a clock down a guide's edge, channel
+ * numbers down a list, times under one another in a programme's details.
+ *
+ * A proportional 1 is narrower than a 0, so a clock ticking from 19:11 to
+ * 19:12 shifts the whole line sideways, and numbers in a column do not line
+ * up at all. `tnum` gives every digit the same width. Put it on anything
+ * whose text is mostly numbers; it does nothing to words.
+ */
+fun TextStyle.tabular(): TextStyle = copy(fontFeatureSettings = "tnum")
+
+/**
+ * The corners, as roles rather than a number per call site. They were 18 and
+ * 22 with pills for anything chosen, which is a soft look for a schedule; a
+ * guide wants edges near square. One step for each kind of thing, so a card
+ * inside a panel is visibly the smaller object.
+ */
+object Corners {
+    /** Settings sections, sheets, the card over video. */
+    val panel = RoundedCornerShape(12.dp)
+    /** A channel row, a poster, a message card. */
+    val card = RoundedCornerShape(10.dp)
+    /** Buttons, choice cells, text fields, the focus ring. */
+    val control = RoundedCornerShape(8.dp)
+    /** A channel number, a small status label, a guide cell. */
+    val tag = RoundedCornerShape(6.dp)
+}
 
 @Composable
 fun IPTerebiTheme(content: @Composable () -> Unit) {

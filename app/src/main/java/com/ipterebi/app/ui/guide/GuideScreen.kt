@@ -60,7 +60,9 @@ import com.ipterebi.app.ui.ScreenTopBar
 import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.channels.tileColour
 import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
+import com.ipterebi.app.ui.theme.tabular
 import com.ipterebi.core.GUIDE_STEP
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XmltvProgramme
@@ -221,7 +223,7 @@ private fun TimeHeader(windowStart: Long, visibleSeconds: Long, now: Long, zone:
         Row(Modifier.fillMaxSize().padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 dayName(windowStart + visibleSeconds / 2, zone),
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.tabular(),
                 color = Night.accent,
                 modifier = Modifier.width(ChannelColumn),
             )
@@ -234,7 +236,7 @@ private fun TimeHeader(windowStart: Long, visibleSeconds: Long, now: Long, zone:
                     if (mark >= windowStart) {
                         Text(
                             Instant.ofEpochSecond(mark).atZone(zone).format(clock),
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelMedium.tabular(),
                             color = Night.inkSoft,
                             modifier = Modifier
                                 .align(Alignment.CenterStart)
@@ -257,7 +259,7 @@ private fun TimeHeader(windowStart: Long, visibleSeconds: Long, now: Long, zone:
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .padding(end = 12.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(Corners.tag)
                     .clickable(onClick = onNow),
             )
         }
@@ -280,9 +282,9 @@ private fun GuideRow(
             Modifier
                 .width(ChannelColumn - 6.dp)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(Corners.tag)
                 .background(Night.veil)
-                .focusRing(RoundedCornerShape(12.dp))
+                .focusRing(Corners.tag)
                 .clickable(onClick = onChannel),
             contentAlignment = Alignment.Center,
         ) {
@@ -316,9 +318,9 @@ private fun GuideRow(
                         .width(cellWidth)
                         .fillMaxHeight()
                         .padding(end = 3.dp)
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(Corners.tag)
                         .background(if (onNow) Night.quiet else Night.veil)
-                        .focusRing(RoundedCornerShape(10.dp))
+                        .focusRing(Corners.tag)
                         .clickable { onProgramme(p) }
                         .padding(horizontal = 8.dp),
                     contentAlignment = Alignment.CenterStart,
@@ -357,7 +359,7 @@ private fun GuideLogo(channel: LiveStream) {
         )
     } else {
         Box(
-            Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(tileColour(channel.name)),
+            Modifier.size(40.dp).clip(Corners.tag).background(tileColour(channel.name)),
             contentAlignment = Alignment.Center,
         ) {
             Text(channelInitials(channel.name), style = MaterialTheme.typography.labelMedium, color = Color.White)
@@ -384,7 +386,7 @@ private fun ProgrammeSheet(channel: LiveStream, programme: XmltvProgramme, now: 
                     programme.stop <= now -> " · finished"
                     else -> ""
                 },
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.tabular(),
             color = Night.inkSoft,
         )
         if (onNow) {

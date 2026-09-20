@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -31,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 
 /** One chip on a [CategoryShelf]. [key] must be unique on the shelf. */
@@ -90,7 +90,7 @@ fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
                                 chip.label,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = if (chip.selected) FontWeight.SemiBold else FontWeight.Medium,
                             )
                         },
                         shape = ChipShape,
@@ -132,4 +132,4 @@ private const val SHELF_ROWS = 4
 /** How much of the row after the last whole one shows, to say there is more. */
 private val PEEK = 22.dp
 
-private val ChipShape = RoundedCornerShape(12.dp)
+private val ChipShape = Corners.control
