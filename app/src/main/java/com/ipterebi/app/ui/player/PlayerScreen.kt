@@ -94,6 +94,9 @@ import androidx.compose.ui.draw.clip
 import com.ipterebi.core.playerMimeType
 import com.ipterebi.core.StreamReconnect
 import com.ipterebi.core.StreamFormat
+import com.ipterebi.core.WatchKind
+import com.ipterebi.core.WatchedItem
+import com.ipterebi.core.displayTitle
 import com.ipterebi.core.VodStream
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.describeEpisodeHttpError
@@ -101,6 +104,7 @@ import com.ipterebi.core.describeFilmHttpError
 import com.ipterebi.core.describeStreamHttpError
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -199,7 +203,6 @@ private fun PlayerContent(
     // What the stream turned out to carry, for the audio-and-subtitles panel.
     var tracks by remember(playable) { mutableStateOf(Tracks.EMPTY) }
     var tracksOpen by remember(playable) { mutableStateOf(false) }
-
     // A plain reference rather than state: nothing redraws when it is set, and
     // setting state from inside a view factory would be a write mid-composition.
     val playerView = remember { ViewRef<PlayerView>() }
@@ -324,6 +327,83 @@ private fun PlayerContent(
                 // Not prepared here: see the effect below.
                 playWhenReady = true
             }
+    }
+
+
+    // Where you got to, for the home screen's Continue watching rows. Only
+    // films and episodes: a channel is rejoined at the live edge, so a
+    // position in one means nothing.
+    //
+    // Launched on the container's scope rather than this screen's, because the
+    // most important moment to write is the one where this screen is going
+    // away — a scope tied to the composition is cancelled exactly then.
+    val saveProgress: () -> Unit = save@{
+        if (!onDemand) return@save
+        val position = player.currentPosition
+        if (position <= 0) return@save
+        val length = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
+        val film = (playable as? Playable.Film)?.let { container.films.find(it.id) }
+        val episode = (playable as? Playable.Episode)?.let { container.episodes.find(it.id) }
+        val item = when (playable) {
+            is Playable.Film -> WatchedItem(
+                kind = WatchKind.FILM,
+                id = playable.id.toString(),
+                name = film?.name.orEmpty(),
+                poster = film?.icon.orEmpty(),
+                extension = playable.extension,
+                positionMs = position,
+                durationMs = length,
+                watchedAt = System.currentTimeMillis(),
+            )
+            is Playable.Episode -> WatchedItem(
+                kind = WatchKind.EPISODE,
+                id = playable.id,
+                name = episode?.seriesName.orEmpty(),
+                detail = listOfNotNull(
+                    episode?.entry?.code?.takeIf { it.isNotBlank() },
+                    episode?.entry?.displayTitle(episode.seriesName)?.takeIf { it.isNotBlank() },
+                ).joinToString(" · "),
+                poster = episode?.entry?.details?.image.orEmpty(),
+                extension = playable.extension,
+                positionMs = position,
+                durationMs = length,
+                watchedAt = System.currentTimeMillis(),
+            )
+            is Playable.Channel -> return@save
+        }
+        if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} noting ${position / 1000} s of ${length / 1000} s")
+        container.scope.launch { container.watched.record(account, item) }
+    }
+
+    // Carry on where this was left, and keep a note of where it gets to.
+    //
+    // The seek happens before the effect below prepares the player, which is
+    // what stops a resumed film showing a second of its opening before it
+    // jumps: ExoPlayer holds a seek made while it is idle and starts there.
+    //
+    // The position is written as it goes, not only on the way out, because a
+    // process killed from the task switcher never reaches onDispose — and
+    // losing the last half hour of a film to that is exactly what this is
+    // meant to prevent.
+    LaunchedEffect(player, playable) {
+        val kind = when (playable) {
+            is Playable.Film -> WatchKind.FILM
+            is Playable.Episode -> WatchKind.EPISODE
+            is Playable.Channel -> return@LaunchedEffect
+        }
+        val id = when (playable) {
+            is Playable.Film -> playable.id.toString()
+            is Playable.Episode -> playable.id
+            is Playable.Channel -> return@LaunchedEffect
+        }
+        container.watched.resumeAt(account, kind, id).takeIf { it > 0 }?.let { at ->
+            if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} resuming at ${at / 1000} s")
+            player.seekTo(at)
+        }
+        while (true) {
+            delay(SAVE_PROGRESS_EVERY_MS)
+            if (player.isPlaying) saveProgress()
+        }
     }
 
     DisposableEffect(player) {
@@ -484,6 +564,9 @@ private fun PlayerContent(
         // the player is new, so a swipe to the next channel says where it went.
         playerView.value?.showController()
         onDispose {
+            // Leaving by the back button, or swiping to another channel: the
+            // last chance to write where this one got to.
+            saveProgress()
             player.removeListener(listener)
             player.release()
         }
@@ -525,6 +608,9 @@ private fun PlayerContent(
                 // arrives here; closing its window does, with the screen on.
                 Lifecycle.Event.ON_STOP -> {
                     wasStopped = true
+                    // Before anything stops: a stopped player reports position 0,
+                    // and this is the usual way a film is left.
+                    saveProgress()
                     if (power?.isInteractive == false && player.playWhenReady) return@LifecycleEventObserver
 
                     // Anything else — home, another app, the window closed — is
@@ -1044,6 +1130,13 @@ private fun PlayerContent(
  * which Android starts winding down a backgrounded app's services.
  */
 private const val PAUSED_AWAY_GRACE_MS = 30_000L
+
+/**
+ * How often the position is written while a film plays. Often enough that a
+ * process killed from the task switcher loses seconds rather than an hour,
+ * rarely enough that it is a disk write every frame.
+ */
+private const val SAVE_PROGRESS_EVERY_MS = 15_000L
 
 /**
  * A message over the video — an error, "playing in another app" — as a panel

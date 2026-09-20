@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -39,6 +40,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -53,9 +55,11 @@ import androidx.annotation.DrawableRes
 import androidx.compose.ui.res.painterResource
 import com.ipterebi.app.R
 import com.ipterebi.app.data.AccountState
+import com.ipterebi.app.data.EpisodeListing
 import com.ipterebi.app.ui.channels.ChannelsScreen
 import com.ipterebi.app.ui.films.FilmsScreen
 import com.ipterebi.app.ui.guide.GuideScreen
+import com.ipterebi.app.ui.home.HomeScreen
 import com.ipterebi.app.ui.login.LoginScreen
 import com.ipterebi.app.ui.player.Playable
 import com.ipterebi.app.ui.player.PlayerScreen
@@ -63,10 +67,16 @@ import com.ipterebi.app.ui.series.SeriesDetailScreen
 import com.ipterebi.app.ui.series.SeriesScreen
 import com.ipterebi.app.ui.settings.SettingsScreen
 import com.ipterebi.app.ui.theme.Corners
+import com.ipterebi.core.Episode
+import com.ipterebi.core.EpisodeDetails
+import com.ipterebi.core.EpisodeEntry
+import com.ipterebi.core.VodStream
+import com.ipterebi.core.WatchKind
 import com.ipterebi.app.ui.theme.Night
 
 object Route {
     const val LOGIN = "login"
+    const val HOME = "home"
     const val CHANNELS = "channels"
     const val FILMS = "films"
     const val SERIES = "series"
@@ -102,6 +112,7 @@ object Route {
  * strip of film, a run of episodes.
  */
 private enum class Section(val route: String, val label: String, @DrawableRes val icon: Int) {
+    HOME(Route.HOME, "Home", R.drawable.ic_nav_home),
     LIVE(Route.CHANNELS, "Live TV", R.drawable.ic_nav_live),
     FILMS(Route.FILMS, "Films", R.drawable.ic_nav_films),
     SERIES(Route.SERIES, "Series", R.drawable.ic_nav_series),
@@ -125,7 +136,7 @@ fun AppNav(container: AppContainer) {
                 // every state change would look like it works and do nothing —
                 // the navigate calls below are what actually move us.
                 val start = remember {
-                    if (current is AccountState.SignedIn) Route.CHANNELS else Route.LOGIN
+                    if (current is AccountState.SignedIn) Route.HOME else Route.LOGIN
                 }
 
                 val backStack by nav.currentBackStackEntryAsState()
@@ -198,8 +209,73 @@ fun AppNav(container: AppContainer) {
                                 LoginScreen(
                                     container = container,
                                     onSignedIn = {
-                                        nav.navigate(Route.CHANNELS) {
+                                        nav.navigate(Route.HOME) {
                                             popUpTo(Route.LOGIN) { inclusive = true }
+                                        }
+                                    },
+                                )
+                            }
+
+                            composable(Route.HOME) {
+                                HomeScreen(
+                                    container = container,
+                                    onSettings = { nav.navigate(Route.SETTINGS) },
+                                    onChannels = { nav.switchSection(Route.CHANNELS) },
+                                    onFilms = { nav.switchSection(Route.FILMS) },
+                                    onSeries = { nav.switchSection(Route.SERIES) },
+                                    onPlayChannel = { channel ->
+                                        // Published first: the player is given an id
+                                        // and looks the rest up, and the list it
+                                        // would look in belongs to the channel
+                                        // screen, which may never have been opened.
+                                        container.channels.publish(listOf(channel))
+                                        nav.navigate(Route.playChannel(channel.streamId))
+                                    },
+                                    onResume = { item ->
+                                        // The player is given an id and looks
+                                        // the name and the poster up in the
+                                        // list the tap came from. Nothing here
+                                        // came from a list: on a cold start
+                                        // straight to Home, neither the film
+                                        // nor the episode list has been loaded
+                                        // at all, and the overlay would open
+                                        // with no title. What the store kept
+                                        // when the position was written is
+                                        // published in its place.
+                                        when (item.kind) {
+                                            WatchKind.FILM -> {
+                                                val id = item.id.toIntOrNull() ?: 0
+                                                container.films.publish(
+                                                    listOf(
+                                                        VodStream(
+                                                            streamId = id,
+                                                            name = item.name,
+                                                            icon = item.poster,
+                                                            containerExtension = item.extension,
+                                                        )
+                                                    )
+                                                )
+                                                nav.navigate(Route.playFilm(id, item.extension))
+                                            }
+                                            WatchKind.EPISODE -> {
+                                                container.episodes.publish(
+                                                    listOf(
+                                                        EpisodeListing(
+                                                            seriesName = item.name,
+                                                            entry = EpisodeEntry(
+                                                                episode = Episode(
+                                                                    id = item.id,
+                                                                    title = item.detail,
+                                                                    containerExtension = item.extension,
+                                                                ),
+                                                                details = EpisodeDetails(image = item.poster),
+                                                                seasonNumber = 0,
+                                                            ),
+                                                        )
+                                                    )
+                                                )
+                                                nav.navigate(Route.playEpisode(item.id, item.extension))
+                                            }
                                         }
                                     },
                                 )
@@ -321,10 +397,15 @@ fun AppNav(container: AppContainer) {
 }
 
 /**
- * The sections along the bottom on a phone: a pill that floats above the
- * screen's edge, the one you are on filled cobalt with its name beside it.
- * Each tab is focusable and ringed, so a remote on a narrow screen can still
- * reach it — a wide one gets the rail instead, above.
+ * The sections along the bottom on a phone: a bar above the screen's edge,
+ * the one you are on filled cobalt. Each tab is focusable and ringed, so a
+ * remote on a narrow screen can still reach it — a wide one gets the rail
+ * instead, above.
+ *
+ * The name sits under the icon rather than beside it. Beside it was fine with
+ * three sections and clipped "Series" to "S" the moment Home made a fourth:
+ * four labels in a row do not fit a 360dp phone, which is the narrowest thing
+ * this has to work on.
  */
 @Composable
 private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
@@ -337,31 +418,32 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
             .fillMaxWidth()
             .nightCard(bar)
             .border(1.dp, Night.hairline, bar)
-            .height(62.dp)
-            .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.SpaceAround,
+            .padding(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Section.entries.forEach { item ->
             val selected = item == current
             val tint = if (selected) Color.White else Night.inkSoft
-            Row(
+            Column(
                 modifier = Modifier
+                    .weight(1f)
                     .clip(tab)
                     .background(if (selected) Night.cobalt else Color.Transparent)
                     .focusRing(tab)
                     .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(item) })
-                    .height(42.dp)
-                    .padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Icon(painterResource(item.icon), contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(7.dp))
                 Text(
                     item.label,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = tint,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -380,7 +462,7 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
  */
 private fun NavController.switchSection(route: String) {
     navigate(route) {
-        popUpTo(Route.CHANNELS) { saveState = true }
+        popUpTo(Route.HOME) { saveState = true }
         launchSingleTop = true
         restoreState = true
     }
