@@ -29,6 +29,8 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.unit.dp
+import com.ipterebi.app.ui.theme.Corners
+import com.ipterebi.app.ui.theme.Night
 
 /**
  * Remote-control support: everything a D-pad needs that a finger does not.
@@ -52,12 +54,14 @@ private val activateKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter
  * Place it *before* `clickable` in the chain, so that it observes the focus of
  * the element it outlines.
  */
-fun Modifier.focusRing(shape: Shape = RoundedCornerShape(8.dp)): Modifier = composed {
+fun Modifier.focusRing(shape: Shape = Corners.control): Modifier = composed {
     var focused by remember { mutableStateOf(false) }
-    val colour = MaterialTheme.colorScheme.primary
+    // On the dark page, the guide's white focus: the blue accent is a ring
+    // nobody sees on near-black from a sofa. On Light, the accent.
+    val colour = if (Night.palette.dark) Night.ink else MaterialTheme.colorScheme.primary
     this
         .onFocusChanged { focused = it.isFocused }
-        .then(if (focused) Modifier.border(3.dp, colour, shape) else Modifier)
+        .then(if (focused) Modifier.border(2.dp, colour, shape) else Modifier)
 }
 
 /**
@@ -90,7 +94,7 @@ fun DpadTextField(
     val field = remember { FocusRequester() }
     var editing by remember { mutableStateOf(false) }
     var wrapperFocused by remember { mutableStateOf(false) }
-    val ring = MaterialTheme.colorScheme.primary
+    val ring = if (Night.palette.dark) Night.ink else MaterialTheme.colorScheme.primary
 
     // Read when focus is being decided, never captured when the screen was
     // drawn. The mode changes on the input itself — a tap makes it touch, a key
@@ -120,7 +124,7 @@ fun DpadTextField(
             }
             .focusProperties { canFocus = remote() && !editing }
             .focusable()
-            .then(if (wrapperFocused) Modifier.border(3.dp, ring, RoundedCornerShape(6.dp)) else Modifier),
+            .then(if (wrapperFocused) Modifier.border(2.dp, ring, Corners.control) else Modifier),
     ) {
         content(
             Modifier

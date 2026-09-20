@@ -83,16 +83,17 @@ fun SettingsScreen(
 
             // First, as in Debritsu: the one setting that changes everything
             // else on the screen as it is pressed.
-            Panel {
+            // Not on the TV, which has the one look.
+            if (Appearance.SWITCHABLE) Panel {
                 SectionTitle("Appearance")
                 ChoiceRow(
-                    options = listOf(false to "Light", true to "Dark"),
+                    options = listOf(true to "Dark", false to "Light"),
                     isSelected = { it == Night.palette.dark },
                     onSelect = { dark -> Appearance.set(context, dark) },
                 )
                 Hint(
-                    "Light is pale with a dark blue accent; Dark is near-black with the " +
-                        "same blue. The player is dark in both.",
+                    "Dark has the TV guide's colours; Light is pale with a dark blue " +
+                        "accent. The player is dark in both.",
                 )
             }
 

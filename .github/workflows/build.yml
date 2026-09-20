@@ -18,7 +18,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # `packages: tools` is the action's default and that package was removed
+      # from the SDK repository, so the default fails the job before anything
+      # is built: "Failed to find package 'tools'". The runner image already
+      # carries platform-tools and the platforms and build-tools this app
+      # needs, so nothing has to be installed here at all.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
       # There is no Gradle wrapper in this repository, deliberately — the
       # version lives here instead, where it is visible.

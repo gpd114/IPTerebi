@@ -109,13 +109,22 @@ class belongs in `core/`, because that is the half that can be proven.
 
 ## The look
 
-Modelled on the owner's other app, Debritsu (`../Debritsu`, see its
-`ui/Theme.kt` and `ui/Components.kt`), with IPTerebi's dark blue as the accent
-where Debritsu has purple. Two themes, as Debritsu has, switched under
-Settings → Appearance: **Light**, the default — a pale page, white cards, the
-dark blue for what is selected and the main button, like Debritsu's Pastel —
-and **Dark**, near-black with neutral cards and the blue as the accent. The
-player is dark in both (`OverVideo`); it frames video.
+**The structure came from Debritsu; the face no longer does.** The owner's
+other app (`../Debritsu`, see its `ui/Theme.kt` and `ui/Components.kt`) is
+where the way this app is built comes from — colours as roles, flat fills, a
+panel per setting, a row of choices with the chosen one solid — and that part
+stays. What was dropped is Debritsu's softness: its rounded face, its 22px
+corners, its ExtraBold titles. It suits a library of books; against a
+schedule it read as a toy. See the typeface note below.
+
+Two themes, switched under Settings → Appearance: **Dark**, the default — the
+TV guide's colours, near-black with its dark cells for cards and the soft blue
+as the accent, because the owner asked for the whole app to look like the
+guide — and **Light**, a pale page, white cards, the dark blue for what is
+selected and the main button, kept as an option on the phone at their word.
+The TV app has Dark alone (`Appearance.SWITCHABLE` is false there). The player
+is dark in both (`OverVideo`); it frames video. On Dark, focus is the guide's
+white ring, not the blue, which is lost on near-black.
 
 Flat throughout: no gradients, glows, rims or sheen, and each role one colour.
 Colours are roles in a `Palette` (`Light`, `Dark`), read through `Night.*`,
@@ -125,7 +134,9 @@ chosen, the accent solid for the one chosen and for the main button, glass for
 icon and secondary buttons. Pink, from the icon's smile, is for favourites. No
 yellow in the app — its owner asked for it out; the icon keeps it. The choice
 is kept by `Appearance` in plain preferences, read before the first frame; the
-launch splash is the Light page, so on Dark it shows light for that moment.
+launch splash is the Dark page, so on Light it shows dark for that moment. The
+choice moved to a new key when Dark became the default, so an old Light did
+not hide the new look.
 
 This was reached the hard way, and is worth not undoing. The app was
 dark-only, on a navy page lit cobalt from the top, and every button on it read
@@ -141,13 +152,41 @@ are in `ui/NightParts.kt`, named after Debritsu's where they match. Use those
 rather than new literals or Material's own buttons and chips, and never a
 colour that only works in one theme.
 
-The typeface is M PLUS Rounded 1c, bundled in `res/font` as Latin-only cuts —
-the same files Debritsu ships, about 50 KB a weight; the full font carried
-every kanji and added ten megabytes. Anything outside the cut (a channel named
-in Japanese or Arabic) falls back to the system font on its own. The font is
-under the SIL Open Font License, which allows bundling and cutting on
-condition the licence travels with it: that is
-`assets/licenses/mplus_rounded_1c_OFL.txt`, and it must stay.
+The typeface is **Inter**, bundled in `res/font` as Latin-only cuts in four
+weights, about 60 KB each. The app wore M PLUS Rounded 1c, which came over from
+Debritsu along with the rest of that app's look, and the owner's verdict on it
+here was that the Debritsu look does not fit — "as in fonts etc". It suits a
+soft library app; over a guide grid the round terminals close up the counters
+at cell sizes and the digits go pudgy, so a clock down the edge of a schedule
+never quite lines up. Inter was drawn for interfaces at small sizes and is
+deliberately characterless, which is what a page of channel names and times
+wants. Four faces were put on the app's own screens before choosing (channel
+list, guide grid, player overlay, at phone and ten-foot sizes) and this is the
+one that was picked.
+
+The cut is the same treatment as before — Latin only, because the full font
+carries every script and costs megabytes, and a channel named in Japanese or
+Arabic falls back to the system font on its own. The subset is Google Fonts'
+own, fetched with the `text=` parameter, and the `tnum` feature survives it,
+which matters: see below. Inter is under the SIL Open Font License, which
+allows bundling and subsetting on condition the licence travels with it —
+`assets/licenses/inter_OFL.txt`, and it must stay.
+
+Three rules came in with it, and the point of each is that a schedule is not a
+picture book:
+
+- **Corners are roles, not numbers.** `Corners.panel` 12, `.card` 10,
+  `.control` 8, `.tag` 6, in `ui/theme/Theme.kt`. They used to be 22 and 18
+  with full-round pills for anything chosen, written as a literal at each call
+  site. Nothing new should carry its own radius.
+- **Weight carries less than it did.** ExtraBold is gone from the scale;
+  titles are SemiBold, body is Regular, and Bold is for the one thing on a
+  screen that matters. Hierarchy is size and colour first.
+- **Digits that stack get `TextStyle.tabular()`.** A proportional 1 is
+  narrower than a 0, so a clock ticking 19:11 → 19:12 shifts the line sideways
+  and a column of times does not line up at all. It is on the guide's time
+  header, programme times, the channel-number pill and the player's clock; put
+  it on anything new whose text is mostly numbers.
 
 ## Building
 

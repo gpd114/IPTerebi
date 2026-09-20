@@ -58,6 +58,7 @@ import com.ipterebi.app.ui.SectionTopBar
 import com.ipterebi.app.ui.ShelfChip
 import com.ipterebi.app.ui.focusRing
 import com.ipterebi.app.ui.fieldColours
+import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import java.util.Locale
 
@@ -185,7 +186,7 @@ fun PosterTile(
 ) {
     // Rounded, with a faint rim so a dark cover still has an edge against the
     // page — Debritsu's PosterArt, which every cover there is drawn with.
-    val poster = RoundedCornerShape(16.dp)
+    val poster = Corners.card
     Column(modifier = Modifier.focusRing(poster).clickable(onClick = onClick)) {
         Box(
             modifier = Modifier
@@ -227,7 +228,7 @@ fun PosterTile(
         Text(
             text = title,
             style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
