@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -60,6 +64,7 @@ import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Tracks
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
@@ -191,6 +196,9 @@ private fun PlayerContent(
     var recorded by remember(playable) { mutableStateOf(false) }
     var controlsVisible by remember { mutableStateOf(true) }
     var videoAspect by remember { mutableStateOf<Rational?>(null) }
+    // What the stream turned out to carry, for the audio-and-subtitles panel.
+    var tracks by remember(playable) { mutableStateOf(Tracks.EMPTY) }
+    var tracksOpen by remember(playable) { mutableStateOf(false) }
 
     // A plain reference rather than state: nothing redraws when it is set, and
     // setting state from inside a view factory would be a write mid-composition.
@@ -268,6 +276,13 @@ private fun PlayerContent(
                 // Holds the network up while the screen is off. Without it a
                 // stream dies a few seconds after the display sleeps.
                 setWakeMode(C.WAKE_MODE_NETWORK)
+                // The audio language chosen last time, and whether subtitles
+                // were wanted — set before anything is prepared, so the first
+                // frame already has the right track rather than switching a
+                // second in. See TrackChoice for why it is a language and not
+                // a track number.
+                trackSelectionParameters =
+                    TrackChoice.applyTo(context, trackSelectionParameters.buildUpon()).build()
                 setMediaItem(
                     MediaItem.Builder()
                         .setUri(url)
@@ -378,6 +393,13 @@ private fun PlayerContent(
         }
 
         val listener = object : Player.Listener {
+            // A stream announces its tracks a moment after it opens, and
+            // again after every reconnect, so this is read as it changes
+            // rather than once.
+            override fun onTracksChanged(available: Tracks) {
+                tracks = available
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG_PLAY, "${playable.logName()} ${playbackStateName(playbackState, playable)}")
@@ -793,18 +815,37 @@ private fun PlayerContent(
             // Opposite the back button, and like it a tap target only: see
             // there for why nothing over the video may take a remote's focus.
             if (released == null) {
-                IconButton(
-                    onClick = openElsewhere,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .focusProperties { canFocus = false },
+                Row(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.OpenInNew,
-                        contentDescription = "Open in another player",
-                        tint = Color.White,
-                    )
+                    // Only when the stream turned out to carry a choice. On a
+                    // channel with one audio track and no subtitles the panel
+                    // would have nothing in it, and a button over the picture
+                    // has to earn its place.
+                    if (TrackChoice.worthOffering(tracks)) {
+                        IconButton(
+                            onClick = { tracksOpen = !tracksOpen },
+                            modifier = Modifier.focusProperties { canFocus = false },
+                        ) {
+                            Icon(
+                                Icons.Filled.ClosedCaption,
+                                contentDescription = "Audio and subtitles",
+                                tint = if (tracksOpen) OverVideo.accent else Color.White,
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = openElsewhere,
+                        modifier = Modifier.focusProperties { canFocus = false },
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = "Open in another player",
+                            tint = Color.White,
+                        )
+                    }
                 }
             }
 
@@ -841,6 +882,28 @@ private fun PlayerContent(
             ProgrammeProgress(
                 guide = guide,
                 modifier = Modifier.align(Alignment.TopCenter),
+            )
+        }
+
+        // Outside the block above on purpose: the player's own controls time
+        // out after a few seconds, and a panel someone is reading should not
+        // go with them. It closes on a choice, or on a tap beside it.
+        if (tracksOpen && !inPictureInPicture) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) { tracksOpen = false },
+            )
+            TrackPanel(
+                player = player,
+                context = context,
+                onDismiss = { tracksOpen = false },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 56.dp, end = 12.dp),
             )
         }
 

@@ -39,3 +39,50 @@ ff -f lavfi -i "testsrc2=size=400x600:duration=1" -frames:v 1 poster501.jpg
 ff -f lavfi -i "smptebars=size=400x600:duration=1" -frames:v 1 poster502.jpg
 
 echo "done: $(pwd)"
+
+# Streams that carry a choice, which is what the audio-and-subtitles panel
+# exists for. Providers send these constantly — a match with the home and the
+# away commentary, a film with its original language beside a dub — and there
+# was nothing here to point the picker at.
+#
+# The language goes in the ISO 639 descriptor in the PMT (and in the track
+# header in Matroska), which is where a player reads it from. Without it the
+# tracks are "Audio 1" and "Audio 2" and the panel cannot say which is which,
+# so it is worth having both cases: the channel names its languages.
+echo "multitrack.ts (10 min, English and Italian audio)"
+ff -f lavfi -i "testsrc=size=640x360:rate=25:duration=600" \
+    -f lavfi -i "sine=frequency=440:duration=600" \
+    -f lavfi -i "sine=frequency=880:duration=600" \
+    -map 0:v -map 1:a -map 2:a \
+    -c:v libx264 -preset ultrafast -crf 32 -pix_fmt yuv420p -g 50 -c:a aac -b:a 64k \
+    -metadata:s:a:0 language=eng -metadata:s:a:1 language=ita \
+    -f mpegts multitrack.ts
+
+# Subtitles live on the film rather than the channel, and that is not a
+# shortcut: a live TS carries DVB subtitles, which are bitmaps, and ffmpeg
+# cannot make them out of text — "Subtitle encoding currently only possible
+# from text to text or bitmap to bitmap". Matroska takes SubRip as it is, and
+# VOD is where subtitles mostly turn up anyway.
+echo "film_tracks.mkv (2 min, English and French audio, English subtitles)"
+cat > subs.srt <<'SRT'
+1
+00:00:02,000 --> 00:00:12,000
+Subtitles are on.
+
+2
+00:00:14,000 --> 00:00:24,000
+If you can read this, the text track was selected.
+
+3
+00:00:26,000 --> 00:01:59,000
+Still on.
+SRT
+ff -f lavfi -i "smptebars=size=640x360:rate=25:duration=120" \
+    -f lavfi -i "sine=frequency=660:duration=120" \
+    -f lavfi -i "sine=frequency=990:duration=120" \
+    -i subs.srt \
+    -map 0:v -map 1:a -map 2:a -map 3:s \
+    -c:v libx264 -preset ultrafast -crf 32 -pix_fmt yuv420p -c:a aac -b:a 64k -c:s srt \
+    -metadata:s:a:0 language=eng -metadata:s:a:1 language=fra -metadata:s:s:0 language=eng \
+    film_tracks.mkv
+rm -f subs.srt
