@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Series: a run of episodes, the one you would play in front.
+  See ic_nav_live.xml for why these are drawn here rather than taken from
+  Material, and for the grid and stroke they share.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- The one behind, showing as an edge. -->
+    <path
+        android:pathData="M6,6 H17 A3,3 0 0 1 20,9 V17"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round" />
+
+    <!-- The one in front. -->
+    <path
+        android:pathData="M4.5,9 H14.5 A2.5,2.5 0 0 1 17,11.5 V18.5 A2.5,2.5 0 0 1 14.5,21 H4.5 A2.5,2.5 0 0 1 2,18.5 V11.5 A2.5,2.5 0 0 1 4.5,9 Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round" />
+
+    <path
+        android:pathData="M8,13.4 V16.6 L11,15 Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

@@ -92,6 +92,9 @@ public class FakePanel {
                     streamDropping(ex, file.substring(0, 3));
                 } else if (file.startsWith("106.")) {
                     streamAfterHandover(ex);
+                } else if (file.startsWith("107.")) {
+                    // Two audio tracks, English and Italian, named in the PMT.
+                    streamLive(ex, "multitrack.ts");
                 } else if (file.endsWith(".ts")) {
                     streamLive(ex);
                 } else {
@@ -106,6 +109,7 @@ public class FakePanel {
                 if (file.equals("501.mp4")) serveFile(ex, "film.mp4", "video/mp4");
                 else if (file.equals("502.mkv")) serveFile(ex, "film.mkv", "video/x-matroska");
                 else if (file.equals("503.mp4")) serveFileDropping(ex, "film.mp4", "video/mp4");
+                else if (file.equals("504.mkv")) serveFile(ex, "film_tracks.mkv", "video/x-matroska");
                 else status(ex, 404);
             } else if (path.startsWith("/series/")) {
                 String file = fileName(path);
@@ -195,6 +199,7 @@ public class FakePanel {
                     "{\"num\":6,\"name\":\"Drops every 20 s\",\"stream_id\":104,\"category_id\":\"1\"}," +
                     "{\"num\":7,\"name\":\"Drops, then off air\",\"stream_id\":105,\"category_id\":\"1\"}," +
                     "{\"num\":8,\"name\":\"Line busy for 15 s\",\"stream_id\":106,\"category_id\":\"1\"}," +
+                    "{\"num\":9,\"name\":\"Two audio tracks\",\"stream_id\":107,\"category_id\":\"1\"}," +
                     "{\"num\":4,\"name\":\"No stream id A\",\"category_id\":\"1\"}," +
                     "{\"num\":5,\"name\":\"No stream id B\",\"category_id\":\"1\"}";
                 String sport = "{\"num\":\"1\",\"name\":\"Sport One\",\"stream_id\":\"201\",\"category_id\":\"2\",\"stream_icon\":null,\"epg_channel_id\":\"sport.test\"}";
@@ -227,7 +232,10 @@ public class FakePanel {
                     "\"container_extension\":\"mkv\",\"rating\":0}," +
                     "{\"num\":3,\"name\":\"Drops mid-film (MP4)\",\"stream_id\":503," +
                     "\"stream_icon\":\"" + base + "/poster/501.jpg\",\"category_id\":\"10\"," +
-                    "\"container_extension\":\"mp4\"}]";
+                    "\"container_extension\":\"mp4\"}," +
+                    "{\"num\":4,\"name\":\"Two audio tracks and subtitles (MKV)\",\"stream_id\":504," +
+                    "\"stream_icon\":\"" + base + "/poster/502.jpg\",\"category_id\":\"10\"," +
+                    "\"container_extension\":\"mkv\"}]";
             case "get_series_categories":
                 return "[{\"category_id\":\"20\",\"category_name\":\"Drama\"}]";
             case "get_series":
@@ -408,7 +416,11 @@ public class FakePanel {
     }
 
     static void streamLive(HttpExchange ex) throws IOException {
-        Path file = media.resolve("live.ts");
+        streamLive(ex, "live.ts");
+    }
+
+    static void streamLive(HttpExchange ex, String name) throws IOException {
+        Path file = media.resolve(name);
         if (!Files.exists(file)) {
             missing(ex, file);
             return;
