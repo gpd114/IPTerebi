@@ -150,7 +150,7 @@ object Appearance {
     private const val KEY = "theme.guide"
 
     /** Whether Settings offers Light as well. The TV app sets this false. */
-    const val SWITCHABLE = true
+    const val SWITCHABLE = false
 
     fun load(context: Context) {
         Night.palette = if (SWITCHABLE && prefs(context).getString(KEY, null) == "light") Light else Dark
