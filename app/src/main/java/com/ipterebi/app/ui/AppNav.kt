@@ -19,9 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -52,6 +49,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.ipterebi.app.AppContainer
+import androidx.annotation.DrawableRes
+import androidx.compose.ui.res.painterResource
+import com.ipterebi.app.R
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.app.ui.channels.ChannelsScreen
 import com.ipterebi.app.ui.films.FilmsScreen
@@ -92,12 +92,19 @@ object Route {
     fun playEpisode(id: String, extension: String) =
         "player/episode/${Uri.encode(id)}/${Uri.encode(extension)}"
 }
-
-/** The sections the bottom bar, or on a wide screen the rail, switches between. */
-private enum class Section(val route: String, val label: String, val icon: ImageVector) {
-    LIVE(Route.CHANNELS, "Live TV", Icons.Filled.LiveTv),
-    FILMS(Route.FILMS, "Films", Icons.Filled.Movie),
-    SERIES(Route.SERIES, "Series", Icons.Filled.VideoLibrary),
+/**
+ * The sections the bottom bar, or on a wide screen the rail, switches between.
+ *
+ * The icons are this app's own (`res/drawable/ic_nav_*`), not Material's.
+ * Material's set is the house style of every Android app and looked like
+ * nothing in particular here; these three share one 24 grid, one stroke and
+ * one set of joins, so they read as a family — a screen with a signal on it, a
+ * strip of film, a run of episodes.
+ */
+private enum class Section(val route: String, val label: String, @DrawableRes val icon: Int) {
+    LIVE(Route.CHANNELS, "Live TV", R.drawable.ic_nav_live),
+    FILMS(Route.FILMS, "Films", R.drawable.ic_nav_films),
+    SERIES(Route.SERIES, "Series", R.drawable.ic_nav_series),
 }
 
 @Composable
@@ -164,7 +171,7 @@ fun AppNav(container: AppContainer) {
                                     NavigationRailItem(
                                         selected = item == section,
                                         onClick = { nav.switchSection(item.route) },
-                                        icon = { Icon(item.icon, contentDescription = null) },
+                                        icon = { Icon(painterResource(item.icon), contentDescription = null) },
                                         label = { Text(item.label) },
                                         colors = NavigationRailItemDefaults.colors(
                                             selectedIconColor = Color.White,
@@ -348,7 +355,7 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(item.icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+                Icon(painterResource(item.icon), contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
                 Spacer(Modifier.width(7.dp))
                 Text(
                     item.label,

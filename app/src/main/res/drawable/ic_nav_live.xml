@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Live TV: a screen with a signal on it.
+
+  One of three drawn for this app rather than taken from Material, whose set
+  is the house style of every Android app and read as nothing in particular
+  here. All three sit on the same 24 grid with the same 1.9 stroke and round
+  joins, so they are a family: a screen, a strip of film, a run of episodes.
+
+  Stroked in white and tinted where it is used, so the same file serves the
+  selected tab (white on cobalt) and the rest (muted).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- The screen. -->
+    <path
+        android:pathData="M5,8 H19 A3,3 0 0 1 22,11 V18 A3,3 0 0 1 19,21 H5 A3,3 0 0 1 2,18 V11 A3,3 0 0 1 5,8 Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round" />
+
+    <!-- The aerial. -->
+    <path
+        android:pathData="M12,8 V5.5 M9,3 L12,5.5 L15,3"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round" />
+
+    <!-- The signal: an arc and its point, which is what says live. -->
+    <path
+        android:pathData="M8.5,15 A5,5 0 0 1 15.5,15"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M13.1,18.1 A1.1,1.1 0 1 1 10.9,18.1 A1.1,1.1 0 1 1 13.1,18.1 Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>
