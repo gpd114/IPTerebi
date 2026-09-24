@@ -25,7 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material.icons.filled.ClosedCaption
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -406,6 +406,23 @@ private fun PlayerContent(
         }
     }
 
+    // The sleep timer, watched here because this is the only screen that has
+    // anything to stop. Stopped rather than paused: a paused player keeps the
+    // line, and someone who has fallen asleep is not about to free it.
+    LaunchedEffect(player, playable) {
+        while (true) {
+            delay(1_000)
+            if (!SleepTimer.hasFired(SystemClock.elapsedRealtime())) continue
+            SleepTimer.cancel()
+            saveProgress()
+            if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} stopped by the sleep timer")
+            player.stop()
+            error = null
+            reconnecting = false
+            released = Released.BySleepTimer
+        }
+    }
+
     DisposableEffect(player) {
         if (BuildConfig.DEBUG) {
             Log.d(
@@ -775,6 +792,9 @@ private fun PlayerContent(
                     useController = true
                     keepScreenOn = true
                     setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
+                    // The shape chosen last time, before the first frame, so a
+                    // 4:3 channel does not show its bars for a moment first.
+                    resizeMode = Picture.fit.resizeMode
                     // One item at a time, so there is never a next or previous.
                     setShowNextButton(false)
                     setShowPreviousButton(false)
@@ -890,7 +910,13 @@ private fun PlayerContent(
                     post { requestFocus() }
                 }
             },
-            update = { view -> view.player = player },
+            update = { view ->
+                view.player = player
+                // Read here rather than only in the factory: choosing a shape
+                // in the panel has to change the picture while it plays, which
+                // is the only way to judge it.
+                view.resizeMode = Picture.fit.resizeMode
+            },
             modifier = Modifier.fillMaxSize(),
         )
 
@@ -905,21 +931,21 @@ private fun PlayerContent(
                     modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Only when the stream turned out to carry a choice. On a
-                    // channel with one audio track and no subtitles the panel
-                    // would have nothing in it, and a button over the picture
-                    // has to earn its place.
-                    if (TrackChoice.worthOffering(tracks)) {
-                        IconButton(
-                            onClick = { tracksOpen = !tracksOpen },
-                            modifier = Modifier.focusProperties { canFocus = false },
-                        ) {
-                            Icon(
-                                Icons.Filled.ClosedCaption,
-                                contentDescription = "Audio and subtitles",
-                                tint = if (tracksOpen) OverVideo.accent else Color.White,
-                            )
-                        }
+                    // Always here now, where the CC button used to appear only
+                    // when a stream carried a choice: it holds the picture
+                    // shape and the sleep timer too, and both of those are
+                    // wanted on a stream that has one audio track and no
+                    // subtitles — often exactly that stream, when it is the
+                    // 4:3 channel with bars down the sides.
+                    IconButton(
+                        onClick = { tracksOpen = !tracksOpen },
+                        modifier = Modifier.focusProperties { canFocus = false },
+                    ) {
+                        Icon(
+                            Icons.Filled.Tune,
+                            contentDescription = "Picture, sleep timer, audio and subtitles",
+                            tint = if (tracksOpen || SleepTimer.running) OverVideo.accent else Color.White,
+                        )
                     }
 
                     IconButton(
@@ -983,9 +1009,10 @@ private fun PlayerContent(
                         interactionSource = remember { MutableInteractionSource() },
                     ) { tracksOpen = false },
             )
-            TrackPanel(
+            PlaybackPanel(
                 player = player,
                 context = context,
+                live = playable is Playable.Channel,
                 onDismiss = { tracksOpen = false },
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -1036,7 +1063,7 @@ private fun PlayerContent(
                 Icon(
                     when (why) {
                         Released.ToAnotherApp -> Icons.AutoMirrored.Filled.OpenInNew
-                        Released.ByYou -> Icons.Filled.Stop
+                        Released.ByYou, Released.BySleepTimer -> Icons.Filled.Stop
                     },
                     contentDescription = null,
                     tint = OverVideo.accent,
@@ -1045,6 +1072,7 @@ private fun PlayerContent(
                     text = when (why) {
                         Released.ToAnotherApp -> "Playing in another app"
                         Released.ByYou -> "Stopped"
+                        Released.BySleepTimer -> "Sleep timer"
                     },
                     style = MaterialTheme.typography.titleMedium,
                     color = OverVideo.ink,
@@ -1054,6 +1082,7 @@ private fun PlayerContent(
                     text = when (why) {
                         Released.ToAnotherApp -> "Stopped here, so your line is free for it."
                         Released.ByYou -> "Your line is free for another device."
+                        Released.BySleepTimer -> "Stopped, and your line is free."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = OverVideo.inkSoft,
@@ -1197,4 +1226,6 @@ private enum class Released {
     ToAnotherApp,
     /** Stopped from the notification or Settings, to free the line for another device. */
     ByYou,
+    /** The sleep timer went off. */
+    BySleepTimer,
 }

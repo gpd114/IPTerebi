@@ -1,6 +1,7 @@
 package com.ipterebi.app.ui.player
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,6 +23,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +44,7 @@ import com.ipterebi.app.ui.focusRing
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.OverVideo
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 /**
  * Which audio and which subtitles, chosen over the picture.
@@ -206,16 +211,23 @@ private fun Format.describe(type: Int, index: Int): String {
 }
 
 /**
- * The panel itself: audio above, subtitles below, the one in use ticked.
+ * Everything about this playback that can be changed while it runs: how the
+ * picture fills the screen, when to stop, which audio, which subtitles.
  *
- * It reads the player's tracks as they change rather than once, because a live
- * stream announces them a moment after it opens and a reconnect announces them
- * again.
+ * One panel rather than a button each, because over a picture every extra
+ * control is something in the way of the thing being watched. Picture and
+ * Sleep are always here; the track sections appear only when the stream
+ * carries a choice.
+ *
+ * The tracks are read as they change rather than once, because a live stream
+ * announces them a moment after it opens and again after every reconnect.
  */
 @Composable
-fun TrackPanel(
+fun PlaybackPanel(
     player: Player,
     context: Context,
+    /** Live has no end of its own, so a sleep timer means something different. */
+    live: Boolean,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -230,19 +242,62 @@ fun TrackPanel(
         onDispose { player.removeListener(listener) }
     }
 
+    // Ticks while the panel is open so the countdown is not stale. Only while
+    // it is open: nothing is drawn from it otherwise.
+    var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1_000)
+            now = SystemClock.elapsedRealtime()
+        }
+    }
+
     val audio = rowsFor(tracks, C.TRACK_TYPE_AUDIO)
     val text = rowsFor(tracks, C.TRACK_TYPE_TEXT)
 
     Column(
         modifier
-            .widthIn(max = 300.dp)
-            .heightIn(max = 420.dp)
+            .widthIn(max = 320.dp)
+            // A share of the screen rather than a fixed height: in landscape,
+            // which is how anything is watched, 460dp is taller than the phone
+            // and the panel ran off the bottom.
+            .fillMaxHeight(0.78f)
+            .heightIn(max = 460.dp)
             .clip(Corners.panel)
             .background(OverVideo.panel)
             .verticalScroll(rememberScrollState())
             .padding(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        Heading("Picture")
+        PictureFit.entries.forEach { option ->
+            Line(
+                label = option.label,
+                selected = option == Picture.fit,
+                // Chosen without closing: the whole point is to see the
+                // difference, and a panel that shut each time would mean
+                // opening it three times to compare three shapes.
+                onClick = { Picture.set(context, option) },
+            )
+        }
+
+        Heading(if (SleepTimer.running) "Sleep · ${sleepRemainingLabel(SleepTimer.remaining(now))}" else "Sleep")
+        Line(label = "Off", selected = !SleepTimer.running, onClick = { SleepTimer.cancel() })
+        SLEEP_CHOICES.forEach { minutes ->
+            Line(
+                label = "$minutes minutes",
+                // Never ticked once it is running: what is running is a
+                // deadline, and after a minute "30 minutes" would be a lie.
+                selected = false,
+                onClick = { SleepTimer.set(minutes, SystemClock.elapsedRealtime()) },
+            )
+        }
+        if (!live) {
+            Hint("Stops the film and frees your line. It will carry on where it stopped.")
+        } else {
+            Hint("Stops the channel and frees your line.")
+        }
+
         if (audio.size > 1) {
             Heading("Audio")
             audio.forEach { row -> Line(row) { TrackChoice.choose(context, player, row); onDismiss() } }
@@ -257,14 +312,20 @@ fun TrackPanel(
 
         if (audio.size <= 1 && text.isEmpty()) {
             Heading("Audio and subtitles")
-            Text(
-                "This stream carries one audio track and no subtitles.",
-                style = MaterialTheme.typography.bodySmall,
-                color = OverVideo.inkSoft,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
+            Hint("This stream carries one audio track and no subtitles.")
         }
     }
+}
+
+/** Small print under a section, in the panel's own colours. */
+@Composable
+private fun Hint(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = OverVideo.inkSoft,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+    )
 }
 
 @Composable
@@ -278,7 +339,12 @@ private fun Heading(text: String) {
 }
 
 @Composable
-private fun Line(row: TrackRow, onClick: () -> Unit) {
+private fun Line(row: TrackRow, onClick: () -> Unit) =
+    Line(label = row.label, selected = row.selected, onClick = onClick)
+
+/** One choosable line: a tick where the chosen one is, and the label beside it. */
+@Composable
+private fun Line(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -291,14 +357,14 @@ private fun Line(row: TrackRow, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-            if (row.selected) {
-                Icon(Icons.Filled.Check, contentDescription = "Playing", tint = OverVideo.accent)
+            if (selected) {
+                Icon(Icons.Filled.Check, contentDescription = "Chosen", tint = OverVideo.accent)
             }
         }
         Text(
-            row.label,
+            label,
             style = MaterialTheme.typography.bodyMedium,
-            color = if (row.selected) OverVideo.ink else OverVideo.inkSoft,
+            color = if (selected) OverVideo.ink else OverVideo.inkSoft,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
