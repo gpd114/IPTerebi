@@ -530,6 +530,26 @@ behind the clock** — a minute of wall time was ten seconds of film — so
 watching something for a while will not pass the 30-second mark. Skip forward
 with the player's own button instead.
 
+### The options panel on a remote
+
+Hold **OK**, or press **Menu** on a remote that has one, for the phone's
+picture-and-sleep panel: picture shape, sleep timer, and the audio and
+subtitle tracks when the stream carries a choice. **Back** closes it and the
+remote goes back to changing channel.
+
+It is reached by a key rather than by a button because of the rule above —
+nothing focusable may *wait* over the video, or the first press of OK goes to
+it instead of to the channel list. A panel that is only there when asked for
+is a different thing: while it is up it takes the remote deliberately, which
+is what `covered` already means for the channel list, and focus is handed back
+when it closes.
+
+Holding OK is the way in that matters. Most remotes have no Menu key — the
+box's certainly does not — and OK is the one button every remote has. The hold
+is read from the key event's repeat count, and `okHeld` carries the fact
+between the repeat and the release, so the release that ends a hold does not
+also open the channel list.
+
 ### The home screen is the phone's, not the box's
 
 The TV build keeps `TvLiveScreen` as its home — the channel list with its

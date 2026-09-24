@@ -77,6 +77,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.compose.foundation.focusGroup
+import com.ipterebi.app.ui.player.PlaybackPanel
+import com.ipterebi.app.ui.player.Picture
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.BuildConfig
 import com.ipterebi.app.TAG_PLAY
@@ -159,9 +162,17 @@ private fun TvLive(
         ?: tuned?.categoryId?.takeIf { state.lineup?.group(it) != null }?.let { TvGroup.Category(it) }
         ?: TvGroup.All
 
+    // Picture shape, sleep timer, audio and subtitles — the phone's panel,
+    // reached here with Menu or by holding OK, because nothing may sit over
+    // the video waiting to take a press of OK.
+    var optionsOpen by remember { mutableStateOf(false) }
+    // Whether the press of OK that is happening now was a hold. A plain array
+    // rather than state: it is read and written inside a key handler, where a
+    // recomposition is neither wanted nor guaranteed between the two events.
+    val okHeld = remember { BooleanArray(1) }
     var listOpen by remember { mutableStateOf(false) }
     // It covers the picture (bar the corner it plays in), and takes the remote.
-    val covered = listOpen
+    val covered = listOpen || optionsOpen
     var bannerAt by remember { mutableLongStateOf(0L) }
     var bannerShown by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
@@ -455,6 +466,7 @@ private fun TvLive(
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     fun onBack() {
         when {
+            optionsOpen -> optionsOpen = false
             listOpen -> listOpen = false
             bannerShown || typed.isNotEmpty() -> {
                 bannerShown = false
@@ -502,13 +514,33 @@ private fun TvLive(
                     // On release, not press: the list opens under the remote,
                     // and a row that saw only the release will not take it as a click.
                     e.key in Select -> {
+                        // Held, not tapped: the options panel. A remote with no
+                        // Menu key — which is most of them — needs some way in,
+                        // and holding the one button every remote has is the
+                        // convention set-top boxes already use. The repeat
+                        // count is how a hold is known; the release that
+                        // follows must then not also open the list, which is
+                        // what okHeld carries between the two events.
+                        if (down && e.nativeKeyEvent.repeatCount > 0 && !okHeld[0]) {
+                            okHeld[0] = true
+                            optionsOpen = true
+                        }
                         if (!down) {
-                            if (typed.isNotEmpty()) commitNumber() else listOpen = true
+                            if (okHeld[0]) {
+                                okHeld[0] = false
+                            } else if (typed.isNotEmpty()) {
+                                commitNumber()
+                            } else {
+                                listOpen = true
+                            }
                         }
                         // Left to a focused button — Try again — to press.
                         error == null && !released
                     }
-                    e.key == Key.Menu -> { if (!down) listOpen = true; true }
+                    // The options panel, on the remotes that have this key.
+                    // The channel list is still OK and Guide, so nothing is
+                    // lost by Menu meaning something more specific.
+                    e.key == Key.Menu -> { if (!down) optionsOpen = true; true }
                     e.key == Key.Guide -> { if (!down) listOpen = true; true }
                     else -> false
                 }
@@ -525,7 +557,8 @@ private fun TvLive(
                     useController = false
                     isFocusable = false
                     keepScreenOn = true
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    // The shape chosen last time, before the first frame.
+                    resizeMode = Picture.fit.resizeMode
                     setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
                 }
             },
@@ -535,6 +568,10 @@ private fun TvLive(
                 // list: two things turning in one place reads as a fault.
                 val quiet = waitingForLine || error != null || released || covered
                 view.setShowBuffering(if (quiet) PlayerView.SHOW_BUFFERING_NEVER else PlayerView.SHOW_BUFFERING_ALWAYS)
+                // Choosing a shape in the options panel has to change the picture
+                // while it plays — on a television that is the only way to judge
+                // it, and the panel stays open so it can be compared.
+                view.resizeMode = Picture.fit.resizeMode
             },
             // Under the channel guide, the same player in the corner it leaves:
             // one stream, never a second for a preview.
@@ -662,6 +699,7 @@ private fun TvLive(
             Text(
                 "Press Back again to leave",
                 style = MaterialTheme.typography.labelLarge,
+
                 color = TvInk,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -670,6 +708,34 @@ private fun TvLive(
                     .background(TvPanel)
                     .padding(horizontal = 18.dp, vertical = 9.dp),
             )
+        }
+
+        // Over the picture, and taking the remote while it is up — which is
+        // allowed because it is only here when asked for. The rule it would
+        // otherwise break is that nothing focusable may *wait* over the video:
+        // the first press of OK belongs to the channel list, not to a button
+        // nobody asked to be there.
+        if (optionsOpen) {
+            val panelFocus = remember { FocusRequester() }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                PlaybackPanel(
+                    player = player,
+                    context = context,
+                    // This screen is channels and nothing else.
+                    live = true,
+                    onDismiss = { optionsOpen = false },
+                    modifier = Modifier
+                        .padding(end = 40.dp)
+                        .focusRequester(panelFocus)
+                        .focusGroup(),
+                )
+            }
+            LaunchedEffect(Unit) { runCatching { panelFocus.requestFocus() } }
         }
 
         if (listOpen) {
