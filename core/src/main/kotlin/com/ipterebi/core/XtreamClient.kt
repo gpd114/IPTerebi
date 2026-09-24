@@ -99,7 +99,17 @@ class XtreamClient(
                 (if (channels.size != parsed.size) {
                     ", ${parsed.size - channels.size} dropped as unplayable"
                 } else "") +
-                (channels.firstOrNull()?.let { ", first: ${it.name} (id ${it.streamId})" } ?: "")
+                (channels.firstOrNull()?.let { ", first: ${it.name} (id ${it.streamId})" } ?: "") +
+                // Whether this line keeps anything to watch back, which no
+                // other line of the log would reveal and which decides
+                // whether the guide has anything to offer on a finished
+                // programme. Most lines answer "none".
+                (channels.count { it.hasCatchUp }.let { archived ->
+                    if (archived > 0) {
+                        ", $archived with catch-up up to " +
+                            "${channels.maxOf { it.tvArchiveDays }} days"
+                    } else ", none with catch-up"
+                })
         )
         channels
     }
@@ -319,6 +329,39 @@ class XtreamClient(
      */
     fun liveStreamUrl(account: XtreamAccount, streamId: Int): String =
         mediaUrl(account, "live", "$streamId", account.format.extension)
+
+    /**
+     * Where a programme that has already been on is kept.
+     *
+     * `/timeshift/user/pass/{minutes}/{yyyy-MM-dd:HH-mm}/{id}.{ext}` — the
+     * shape every fork that has catch-up at all agrees on. Note what it is
+     * *not*: an action on `player_api.php`. There is no API call that says
+     * "give me this programme"; the recording is addressed by when it was on,
+     * which is why [catchUpStartLabel] and the panel's own idea of the time
+     * matter so much here.
+     *
+     * [startSeconds] is a real instant and [shiftSeconds] is what [GuideClock]
+     * learned about this line, because the time in this URL is the panel's
+     * wall clock. Get that wrong and nothing fails — it plays the wrong hour.
+     *
+     * As sensitive as any other stream URL: the credentials are in the path.
+     */
+    fun catchUpUrl(
+        account: XtreamAccount,
+        streamId: Int,
+        startSeconds: Long,
+        minutes: Int,
+        shiftSeconds: Long,
+    ): String =
+        requireBase(account).newBuilder()
+            .addPathSegment("timeshift")
+            .addPathSegment(account.username)
+            .addPathSegment(account.password)
+            .addPathSegment("$minutes")
+            .addPathSegment(catchUpStartLabel(startSeconds, shiftSeconds))
+            .addPathSegment("$streamId.${account.format.extension}")
+            .build()
+            .toString()
 
     /**
      * Where a film is.

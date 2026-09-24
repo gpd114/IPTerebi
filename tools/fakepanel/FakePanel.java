@@ -82,6 +82,27 @@ public class FakePanel {
                     return;
                 }
                 json(ex, api(action, q, base(ex)));
+            } else if (path.startsWith("/timeshift/")) {
+                // /timeshift/user/pass/{minutes}/{yyyy-MM-dd:HH-mm}/{id}.ts
+                //
+                // The whole point of serving this is that the *time* can be
+                // checked: a client that sends the viewer's clock to a panel
+                // on another one gets television, just not the television it
+                // asked for, so the log prints what was asked for and how far
+                // from now that is.
+                String[] parts = path.split("/");
+                String when = parts.length > 5 ? parts[5] : "";
+                String mins = parts.length > 4 ? parts[4] : "";
+                log("CATCHUP " + fileName(path) + "  " + mins + " min from " + when
+                    + "  (" + describeCatchUpAge(when) + ")");
+                if (catchUpTooOld(when)) {
+                    // Past the four days this panel claims to keep, which is
+                    // what a real one does with a programme it has thrown away.
+                    log("   (404: outside the archive window)");
+                    status(ex, 404);
+                } else {
+                    streamLive(ex);
+                }
             } else if (path.startsWith("/live/")) {
                 String file = fileName(path);
                 log("LIVE " + file + "  ua=" + ua);
@@ -196,8 +217,8 @@ public class FakePanel {
                 // Ids as numbers and strings, one refusing channel, and two with
                 // no stream_id at all — they would share list key 0 and crash
                 // the list if they got through.
-                String news = "{\"num\":1,\"name\":\"Test News HD\",\"stream_id\":101,\"category_id\":\"1\",\"stream_icon\":\"\",\"epg_channel_id\":\"news.test\"}," +
-                    "{\"num\":\"2\",\"name\":\"Test Pattern TV\",\"stream_id\":\"102\",\"category_id\":1}," +
+                String news = "{\"num\":1,\"name\":\"Test News HD\",\"stream_id\":101,\"category_id\":\"1\",\"stream_icon\":\"\",\"epg_channel_id\":\"news.test\",\"tv_archive\":1,\"tv_archive_duration\":4}," +
+                    "{\"num\":\"2\",\"name\":\"Test Pattern TV\",\"stream_id\":\"102\",\"category_id\":1,\"tv_archive\":1,\"tv_archive_duration\":0}," +
                     "{\"num\":3,\"name\":\"Refused (connection limit)\",\"stream_id\":103,\"category_id\":\"1\"}," +
                     "{\"num\":6,\"name\":\"Drops every 20 s\",\"stream_id\":104,\"category_id\":\"1\"}," +
                     "{\"num\":7,\"name\":\"Drops, then off air\",\"stream_id\":105,\"category_id\":\"1\"}," +
@@ -299,6 +320,12 @@ public class FakePanel {
     static String xmltv() {
         long now = Instant.now().getEpochSecond();
         long start = now - 20 * 60, mid = now + 40 * 60, end = mid + 30 * 60;
+        // Two that have already been on, because catch-up has nothing to
+        // offer without them: one this morning, inside the four days this
+        // panel keeps, and one five days ago, outside it. The second is the
+        // one that proves the window is honoured rather than assumed.
+        long earlierStart = now - 6 * 3600, earlierEnd = now - 5 * 3600;
+        long ancientStart = now - 5 * 24 * 3600, ancientEnd = ancientStart + 3600;
         java.time.format.DateTimeFormatter f = java.time.format.DateTimeFormatter
             .ofPattern("yyyyMMddHHmmss Z").withZone(java.time.ZoneId.of("Europe/London"));
         java.util.function.LongFunction<String> t = s -> f.format(Instant.ofEpochSecond(s));
@@ -312,6 +339,10 @@ public class FakePanel {
             "<desc>The day&apos;s headlines.</desc></programme>\n" +
             "<programme start=\"" + t.apply(mid) + "\" stop=\"" + t.apply(end) + "\" channel=\"news.test\">" +
             "<title>Weather Tonight</title><desc><![CDATA[Rain, probably.]]></desc></programme>\n" +
+            "<programme start=\"" + t.apply(earlierStart) + "\" stop=\"" + t.apply(earlierEnd) + "\" channel=\"news.test\">" +
+            "<title>The Lunchtime Film</title><desc>Been on already, and still kept.</desc></programme>\n" +
+            "<programme start=\"" + t.apply(ancientStart) + "\" stop=\"" + t.apply(ancientEnd) + "\" channel=\"news.test\">" +
+            "<title>Last Week&apos;s News</title><desc>Older than the archive window.</desc></programme>\n" +
             "<programme start=\"" + t.apply(now - 3600) + "\" stop=\"" + t.apply(now + 3600) + "\" channel=\"sport.test\">" +
             "<title>Live: Rovers &amp; United</title></programme>\n" +
             "<programme start=\"" + t.apply(now + 3600) + "\" stop=\"" + t.apply(now + 7200) + "\" channel=\"sport.test\">" +
@@ -419,6 +450,39 @@ public class FakePanel {
         streamLive(ex);
     }
 
+
+    /** How long ago a catch-up start is, in words, for the log. */
+    static String describeCatchUpAge(String when) {
+        long seconds = catchUpAgeSeconds(when);
+        if (seconds == Long.MIN_VALUE) return "unreadable";
+        long minutes = seconds / 60;
+        if (Math.abs(minutes) < 90) return minutes + " min ago";
+        long hours = minutes / 60;
+        if (Math.abs(hours) < 48) return hours + " h ago";
+        return (hours / 24) + " days ago";
+    }
+
+    /** Older than the four days this panel says it keeps. */
+    static boolean catchUpTooOld(String when) {
+        long seconds = catchUpAgeSeconds(when);
+        return seconds != Long.MIN_VALUE && seconds > 4L * 24 * 60 * 60;
+    }
+
+    /**
+     * How far back the requested start is, in seconds, read as UTC — which is
+     * what this panel pretends its own clock is. Long.MIN_VALUE when the shape
+     * is not what a panel expects, which is itself worth seeing in the log.
+     */
+    static long catchUpAgeSeconds(String when) {
+        try {
+            java.time.format.DateTimeFormatter f =
+                java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd:HH-mm");
+            java.time.LocalDateTime t = java.time.LocalDateTime.parse(when, f);
+            return (System.currentTimeMillis() / 1000) - t.toEpochSecond(java.time.ZoneOffset.UTC);
+        } catch (Exception e) {
+            return Long.MIN_VALUE;
+        }
+    }
     static void streamLive(HttpExchange ex) throws IOException {
         streamLive(ex, "live.ts");
     }

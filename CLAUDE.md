@@ -593,6 +593,47 @@ The panel's height is a share of the screen rather than a fixed figure.
 Anything is watched in landscape, where a phone is about 360dp tall, and a
 460dp panel ran off the bottom.
 
+## Catch-up
+
+Some providers keep a recording of a channel. Two fields say so —
+`tv_archive` and `tv_archive_duration` — and `hasCatchUp` wants both, because
+panels send archive on with a duration of zero, which is a promise of nothing.
+The channel-list log line says what a line offers ("1 with catch-up up to 4
+days", or "none with catch-up"); nothing else reveals it.
+
+There is **no API call for a past programme**. The recording is addressed by
+when it was on: `/timeshift/user/pass/{minutes}/{yyyy-MM-dd:HH-mm}/{id}.{ext}`.
+Three things follow, and `core/CatchUp.kt` holds all three with tests:
+
+- **The time in that URL is the panel's wall clock**, like everything else a
+  panel says about time. So the shift `GuideClock` learned from evidence is
+  applied *in reverse* when building it. Get this wrong and nothing fails —
+  it plays the wrong hour, which is much harder to notice than an error.
+- **The programme must have finished.** A panel will serve a catch-up that
+  runs into the future, and what comes back stops dead at the live edge with
+  the player waiting for more.
+- **A programme half out of the window starts at the window's edge.** A
+  three-hour film that began four days and an hour ago still has two hours
+  kept; asking from its own start gets silence.
+
+A catch-up plays as a *channel*, not as a film: a panel serves it as a stream
+with no length and nothing to seek in, so it takes the channel's retry policy,
+the channel's reconnect — rejoin, never resume at a byte — and the channel's
+error wording, the connection limit included. `Playable.CatchUp` says so, and
+`isBroadcast` is what the player asks.
+
+**The guide is the way in**, so the guide had to change: it only ever scrolled
+back two hours, which was right when it answered "what is on" and useless for
+finding something that has been on. On a line with an archive it now reaches
+back as far as the recording does. It goes no further than the guide itself
+knows, though, and that is usually less: `xmltv.php` generally starts at about
+now, so the past is only as deep as what that download happened to include.
+
+The fake panel serves all of it: channel 101 keeps four days, channel 102
+claims an archive for zero days, `/timeshift/` streams what is inside the
+window and 404s what is outside, and the log prints how long ago each request
+was for — which is the check that catches a wrong clock.
+
 ## Things that are true about a D-pad
 
 Every one of these was found by driving the app on an emulator with key events,
