@@ -111,6 +111,7 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
             // in a shelf of stream ids from somebody else's panel.
             account?.let {
                 container.channelLists.clear(it)
+                container.watched.clear(it)
                 container.guide.forget(it)
             }
             container.credentials.clear()

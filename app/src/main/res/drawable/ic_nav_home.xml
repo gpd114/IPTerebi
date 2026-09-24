@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home: a house. The other three in the set draw the thing they open — a
+  screen, a strip of film, a run of episodes — and there is no object called
+  "home", so this one draws the word instead. It keeps the family's 24 grid,
+  1.9 stroke and round joins, which is what makes the four read as a set.
+  See ic_nav_live.xml for why they are drawn here rather than taken from
+  Material.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!-- The roof and the walls in one line, so the eaves join cleanly. -->
+    <path
+        android:pathData="M3.2,10.4 L12,3.4 L20.8,10.4 V18.6 A2.4,2.4 0 0 1 18.4,21 H5.6 A2.4,2.4 0 0 1 3.2,18.6 Z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round" />
+
+    <!-- The door. Stops at the floor, which is what makes it read as a door
+         rather than as a window. -->
+    <path
+        android:pathData="M9.4,21 V14.6 H14.6 V21"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.9"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round" />
+</vector>

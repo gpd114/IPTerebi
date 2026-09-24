@@ -12,6 +12,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.view.WindowCompat
 import com.ipterebi.app.ui.AppNav
+import com.ipterebi.app.ui.home.HomeChannels
 import com.ipterebi.app.ui.theme.Appearance
 import com.ipterebi.app.ui.theme.IPTerebiTheme
 import com.ipterebi.app.ui.theme.Night
@@ -23,6 +24,8 @@ class MainActivity : ComponentActivity() {
         val container = (application as IPTerebiApp).container
         // Before the first frame, so a Dark choice does not open on the Light page.
         Appearance.load(this)
+        // Both read before the first frame: see Appearance, and HomeChannels.
+        HomeChannels.load(this)
         setContent {
             IPTerebiTheme {
                 SystemBarsFollowTheme()
