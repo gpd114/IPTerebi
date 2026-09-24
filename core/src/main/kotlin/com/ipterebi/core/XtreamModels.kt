@@ -107,11 +107,34 @@ data class LiveStream(
     @Serializable(with = FlexibleIntSerializer::class)
     val number: Int = 0,
 
+
     /** Key into the XMLTV guide. Empty on a channel the provider has no EPG for. */
     @SerialName("epg_channel_id")
     @Serializable(with = FlexibleStringSerializer::class)
     val epgChannelId: String = "",
-)
+
+    /**
+     * 1 when the provider keeps a recording of this channel to watch back.
+     * Absent on most panels and on most channels of the panels that have it.
+     */
+    @SerialName("tv_archive")
+    @Serializable(with = FlexibleIntSerializer::class)
+    val tvArchive: Int = 0,
+
+    /** How many days back that recording goes. Meaningless when [tvArchive] is 0. */
+    @SerialName("tv_archive_duration")
+    @Serializable(with = FlexibleIntSerializer::class)
+    val tvArchiveDays: Int = 0,
+) {
+    /**
+     * Whether anything can be watched back on this channel.
+     *
+     * Both halves are needed: panels send `tv_archive: 1` with a duration of 0,
+     * which is a promise of nothing, and the list would then offer a catch-up
+     * that always failed.
+     */
+    val hasCatchUp: Boolean get() = tvArchive > 0 && tvArchiveDays > 0
+}
 
 @Serializable
 data class UserInfo(

@@ -63,6 +63,9 @@ import com.ipterebi.app.ui.focusRing
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.theme.tabular
+import com.ipterebi.core.catchUpMinutes
+import com.ipterebi.core.catchUpFrom
+import com.ipterebi.core.canCatchUp
 import com.ipterebi.core.GUIDE_STEP
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XmltvProgramme
@@ -93,7 +96,13 @@ private val RowHeight = 58.dp
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GuideScreen(container: AppContainer, onChannel: (Int) -> Unit, onBack: () -> Unit) {
+fun GuideScreen(
+    container: AppContainer,
+    onChannel: (Int) -> Unit,
+    /** Watch a programme that has already been on, where the provider kept it. */
+    onCatchUp: (channelId: Int, startSeconds: Long, minutes: Int) -> Unit,
+    onBack: () -> Unit,
+) {
     val accountState by container.credentials.state.collectAsStateWithLifecycle(AccountState.Loading)
     val account = (accountState as? AccountState.SignedIn)?.account
     val channels by container.channels.items.collectAsStateWithLifecycle()
@@ -109,7 +118,19 @@ fun GuideScreen(container: AppContainer, onChannel: (Int) -> Unit, onBack: () ->
             now = Instant.now().epochSecond
         }
     }
-    val earliest = remember { floorToGuideStep(now) - 2 * 3600 }
+    // How far back the guide may be dragged.
+    //
+    // Two hours was right when this only answered "what is on": nobody drags a
+    // guide into the past to see what they missed. Catch-up changes that — the
+    // way to watch something that has been on is to find it here — so on a
+    // line that keeps a recording, the guide reaches back as far as the
+    // recording does. It goes no further than the guide itself knows, which is
+    // usually less: xmltv.php generally starts at about now, so the past is
+    // only as deep as what that download happened to include.
+    val archiveDays = channels.maxOfOrNull { if (it.hasCatchUp) it.tvArchiveDays else 0 } ?: 0
+    val earliest = remember(archiveDays) {
+        floorToGuideStep(now) - if (archiveDays > 0) archiveDays * 24L * 3600 else 2 * 3600
+    }
     val latest = remember { now + 4 * 24 * 3600 }
 
     var fetchedAt by remember { mutableStateOf<Long?>(0L) }
@@ -208,10 +229,23 @@ fun GuideScreen(container: AppContainer, onChannel: (Int) -> Unit, onBack: () ->
 
     selected?.let { (channel, programme) ->
         ModalBottomSheet(onDismissRequest = { selected = null }, containerColor = Night.veil) {
-            ProgrammeSheet(channel, programme, now, zone, onWatch = {
-                selected = null
-                onChannel(channel.streamId)
-            })
+            ProgrammeSheet(
+                channel = channel,
+                programme = programme,
+                now = now,
+                zone = zone,
+                onWatch = {
+                    selected = null
+                    onChannel(channel.streamId)
+                },
+                onCatchUp = {
+                    selected = null
+                    // From the window's edge when the start has already fallen
+                    // out of it, which is what catchUpFrom answers.
+                    val from = catchUpFrom(channel, programme.start, programme.stop, now) ?: programme.start
+                    onCatchUp(channel.streamId, from, catchUpMinutes(from, programme.stop))
+                },
+            )
         }
     }
 }
@@ -368,7 +402,14 @@ private fun GuideLogo(channel: LiveStream) {
 }
 
 @Composable
-private fun ProgrammeSheet(channel: LiveStream, programme: XmltvProgramme, now: Long, zone: ZoneId, onWatch: () -> Unit) {
+private fun ProgrammeSheet(
+    channel: LiveStream,
+    programme: XmltvProgramme,
+    now: Long,
+    zone: ZoneId,
+    onWatch: () -> Unit,
+    onCatchUp: () -> Unit,
+) {
     val clock = DateTimeFormatter.ofPattern("HH:mm")
     val from = Instant.ofEpochSecond(programme.start).atZone(zone)
     val to = Instant.ofEpochSecond(programme.stop).atZone(zone)
@@ -403,13 +444,40 @@ private fun ProgrammeSheet(channel: LiveStream, programme: XmltvProgramme, now: 
             Text(programme.description, style = MaterialTheme.typography.bodyMedium, color = Night.ink)
         }
         Spacer(Modifier.height(6.dp))
-        if (onNow) {
-            PrimaryButton(onClick = onWatch, modifier = Modifier.fillMaxWidth()) {
-                Text("Watch ${channel.name}", style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        when {
+            onNow -> {
+                PrimaryButton(onClick = onWatch, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Watch ${channel.name}",
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-        } else {
-            // Not on yet, or finished: the channel is still on something now.
-            SecondaryButton("Watch ${channel.name} now", onClick = onWatch, modifier = Modifier.fillMaxWidth())
+
+            // Already been on, and the provider still has it. The main button,
+            // because someone who opened a finished programme's details wants
+            // that programme and not whatever is on instead.
+            canCatchUp(channel, programme.start, programme.stop, now) -> {
+                PrimaryButton(onClick = onCatchUp, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Watch from the start",
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                SecondaryButton("Watch ${channel.name} now", onClick = onWatch, modifier = Modifier.fillMaxWidth())
+            }
+
+            // Not on yet, or finished on a channel keeping nothing: the
+            // channel is still on something now.
+            else -> SecondaryButton(
+                "Watch ${channel.name} now",
+                onClick = onWatch,
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 }
