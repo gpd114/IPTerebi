@@ -528,6 +528,36 @@ What does come over, and is worth having: `WatchStore` and the player's
 resume. A film left half-watched on the box carries on where it stopped, the
 same as on the phone. The rows that would show it are the phone's; the
 position is the app's.
+## Over the video: one panel, not a row of buttons
+
+The button beside "open in another player" opens everything that can be
+changed while something plays — the picture's shape, a sleep timer, the audio
+track, the subtitles. One panel rather than a button each, because over a
+picture every control is something in the way of the thing being watched.
+
+- **Picture** — Fit, Fill, Stretch, mapped to Media3's `RESIZE_MODE_FIT`,
+  `ZOOM` and `FILL`. A line is not all one shape: a 4:3 channel is pillarboxed
+  on a 16:9 screen, and a panel that lies about a stream's aspect ratio is
+  common enough that every set-top box has this button. Choosing one does
+  *not* close the panel — the whole point is to see the difference, and
+  closing each time would mean opening it three times to compare three shapes.
+  Kept in plain preferences and applied in the view's factory as well as its
+  update, so a 4:3 channel does not show its bars for a moment on the way in.
+- **Sleep** — Off, and 15 to 90 minutes. Deliberately not stored and
+  deliberately not a service: a timer that survived the app being killed would
+  stop something hours later with no warning, which is the opposite of what it
+  is for. When it goes off the player is *stopped*, not paused — a paused
+  player keeps the line, and someone who has fallen asleep is not about to
+  free it — and the screen offers Play here, as it does after the
+  notification's Stop. It fires with the screen off too, because the effect
+  watching it is tied to the composition rather than to the lifecycle, and
+  that is the case it exists for.
+- **Audio** and **Subtitles** appear only when the stream carries a choice.
+  See `TrackChoice`: what is remembered is the language, not the track number.
+
+The panel's height is a share of the screen rather than a fixed figure.
+Anything is watched in landscape, where a phone is about 360dp tall, and a
+460dp panel ran off the bottom.
 
 ## Things that are true about a D-pad
 
