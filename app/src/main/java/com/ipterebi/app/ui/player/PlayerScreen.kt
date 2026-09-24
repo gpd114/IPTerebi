@@ -414,6 +414,10 @@ private fun PlayerContent(
             delay(1_000)
             if (!SleepTimer.hasFired(SystemClock.elapsedRealtime())) continue
             SleepTimer.cancel()
+            // The panel goes with it: the card that replaces the picture is
+            // the only thing worth reading now, and a panel still open over
+            // it is two answers to the same question.
+            tracksOpen = false
             saveProgress()
             if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} stopped by the sleep timer")
             player.stop()
