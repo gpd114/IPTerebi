@@ -86,3 +86,14 @@ ff -f lavfi -i "smptebars=size=640x360:rate=25:duration=120" \
     -metadata:s:a:0 language=eng -metadata:s:a:1 language=fra -metadata:s:s:0 language=eng \
     film_tracks.mkv
 rm -f subs.srt
+
+# A 4:3 channel, which is what the picture-shape setting exists for. On a
+# 16:9 screen this one sits in pillarbox bars under Fit, fills the screen
+# cropped under Fill, and fills it stretched under Stretch — and without it
+# there is nothing here that tells those three apart, because everything else
+# is 16:9 and so is every screen this runs on.
+echo "fourbythree.ts (10 min, 4:3)"
+ff -f lavfi -i "testsrc=size=640x480:rate=25:duration=600" \
+    -f lavfi -i "sine=frequency=550:duration=600" \
+    -c:v libx264 -preset ultrafast -crf 32 -pix_fmt yuv420p -g 50 -c:a aac -b:a 64k \
+    -f mpegts fourbythree.ts
