@@ -388,6 +388,45 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   the UI loads one category at a time and the player is navigated to with a
   stream id alone — never the list, which would end up in a Bundle.
 
+## The home screen
+
+The app opens on Home, and the bottom bar has four tabs: Home, Live TV, Films,
+Series. Home is one row per section — favourite channels (or recent ones,
+switched under Settings → Home), then the films and the episodes you are
+part-way through — and each heading opens that section's full list.
+
+**Everything on it is already on the device.** Favourites and recents are
+stored per line, what is on comes from the guide `xmltv.php` already left
+behind, and the positions are a local list. Opening the app therefore costs no
+request and the screen is full before the panel has answered anything. That is
+the reason there is no "recently added films" row: it would mean pulling the
+whole VOD list on every launch, which is several megabytes on a real line.
+
+Where you got to is `WatchStore`, its own DataStore beside the channel lists
+and keyed on the line the same way, holding the position with the name, the
+poster and the container extension. Those three are kept because the list a
+film came from is usually gone by the time someone taps the row — the player
+is navigated to with an id and looks the rest up in a list that, on a cold
+start straight to Home, was never loaded. `AppNav` publishes a one-item list
+built from the stored record before navigating, so the overlay has a title.
+
+The rules about what is worth keeping are `WatchProgress` in `core/`, tested:
+
+- **Under 30 seconds in is a mis-tap, not a film.** On a line where things fail
+  to play, the row would otherwise fill with things nobody watched.
+- **Finished means within the smaller of two minutes and a twentieth of the
+  length.** The flat two minutes came first and was wrong: the fake panel's
+  test film is 90 seconds long, so everything past 30 seconds counted as
+  finished and the row stayed empty through three runs on the emulator before
+  the rule was the suspect. Short episodes have the same problem in miniature.
+- The position is written every 15 seconds as well as on the way out, because
+  a process killed from the task switcher never reaches `onDispose`.
+
+One thing to know when testing this on the emulator: **playback there runs far
+behind the clock** — a minute of wall time was ten seconds of film — so
+watching something for a while will not pass the 30-second mark. Skip forward
+with the player's own button instead.
+
 ## Things that are true about a D-pad
 
 Every one of these was found by driving the app on an emulator with key events,

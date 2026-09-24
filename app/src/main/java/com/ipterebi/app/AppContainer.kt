@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.ipterebi.app.data.ChannelListStore
 import com.ipterebi.app.data.MediaRepository
+import com.ipterebi.app.data.WatchStore
 import com.ipterebi.app.data.CredentialStore
 import com.ipterebi.app.data.EpisodeListing
 import com.ipterebi.app.data.Guide
@@ -12,6 +13,9 @@ import com.ipterebi.core.Series
 import com.ipterebi.core.VodStream
 import com.ipterebi.core.XtreamClient
 import com.ipterebi.core.defaultXtreamHttpClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
@@ -40,6 +44,17 @@ class AppContainer(context: Context) {
 
     /** Keyed on the episode's own id, which is a string. See Episode.id. */
     val episodes = MediaRepository<String, EpisodeListing> { it.id }
+
+    /**
+     * For writes that must finish even though the screen that started them is
+     * going away — where you got to in a film, written as the player is torn
+     * down. A scope tied to a composition is cancelled at exactly that moment,
+     * which is the one time this must not be.
+     */
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** Where you got to in films and episodes you have not finished, per line. */
+    val watched = WatchStore(context.applicationContext)
 
     /** Starred and recently watched channels, per line. */
     val channelLists = ChannelListStore(context.applicationContext)

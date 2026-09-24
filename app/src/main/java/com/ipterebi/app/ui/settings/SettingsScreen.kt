@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.ipterebi.app.playback.ActivePlayback
+import com.ipterebi.app.ui.home.HomeChannels
 import com.ipterebi.app.ui.theme.Appearance
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.StreamFormat
@@ -94,6 +95,19 @@ fun SettingsScreen(
                 Hint(
                     "Dark has the TV guide's colours; Light is pale with a dark blue " +
                         "accent. The player is dark in both.",
+                )
+            }
+
+            Panel {
+                SectionTitle("Home")
+                ChoiceRow(
+                    options = HomeChannels.Source.entries.map { it to it.label },
+                    isSelected = { it == HomeChannels.source },
+                    onSelect = { source -> HomeChannels.set(context, source) },
+                )
+                Hint(
+                    "Which channels the home screen's Live TV row shows. Favourites " +
+                        "is the list you starred; Recent is where you have just been.",
                 )
             }
 
