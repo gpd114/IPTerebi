@@ -84,10 +84,18 @@ object Route {
     const val SETTINGS = "settings"
     const val GUIDE = "guide"
     const val PLAY_CHANNEL = "player/channel/{id}"
+    const val PLAY_CATCHUP = "player/catchup/{id}/{start}/{minutes}"
     const val PLAY_FILM = "player/film/{id}/{ext}"
     const val PLAY_EPISODE = "player/episode/{id}/{ext}"
 
     fun playChannel(id: Int) = "player/channel/$id"
+
+    /**
+     * A recording of a channel, addressed by when it was on: there is no id
+     * for a past programme, only the channel and the hour.
+     */
+    fun playCatchUp(channelId: Int, startSeconds: Long, minutes: Int) =
+        "player/catchup/$channelId/$startSeconds/$minutes"
 
     /**
      * The extension is encoded because it comes from the panel, and a route is a
@@ -328,6 +336,9 @@ fun AppNav(container: AppContainer) {
                                 GuideScreen(
                                     container = container,
                                     onChannel = { id -> nav.navigate(Route.playChannel(id)) },
+                                    onCatchUp = { id, start, minutes ->
+                                        nav.navigate(Route.playCatchUp(id, start, minutes))
+                                    },
                                     onBack = { nav.popBackStack() },
                                 )
                             }
@@ -349,6 +360,25 @@ fun AppNav(container: AppContainer) {
                                 PlayerScreen(
                                     container = container,
                                     playable = Playable.Channel(entry.arguments?.getInt("id") ?: 0),
+                                    onBack = { nav.popBackStack() },
+                                )
+                            }
+
+                            composable(
+                                route = Route.PLAY_CATCHUP,
+                                arguments = listOf(
+                                    navArgument("id") { type = NavType.IntType },
+                                    navArgument("start") { type = NavType.LongType },
+                                    navArgument("minutes") { type = NavType.IntType },
+                                ),
+                            ) { entry ->
+                                PlayerScreen(
+                                    container = container,
+                                    playable = Playable.CatchUp(
+                                        channelId = entry.arguments?.getInt("id") ?: 0,
+                                        startSeconds = entry.arguments?.getLong("start") ?: 0L,
+                                        minutes = entry.arguments?.getInt("minutes") ?: 0,
+                                    ),
                                     onBack = { nav.popBackStack() },
                                 )
                             }

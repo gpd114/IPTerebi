@@ -94,6 +94,8 @@ import androidx.compose.ui.draw.clip
 import com.ipterebi.core.playerMimeType
 import com.ipterebi.core.StreamReconnect
 import com.ipterebi.core.StreamFormat
+import com.ipterebi.core.catchUpStartLabel
+import com.ipterebi.core.lineKey
 import com.ipterebi.core.WatchKind
 import com.ipterebi.core.WatchedItem
 import com.ipterebi.core.displayTitle
@@ -169,11 +171,13 @@ private fun PlayerContent(
     // travels through navigation. Null after a process death, when that list is
     // gone — the overlay then shows no title rather than a wrong one.
     val channel = remember(playable) {
-        (playable as? Playable.Channel)?.let { container.channels.find(it.id) }
+        // A catch-up is a recording of a channel, and wears that channel's
+        // name and logo throughout.
+        playable.channelOrNull?.let { container.channels.find(it) }
     }
     val title = remember(playable) {
         when (playable) {
-            is Playable.Channel -> channel?.name
+            is Playable.Channel, is Playable.CatchUp -> channel?.name
             is Playable.Film -> container.films.find(playable.id)?.name
             is Playable.Episode -> container.episodes.find(playable.id)?.title
         }
@@ -182,7 +186,7 @@ private fun PlayerContent(
     // link; either way the notification simply goes without.
     val artwork = remember(playable) {
         when (playable) {
-            is Playable.Channel -> channel?.icon
+            is Playable.Channel, is Playable.CatchUp -> channel?.icon
             is Playable.Film -> container.films.find(playable.id)?.icon
             is Playable.Episode -> null
         }?.takeIf { it.isNotBlank() }
@@ -210,6 +214,14 @@ private fun PlayerContent(
 
     val url = remember(playable, account) {
         when (playable) {
+            // Addressed by when it was on, not by an id of its own.
+            is Playable.CatchUp -> container.xtream.catchUpUrl(
+                account = account,
+                streamId = playable.channelId,
+                startSeconds = playable.startSeconds,
+                minutes = playable.minutes,
+                shiftSeconds = container.guide.clock.shiftFor(account.lineKey),
+            )
             is Playable.Channel -> container.xtream.liveStreamUrl(account, playable.id)
             is Playable.Film -> container.xtream.vodStreamUrl(
                 account,
@@ -253,7 +265,7 @@ private fun PlayerContent(
             when (playable) {
                 // HLS is left to ExoPlayer: its segments are separate requests
                 // with nothing to range over, and it has never met a real line.
-                is Playable.Channel ->
+                is Playable.Channel, is Playable.CatchUp ->
                     if (account.format == StreamFormat.TS) setLoadErrorHandlingPolicy(StreamRetryPolicy(live = true))
                 is Playable.Film, is Playable.Episode ->
                     setLoadErrorHandlingPolicy(StreamRetryPolicy(live = false))
@@ -295,7 +307,7 @@ private fun PlayerContent(
                                 // always end in a usable extension, and guessing
                                 // wrong picks the wrong extractor and fails with
                                 // nothing useful in the log.
-                                is Playable.Channel -> when (account.format) {
+                                is Playable.Channel, is Playable.CatchUp -> when (account.format) {
                                     StreamFormat.HLS -> MimeTypes.APPLICATION_M3U8
                                     StreamFormat.TS -> MimeTypes.VIDEO_MP2T
                                 }
@@ -315,6 +327,7 @@ private fun PlayerContent(
                                 .setArtist(
                                     when (playable) {
                                         is Playable.Channel -> "Live TV"
+                                        is Playable.CatchUp -> "Catch-up"
                                         is Playable.Film -> "Film"
                                         is Playable.Episode -> "Series"
                                     }
@@ -369,7 +382,7 @@ private fun PlayerContent(
                 durationMs = length,
                 watchedAt = System.currentTimeMillis(),
             )
-            is Playable.Channel -> return@save
+            is Playable.Channel, is Playable.CatchUp -> return@save
         }
         if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} noting ${position / 1000} s of ${length / 1000} s")
         container.scope.launch { container.watched.record(account, item) }
@@ -389,12 +402,12 @@ private fun PlayerContent(
         val kind = when (playable) {
             is Playable.Film -> WatchKind.FILM
             is Playable.Episode -> WatchKind.EPISODE
-            is Playable.Channel -> return@LaunchedEffect
+            is Playable.Channel, is Playable.CatchUp -> return@LaunchedEffect
         }
         val id = when (playable) {
             is Playable.Film -> playable.id.toString()
             is Playable.Episode -> playable.id
-            is Playable.Channel -> return@LaunchedEffect
+            is Playable.Channel, is Playable.CatchUp -> return@LaunchedEffect
         }
         container.watched.resumeAt(account, kind, id).takeIf { it > 0 }?.let { at ->
             if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} resuming at ${at / 1000} s")
@@ -434,6 +447,9 @@ private fun PlayerContent(
                 when (playable) {
                     is Playable.Channel ->
                         "open channel ${playable.id} as ${account.format.label}, ua=${account.userAgent}"
+                    is Playable.CatchUp ->
+                        "open catch-up on channel ${playable.channelId}, ${playable.minutes} min, " +
+                            "as ${account.format.label}, ua=${account.userAgent}"
                     is Playable.Film ->
                         "open film ${playable.id} as .${playable.extension}, ua=${account.userAgent}"
                     is Playable.Episode ->
@@ -448,6 +464,15 @@ private fun PlayerContent(
                 when (playable) {
                     is Playable.Channel ->
                         "  ${account.base}/live/***/***/${playable.id}.${account.format.extension}"
+                    is Playable.CatchUp ->
+                        // The time is in the path, and it is the thing worth
+                        // seeing: a catch-up that plays the wrong hour is a
+                        // wrong clock, and this is where that shows.
+                        "  ${account.base}/timeshift/***/***/${playable.minutes}/" +
+                            catchUpStartLabel(
+                                playable.startSeconds,
+                                container.guide.clock.shiftFor(account.lineKey),
+                            ) + "/${playable.channelId}.${account.format.extension}"
                     is Playable.Film ->
                         "  ${account.base}/movie/***/***/${playable.id}.${playable.extension}"
                     is Playable.Episode ->
@@ -550,7 +575,9 @@ private fun PlayerContent(
             override fun onPlayerError(e: PlaybackException) {
                 val message = when (val cause = e.cause) {
                     is HttpDataSource.InvalidResponseCodeException -> when (playable) {
-                        is Playable.Channel -> describeStreamHttpError(cause.responseCode)
+                        // A catch-up is refused the same way and for the same
+                        // reasons as a channel — the connection limit above all.
+                        is Playable.Channel, is Playable.CatchUp -> describeStreamHttpError(cause.responseCode)
                         is Playable.Film -> describeFilmHttpError(cause.responseCode)
                         is Playable.Episode -> describeEpisodeHttpError(cause.responseCode)
                     }
@@ -672,7 +699,7 @@ private fun PlayerContent(
                         // has usually slid out of the live window while the app
                         // was away. Stopped first, because a channel paused from
                         // the lock screen is still prepared, minutes behind.
-                        is Playable.Channel -> {
+                        is Playable.Channel, is Playable.CatchUp -> {
                             // A fresh start: whatever went wrong while away —
                             // reconnecting given up on, say — is not current.
                             error = null
@@ -738,7 +765,7 @@ private fun PlayerContent(
             url = url,
             mimeType = playerMimeType(
                 when (playable) {
-                    is Playable.Channel -> account.format.extension
+                    is Playable.Channel, is Playable.CatchUp -> account.format.extension
                     is Playable.Film -> playable.extension
                     is Playable.Episode -> playable.extension
                 }
@@ -979,7 +1006,7 @@ private fun PlayerContent(
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = when (playable) {
-                        is Playable.Channel -> "Back to channels"
+                        is Playable.Channel, is Playable.CatchUp -> "Back to channels"
                         is Playable.Film -> "Back to films"
                         is Playable.Episode -> "Back to episodes"
                     },
@@ -1191,6 +1218,7 @@ private fun OverVideoPanel(modifier: Modifier = Modifier, content: @Composable C
 
 private fun Playable.logName(): String = when (this) {
     is Playable.Channel -> "channel $id"
+    is Playable.CatchUp -> "catch-up on channel $channelId"
     is Playable.Film -> "film $id"
     is Playable.Episode -> "episode $id"
 }
@@ -1206,7 +1234,7 @@ private fun playbackStateName(state: Int, playable: Playable): String = when (st
     Player.STATE_BUFFERING -> "buffering"
     Player.STATE_READY -> "ready"
     Player.STATE_ENDED -> when (playable) {
-        is Playable.Channel -> "ended (source closed the connection)"
+        is Playable.Channel, is Playable.CatchUp -> "ended (source closed the connection)"
         is Playable.Film, is Playable.Episode -> "ended"
     }
     else -> "state $state"
