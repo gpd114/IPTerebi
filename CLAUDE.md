@@ -235,6 +235,20 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   still works: Android lets a media key start a foreground service from the
   background, and the session's `LivePlayer` rejoins at the live edge.
 
+  **Stopping that service is a race, and losing it kills the app.** Media3
+  promotes it by calling `startForegroundService` and then posting the
+  notification that calls `startForeground`; Android gives it five seconds to
+  make the second call and kills the process if it does not come. `Attachment.
+  hide()` used to `stopSelf()` the moment the last session was handed back, and
+  a stop that landed between those two destroyed the service before the
+  notification was posted — `RemoteServiceException: Context.
+  startForegroundService() did not then call Service.startForeground()`, seen
+  once on the box on 20 September at 20:47 and never reproduced in twenty
+  attempts of starting and leaving playback on that same box. The stop is now
+  posted to the main thread instead, so anything Media3 has already queued runs
+  first, and the sessions are re-checked on the way through — switching channel
+  attaches a new one in exactly that gap.
+
   Moving to another device — the phone to a TV — is the case the one
   connection makes awkward, so there are two ways to let go on purpose: Stop in
   the media notification (a session custom command) and "Free the line" in
