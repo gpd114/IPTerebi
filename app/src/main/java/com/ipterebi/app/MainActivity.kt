@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.core.view.WindowCompat
 import com.ipterebi.app.ui.AppNav
 import com.ipterebi.app.ui.home.HomeChannels
+import com.ipterebi.app.ui.player.Picture
 import com.ipterebi.app.ui.theme.Appearance
 import com.ipterebi.app.ui.theme.IPTerebiTheme
 import com.ipterebi.app.ui.theme.Night
@@ -26,6 +27,7 @@ class MainActivity : ComponentActivity() {
         Appearance.load(this)
         // Both read before the first frame: see Appearance, and HomeChannels.
         HomeChannels.load(this)
+        Picture.load(this)
         setContent {
             IPTerebiTheme {
                 SystemBarsFollowTheme()
