@@ -92,6 +92,9 @@ public class FakePanel {
                     streamDropping(ex, file.substring(0, 3));
                 } else if (file.startsWith("106.")) {
                     streamAfterHandover(ex);
+                } else if (file.startsWith("108.")) {
+                    // 4:3, for the picture-shape setting to be judged against.
+                    streamLive(ex, "fourbythree.ts");
                 } else if (file.startsWith("107.")) {
                     // Two audio tracks, English and Italian, named in the PMT.
                     streamLive(ex, "multitrack.ts");
@@ -200,6 +203,7 @@ public class FakePanel {
                     "{\"num\":7,\"name\":\"Drops, then off air\",\"stream_id\":105,\"category_id\":\"1\"}," +
                     "{\"num\":8,\"name\":\"Line busy for 15 s\",\"stream_id\":106,\"category_id\":\"1\"}," +
                     "{\"num\":9,\"name\":\"Two audio tracks\",\"stream_id\":107,\"category_id\":\"1\"}," +
+                    "{\"num\":10,\"name\":\"Old 4:3 channel\",\"stream_id\":108,\"category_id\":\"1\"}," +
                     "{\"num\":4,\"name\":\"No stream id A\",\"category_id\":\"1\"}," +
                     "{\"num\":5,\"name\":\"No stream id B\",\"category_id\":\"1\"}";
                 String sport = "{\"num\":\"1\",\"name\":\"Sport One\",\"stream_id\":\"201\",\"category_id\":\"2\",\"stream_icon\":null,\"epg_channel_id\":\"sport.test\"}";
