@@ -161,7 +161,10 @@ class TvLiveViewModel(private val container: AppContainer, context: Context) : V
                 // The full guide, in the background, for the channels just
                 // loaded — whatever the network: a television on the mains is
                 // what a guide grid is for, and it has nowhere else to get one.
-                container.guide.refreshIfStale(account, lineup.all.map { it.epgChannelId }, onMetered = true)
+                // The channels themselves, not just their guide ids: the
+                // refresh needs to know which of them keep a recording, to
+                // decide whose past is worth holding on to.
+                container.guide.refreshIfStale(account, lineup.all, onMetered = true)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
