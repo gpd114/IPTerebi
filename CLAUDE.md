@@ -355,7 +355,7 @@ is at fault — a panel that does not list `m3u8` will not serve it.
 - **The full guide is `xmltv.php`, and it is the one to trust.** It is the
   whole schedule for every channel the provider has, as XMLTV, with each time's
   offset stated. On the first real line it was 76 MB, 228,709 programmes across
-  8,350 channels — 1,569 of them the line's — about four days ahead, and it
+  8,350 channels — 1,569 of them the line's — and it
   covered channels `get_short_epg` answered nothing for. It took a phone 13 s
   and the TV box 52 s. So it is fetched in the background, at most every twelve
   hours (on the phone only off metered networks), streamed through `readXmltv`
@@ -370,6 +370,23 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   time with a fling, like any list; the grid's time rules are `GuideGrid` in
   `core/`. Until the phone has the full guide it says so, and offers to fetch
   it now over mobile data.
+
+  **How far it reaches is a property of the provider, and it moves.** The same
+  line measured 228,709 programmes in September and 211,689 a few days later;
+  the first reading here said "about four days ahead", and a later one, printed
+  by the refresh itself, said **from 24 hours ago to 41 hours ahead**. So do not
+  rely on a figure in this file — the log line says what today's download
+  actually covered, and that is the number that matters.
+
+  It matters because of catch-up: that line keeps **seven days** of recordings
+  and publishes **one day** of past guide, so six of those days have nothing to
+  point at. `GuideStore.commit` therefore carries the past forward instead of
+  dropping it — the programmes falling before the new download's earliest entry
+  are moved into the new generation rather than deleted, for the channels that
+  keep a recording, up to `RETAIN_PAST_SECONDS`. The guide's past then grows a
+  day at a time until it matches the archive. Only for those channels, because
+  keeping it for the whole line would be a day of extra programmes per refresh,
+  most of them for channels that can play none of it back.
 - **A missing guide is the normal case, not an error.** Lines carry no EPG,
   channels are missing from guides that exist, and some forks answer `false`.
   All of it arrives as an empty list.

@@ -2,6 +2,7 @@ package com.ipterebi.app.data
 
 import android.content.Context
 import android.net.ConnectivityManager
+import com.ipterebi.core.LiveStream
 import com.ipterebi.core.EpgListing
 import com.ipterebi.core.GuideClock
 import com.ipterebi.core.XmltvProgramme
@@ -51,10 +52,11 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
      * hours old — never two at once, not again for six hours after a failure,
      * and not on a metered network unless [onMetered]: it is tens of megabytes.
      *
-     * [channels] are the line's `epg_channel_id`s, to keep only those; when not
+     * [channels] are the line's channels, to keep only their guide entries —
+     * and to know which of them keep a recording. When not
      * given, the channel list is fetched to find them.
      */
-    fun refreshIfStale(account: XtreamAccount, channels: Collection<String>? = null, onMetered: Boolean = false) =
+    fun refreshIfStale(account: XtreamAccount, channels: Collection<LiveStream>? = null, onMetered: Boolean = false) =
         refresh(account, channels, onMetered, asked = false)
 
     /**
@@ -68,7 +70,7 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
     /** A refresh is under way, for a screen that offered one. */
     val downloading: StateFlow<Boolean> = _downloading.asStateFlow()
 
-    private fun refresh(account: XtreamAccount, channels: Collection<String>?, onMetered: Boolean, asked: Boolean) {
+    private fun refresh(account: XtreamAccount, channels: Collection<LiveStream>?, onMetered: Boolean, asked: Boolean) {
         scope.launch {
             val line = account.lineKey
             val now = System.currentTimeMillis()
@@ -81,14 +83,42 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
             if (!refreshing.compareAndSet(false, true)) return@launch
             _downloading.value = true
             try {
-                val wanted = (channels ?: xtream.liveStreams(account).map { it.epgChannelId })
+                // The line's channels, for two questions: which guide entries
+                // to keep at all, and which of those keep a recording — the
+                // past is only worth holding on to for channels that can play
+                // it back. See GuideStore.commit.
+                val streams = channels ?: xtream.liveStreams(account)
+                val wanted = streams.map { it.epgChannelId }.filter { it.isNotBlank() }.toHashSet()
+                val withArchive = streams
+                    .filter { it.hasCatchUp }
+                    .map { it.epgChannelId }
                     .filter { it.isNotBlank() }
                     .toHashSet()
                 val writer = store.writer(line)
-                xtream.xmltv(account) { if (it.channel in wanted) writer.add(it) }
-                writer.commit(System.currentTimeMillis())
+                // How far the guide reaches either way, which nothing else
+                // reports and which decides what catch-up can offer: a
+                // provider keeping seven days of recordings is no use if its
+                // guide starts at this morning, because there is then nothing
+                // to point at. Measured rather than assumed.
+                var earliest = Long.MAX_VALUE
+                var latest = Long.MIN_VALUE
+                xtream.xmltv(account) {
+                    if (it.channel in wanted) {
+                        writer.add(it)
+                        if (it.start < earliest) earliest = it.start
+                        if (it.stop > latest) latest = it.stop
+                    }
+                }
+                val fetchedAt = System.currentTimeMillis()
+                writer.commit(fetchedAt, keepPastFor = withArchive)
                 failedAt.remove(line)
-                log("  guide kept: ${writer.written} programmes for ${wanted.size} channels")
+                log(
+                    "  guide kept: ${writer.written} programmes for ${wanted.size} channels" +
+                        if (writer.written > 0) {
+                            val nowSeconds = fetchedAt / 1000
+                            ", from ${hoursFrom(nowSeconds, earliest)} to ${hoursFrom(nowSeconds, latest)}"
+                        } else ""
+                )
                 _version.value++
             } catch (e: CancellationException) {
                 throw e
@@ -160,5 +190,22 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
     private companion object {
         const val STALE_AFTER_MS = 12 * 60 * 60 * 1000L
         const val RETRY_AFTER_MS = 6 * 60 * 60 * 1000L
+    }
+}
+
+/**
+ * "6 h ago", "in 4 days" — how far a moment is from now, for the guide's own
+ * log. Rough on purpose: the question it answers is "does this guide have a
+ * past worth catching up on", not "when exactly".
+ */
+private fun hoursFrom(nowSeconds: Long, seconds: Long): String {
+    val delta = seconds - nowSeconds
+    val hours = delta / 3600
+    return when {
+        hours in -1..1 -> "now"
+        hours < -48 -> "${-hours / 24} days ago"
+        hours < 0 -> "${-hours} h ago"
+        hours > 48 -> "in ${hours / 24} days"
+        else -> "in $hours h"
     }
 }

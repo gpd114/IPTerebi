@@ -314,6 +314,9 @@ public class FakePanel {
      * get wrong: an entity, CDATA, a second title in another language, and a
      * programme whose times cannot be read.
      */
+    /** Whether the guide includes what has already been on; see the README. */
+    static final boolean SHOW_PAST = !"narrow".equals(System.getenv("FAKE_GUIDE"));
+
     static String xmltv() {
         long now = Instant.now().getEpochSecond();
         long start = now - 20 * 60, mid = now + 40 * 60, end = mid + 30 * 60;
@@ -336,10 +339,10 @@ public class FakePanel {
             "<desc>The day&apos;s headlines.</desc></programme>\n" +
             "<programme start=\"" + t.apply(mid) + "\" stop=\"" + t.apply(end) + "\" channel=\"news.test\">" +
             "<title>Weather Tonight</title><desc><![CDATA[Rain, probably.]]></desc></programme>\n" +
-            "<programme start=\"" + t.apply(earlierStart) + "\" stop=\"" + t.apply(earlierEnd) + "\" channel=\"news.test\">" +
+            "" + (SHOW_PAST ? "<programme start=\"" + t.apply(earlierStart) + "\" stop=\"" + t.apply(earlierEnd) + "\" channel=\"news.test\">" +
             "<title>The Lunchtime Film</title><desc>Been on already, and still kept.</desc></programme>\n" +
             "<programme start=\"" + t.apply(ancientStart) + "\" stop=\"" + t.apply(ancientEnd) + "\" channel=\"news.test\">" +
-            "<title>Last Week&apos;s News</title><desc>Older than the archive window.</desc></programme>\n" +
+            "<title>Last Week&apos;s News</title><desc>Older than the archive window.</desc></programme>\n" : "") +
             "<programme start=\"" + t.apply(now - 3600) + "\" stop=\"" + t.apply(now + 3600) + "\" channel=\"sport.test\">" +
             "<title>Live: Rovers &amp; United</title></programme>\n" +
             "<programme start=\"" + t.apply(now + 3600) + "\" stop=\"" + t.apply(now + 7200) + "\" channel=\"sport.test\">" +
