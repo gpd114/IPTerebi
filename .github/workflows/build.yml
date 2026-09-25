@@ -2,6 +2,9 @@ name: Build APK
 
 on:
   push:
+    # The TV branch is built too. It shares core/ and most of app/ with main
+    # and has its own screens on top, so it can be broken by a change that
+    # leaves main perfectly green — which has happened twice.
     branches: [ main, tv ]
   pull_request:
   workflow_dispatch:
@@ -46,3 +49,66 @@ jobs:
         with:
           name: ipterebi-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+  # What this change does to the TV branch, before it lands rather than after.
+  #
+  # main and tv share core/ and nearly all of app/, and tv adds its own screens
+  # that main knows nothing about. So a change can be green here and break the
+  # box: it happened when `refreshIfStale` started taking channels instead of
+  # their guide ids — the phone's caller passes nothing and picks them up
+  # inside, so main never noticed, and the TV's caller, which passes ids, only
+  # failed when it was built by hand afterwards.
+  tv:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      # The whole history, because this job merges branches.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge this change into the TV branch
+        run: |
+          git config user.name "ci"
+          git config user.email "ci@example.invalid"
+          git fetch origin tv:tv
+          # The change as it will be on main — for a pull request that is the
+          # merge commit this job was given — put on top of tv.
+          merged="$GITHUB_SHA"
+          git checkout tv
+          if git merge --no-edit "$merged"; then
+            exit 0
+          fi
+          conflicts=$(git diff --name-only --diff-filter=U)
+          echo "Conflicts:"; echo "$conflicts"
+          # Only what gets compiled can break the build, and only that is worth
+          # stopping a pull request over. Conflicts elsewhere are routine and
+          # expected: both branches add their own test channels to the same
+          # lines of the fake panel, both keep their own notes in CLAUDE.md,
+          # and tv has had its own name in this workflow's push list since it
+          # was created. Those are taken the TV branch's way so the build can
+          # go ahead and say something useful.
+          if echo "$conflicts" | grep -qE '^(app|core)/'; then
+            echo "::error::This change conflicts with the TV branch in code that is built. Merge it by hand before landing."
+            exit 1
+          fi
+          echo "::warning::Conflicts outside app/ and core/; taking the TV branch's side so the rest can be built."
+          echo "$conflicts" | xargs -r git checkout --ours --
+          echo "$conflicts" | xargs -r git add --
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build the TV app with this change in it
+        run: gradle assembleDebug --no-daemon
