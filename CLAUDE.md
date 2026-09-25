@@ -114,6 +114,23 @@ Versions move together: Kotlin, the Compose compiler plugin and the
 serialization plugin are all 2.1.21 and must stay equal, because the Compose
 compiler plugin is versioned with Kotlin rather than with Compose.
 
+
+**CI builds both branches, and tries every change against the TV one.** A
+change can be green on main and break the box: they share `core/` and nearly
+all of `app/`, and `tv` adds screens main knows nothing about. That happened
+when `refreshIfStale` began taking channels instead of their guide ids — the
+phone's caller passes nothing and picks them up inside, so main never noticed,
+and the TV's caller only failed when it was built by hand afterwards. So on
+every pull request a second job merges the change into `tv` and builds that
+too. Only a conflict in `app/` or `core/` fails it, because only those are
+built: conflicts elsewhere are routine and expected — both branches add their
+own test channels to the same lines of the fake panel, both keep their own
+notes in this file, and `tv` has had its own name in that workflow's push list
+since it was created. Those are taken the TV branch's way and the build goes
+ahead. That rule was learnt immediately: the first version failed on any
+conflict outside `tools/`, and the pull request that introduced it failed on
+its own workflow file.
+
 ## Debugging on device
 
 Debug builds log under two tags, both wrapped in `BuildConfig.DEBUG` and free in
