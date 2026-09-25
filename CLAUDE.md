@@ -530,6 +530,21 @@ behind the clock** — a minute of wall time was ten seconds of film — so
 watching something for a while will not pass the 30-second mark. Skip forward
 with the player's own button instead.
 
+**The groups panel can fail to take focus, and that used to kill the remote.**
+It asks for focus one frame after scrolling its list to the group you are in.
+On the fake panel's handful of groups that always worked; on a real line, with
+hundreds of groups and a slow box, the item often was not composed yet,
+`requestFocus` threw into a `runCatching` that swallowed it, and nothing held
+focus at all. The grid had already stopped taking keys — `if (groupsOpen)
+return false` — so **every key after that went nowhere**, and the only way out
+was to close the guide and open it again. It looked for all the world like
+Left was ignored.
+
+It now tries for ten frames and, if focus still will not land, closes the
+panel rather than stranding the remote; the grid takes focus back when it
+goes. Found by driving the box against a real line — twenty-odd channels of
+the fake panel could never have shown it.
+
 ### The options panel on a remote
 
 Hold **OK**, or press **Menu** on a remote that has one, for the phone's

@@ -358,13 +358,30 @@ private fun GroupsPanel(
     val shownIndex = groups.indexOf(shown).coerceAtLeast(0)
     val list = rememberLazyListState(initialFirstVisibleItemIndex = (shownIndex - 4).coerceAtLeast(0))
 
+    /**
+     * Puts the remote on the group you are in.
+     *
+     * Tried over several frames rather than once, and the panel gives up and
+     * closes if it never lands. One attempt a frame after scrolling was enough
+     * on the fake panel's handful of groups and not enough on a real line:
+     * on the box, with hundreds of groups, the item at [shownIndex] was often
+     * not composed yet, requestFocus threw into a runCatching that swallowed
+     * it, and *nothing* held focus. The grid had already stopped taking keys
+     * because the panel was open, so the remote went dead until the guide was
+     * closed and opened again — which is what a real line actually did.
+     */
     fun focusGroups() {
         scope.launch {
             if (list.layoutInfo.visibleItemsInfo.none { it.index == shownIndex }) {
                 list.scrollToItem((shownIndex - 4).coerceAtLeast(0))
             }
-            withFrameNanos { }
-            runCatching { groupEntry.requestFocus() }
+            repeat(FOCUS_TRIES) {
+                withFrameNanos { }
+                if (runCatching { groupEntry.requestFocus() }.isSuccess) return@launch
+            }
+            // Nothing took it. Better to close than to strand the remote:
+            // the guide takes focus back when the panel goes.
+            onChoose()
         }
     }
     LaunchedEffect(Unit) { focusGroups() }
@@ -503,6 +520,13 @@ private fun LineupStatus(state: TvLiveState, onRetry: () -> Unit) {
         }
     }
 }
+
+/**
+ * How many frames the groups panel will wait for its list to compose before
+ * giving up on focus. Ten is about a sixth of a second on the box, which is
+ * long enough for a list of hundreds and short enough not to be seen.
+ */
+private const val FOCUS_TRIES = 10
 
 private val Select = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
 private val Arrows = setOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight, Key.ChannelUp, Key.ChannelDown)
