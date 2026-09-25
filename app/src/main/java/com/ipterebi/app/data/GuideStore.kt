@@ -94,8 +94,28 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
             batch.clear()
         }
 
-        /** Puts this generation in use and drops every other one for the line. */
-        fun commit(fetchedAt: Long) {
+        /**
+         * Puts this generation in use and drops the rest — except the past
+         * worth keeping.
+         *
+         * A provider's guide is shallower than its archive. This one keeps
+         * seven days of recordings and publishes a guide reaching 24 hours
+         * back, so six of those days have nothing to point at: catch-up can
+         * only offer a programme the guide knows about. Each refresh used to
+         * throw away everything the last one had, so the past never got any
+         * deeper than one download.
+         *
+         * Now the rows that fall before the new download's earliest programme
+         * are carried into this generation instead of deleted, and the guide's
+         * past grows a day at a time until it matches the archive.
+         *
+         * [keepPastFor] is why this does not simply keep everything: on a real
+         * line that would be a day of extra programmes for every channel every
+         * refresh, most of them for channels that cannot play any of it back.
+         * It is the channels that keep a recording — 365 of 1,566 on the line
+         * this was measured against, so about a fifth of the cost.
+         */
+        fun commit(fetchedAt: Long, keepPastFor: Set<String> = emptySet(), retainSeconds: Long = RETAIN_PAST_SECONDS) {
             flush()
             val db = writableDatabase
             db.beginTransaction()
@@ -110,10 +130,41 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
                     },
                     SQLiteDatabase.CONFLICT_REPLACE,
                 )
+                carryPastForward(db, keepPastFor, fetchedAt / 1000 - retainSeconds)
                 db.delete("programme", "line = ? AND gen != ?", arrayOf(line, gen.toString()))
                 db.setTransactionSuccessful()
             } finally {
                 db.endTransaction()
+            }
+        }
+
+        /**
+         * Moves the programmes this download does not cover into it, for the
+         * channels that can play them back, as far back as [oldest].
+         *
+         * Bounded by the new download's own earliest programme rather than by
+         * "now", so nothing is kept twice: what the download covers, it owns.
+         */
+        private fun carryPastForward(db: SQLiteDatabase, channels: Set<String>, oldest: Long) {
+            if (channels.isEmpty()) return
+            val earliest = db.rawQuery(
+                "SELECT MIN(start) FROM programme WHERE line = ? AND gen = ?",
+                arrayOf(line, gen.toString()),
+            ).use { if (it.moveToFirst() && !it.isNull(0)) it.getLong(0) else return }
+
+            // In chunks: SQLite takes 999 bound variables at a time, and a big
+            // line has hundreds of channels with an archive.
+            channels.chunked(400).forEach { some ->
+                val places = some.joinToString(",") { "?" }
+                db.execSQL(
+                    "UPDATE programme SET gen = ? WHERE line = ? AND gen != ? " +
+                        "AND stop <= ? AND stop > ? AND channel IN ($places)",
+                    // Built rather than concatenated: an array plus a
+                    // collection is one of Kotlin's ambiguous overloads.
+                    buildList<Any> {
+                        add(gen); add(line); add(gen); add(earliest); add(oldest); addAll(some)
+                    }.toTypedArray(),
+                )
             }
         }
     }
@@ -163,6 +214,17 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
 
     private companion object {
         const val BATCH = 2_000
+
+        /**
+         * How much of the past to keep for a channel with an archive.
+         *
+         * Eight days, a day more than the longest archive seen on a real line
+         * (seven), so the guide always reaches at least as far back as the
+         * recording does. Kept for those channels only: for the whole line it
+         * would be roughly a day of extra programmes per refresh, most of them
+         * for channels that cannot play any of it back.
+         */
+        const val RETAIN_PAST_SECONDS = 8L * 24 * 60 * 60
         const val MAX_DESCRIPTION = 400
     }
 }

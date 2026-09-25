@@ -2,6 +2,7 @@ package com.ipterebi.app.data
 
 import android.content.Context
 import android.net.ConnectivityManager
+import com.ipterebi.core.LiveStream
 import com.ipterebi.core.EpgListing
 import com.ipterebi.core.GuideClock
 import com.ipterebi.core.XmltvProgramme
@@ -51,10 +52,11 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
      * hours old — never two at once, not again for six hours after a failure,
      * and not on a metered network unless [onMetered]: it is tens of megabytes.
      *
-     * [channels] are the line's `epg_channel_id`s, to keep only those; when not
+     * [channels] are the line's channels, to keep only their guide entries —
+     * and to know which of them keep a recording. When not
      * given, the channel list is fetched to find them.
      */
-    fun refreshIfStale(account: XtreamAccount, channels: Collection<String>? = null, onMetered: Boolean = false) =
+    fun refreshIfStale(account: XtreamAccount, channels: Collection<LiveStream>? = null, onMetered: Boolean = false) =
         refresh(account, channels, onMetered, asked = false)
 
     /**
@@ -68,7 +70,7 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
     /** A refresh is under way, for a screen that offered one. */
     val downloading: StateFlow<Boolean> = _downloading.asStateFlow()
 
-    private fun refresh(account: XtreamAccount, channels: Collection<String>?, onMetered: Boolean, asked: Boolean) {
+    private fun refresh(account: XtreamAccount, channels: Collection<LiveStream>?, onMetered: Boolean, asked: Boolean) {
         scope.launch {
             val line = account.lineKey
             val now = System.currentTimeMillis()
@@ -81,7 +83,15 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
             if (!refreshing.compareAndSet(false, true)) return@launch
             _downloading.value = true
             try {
-                val wanted = (channels ?: xtream.liveStreams(account).map { it.epgChannelId })
+                // The line's channels, for two questions: which guide entries
+                // to keep at all, and which of those keep a recording — the
+                // past is only worth holding on to for channels that can play
+                // it back. See GuideStore.commit.
+                val streams = channels ?: xtream.liveStreams(account)
+                val wanted = streams.map { it.epgChannelId }.filter { it.isNotBlank() }.toHashSet()
+                val withArchive = streams
+                    .filter { it.hasCatchUp }
+                    .map { it.epgChannelId }
                     .filter { it.isNotBlank() }
                     .toHashSet()
                 val writer = store.writer(line)
@@ -100,7 +110,7 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
                     }
                 }
                 val fetchedAt = System.currentTimeMillis()
-                writer.commit(fetchedAt)
+                writer.commit(fetchedAt, keepPastFor = withArchive)
                 failedAt.remove(line)
                 log(
                     "  guide kept: ${writer.written} programmes for ${wanted.size} channels" +
