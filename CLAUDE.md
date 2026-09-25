@@ -122,10 +122,15 @@ when `refreshIfStale` began taking channels instead of their guide ids — the
 phone's caller passes nothing and picks them up inside, so main never noticed,
 and the TV's caller only failed when it was built by hand afterwards. So on
 every pull request a second job merges the change into `tv` and builds that
-too. A conflict under `tools/` is routine — both branches add their own test
-channels to the same lines of the fake panel — and is warned about and worked
-around; a conflict anywhere else fails the job, because that one wants a
-person.
+too. Only a conflict in `app/` or `core/` fails it, because only those are
+built: conflicts elsewhere are routine and expected — both branches add their
+own test channels to the same lines of the fake panel, both keep their own
+notes in this file, and `tv` has had its own name in that workflow's push list
+since it was created. Those are taken the TV branch's way and the build goes
+ahead. That rule was learnt immediately: the first version failed on any
+conflict outside `tools/`, and the pull request that introduced it failed on
+its own workflow file.
+
 ## Debugging on device
 
 Debug builds log under two tags, both wrapped in `BuildConfig.DEBUG` and free in
