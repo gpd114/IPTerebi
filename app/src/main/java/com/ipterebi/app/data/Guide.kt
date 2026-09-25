@@ -85,10 +85,30 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
                     .filter { it.isNotBlank() }
                     .toHashSet()
                 val writer = store.writer(line)
-                xtream.xmltv(account) { if (it.channel in wanted) writer.add(it) }
-                writer.commit(System.currentTimeMillis())
+                // How far the guide reaches either way, which nothing else
+                // reports and which decides what catch-up can offer: a
+                // provider keeping seven days of recordings is no use if its
+                // guide starts at this morning, because there is then nothing
+                // to point at. Measured rather than assumed.
+                var earliest = Long.MAX_VALUE
+                var latest = Long.MIN_VALUE
+                xtream.xmltv(account) {
+                    if (it.channel in wanted) {
+                        writer.add(it)
+                        if (it.start < earliest) earliest = it.start
+                        if (it.stop > latest) latest = it.stop
+                    }
+                }
+                val fetchedAt = System.currentTimeMillis()
+                writer.commit(fetchedAt)
                 failedAt.remove(line)
-                log("  guide kept: ${writer.written} programmes for ${wanted.size} channels")
+                log(
+                    "  guide kept: ${writer.written} programmes for ${wanted.size} channels" +
+                        if (writer.written > 0) {
+                            val nowSeconds = fetchedAt / 1000
+                            ", from ${hoursFrom(nowSeconds, earliest)} to ${hoursFrom(nowSeconds, latest)}"
+                        } else ""
+                )
                 _version.value++
             } catch (e: CancellationException) {
                 throw e
@@ -160,5 +180,22 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
     private companion object {
         const val STALE_AFTER_MS = 12 * 60 * 60 * 1000L
         const val RETRY_AFTER_MS = 6 * 60 * 60 * 1000L
+    }
+}
+
+/**
+ * "6 h ago", "in 4 days" — how far a moment is from now, for the guide's own
+ * log. Rough on purpose: the question it answers is "does this guide have a
+ * past worth catching up on", not "when exactly".
+ */
+private fun hoursFrom(nowSeconds: Long, seconds: Long): String {
+    val delta = seconds - nowSeconds
+    val hours = delta / 3600
+    return when {
+        hours in -1..1 -> "now"
+        hours < -48 -> "${-hours / 24} days ago"
+        hours < 0 -> "${-hours} h ago"
+        hours > 48 -> "in ${hours / 24} days"
+        else -> "in $hours h"
     }
 }
