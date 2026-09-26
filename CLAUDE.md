@@ -660,7 +660,9 @@ three days — a programme picked out of the night before, and
 time in that path is the point: the guide had the programme at 01:25 UTC, the
 panel is two hours ahead of UTC, and 03:25 is what it was therefore asked for.
 That is `GuideClock`'s learned shift being undone, and it is the one part of
-catch-up that fails silently rather than loudly.
+catch-up that fails silently rather than loudly — so it was checked the only
+way it can be: the viewer confirmed that what played was the programme they
+had tapped, not the one an hour either side of it.
 
 That is one provider. The next one will differ, and
 the surprises will be in what it returns.
