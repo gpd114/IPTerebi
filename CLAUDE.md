@@ -599,18 +599,35 @@ is read from the key event's repeat count, and `okHeld` carries the fact
 between the repeat and the release, so the release that ends a hold does not
 also open the channel list.
 
-### The home screen is the phone's, not the box's
+### The box opens on Home too — but a remote cannot yet reach its rows
 
-The TV build keeps `TvLiveScreen` as its home — the channel list with its
-guide, which is what the owner asked for and is why there is no separate
-guide section here. The phone's Home screen, its four-tab bar and the house
-icon are therefore *not* merged into this branch: `AppNav.kt` is resolved in
-favour of this side every time main brings them across.
+The TV build used to open on `TvLiveScreen`, on the grounds that the channel
+list with its guide is what the owner asked for. They then asked for Home
+here as well, so the shared `HomeScreen` is the TV build's start, `HOME` is
+first in the rail, and `AppNav.kt` on this side routes a channel card to
+`tv/live?channel={id}` — the TV's own screen, tuned to that channel, never
+the phone's player. There is still no separate guide section: Live TV is the
+guide.
 
-What does come over, and is worth having: `WatchStore` and the player's
-resume. A film left half-watched on the box carries on where it stopped, the
-same as on the phone. The rows that would show it are the phone's; the
-position is the app's.
+**What does not work yet: the rows are unreachable with a D-pad.** Down from
+the Live TV heading goes to the Films heading, then the Series heading, and
+never into a `LazyRow`. Three things have been tried on the box and none of
+them moved focus into a card: `focusGroup()` on the rows, a `FocusRequester`
+per row with `focusProperties { down = row }` on the heading above it, and
+both together. So on the box Home is a set of three headings that open the
+full sections, which is usable but is not what it looks like.
+
+Two things to know before trying again. The box gives back **blank
+screenshots** — `uiautomator dump` and element bounds are the only view of
+it, and reading focus off bounds alone has already produced one wrong
+conclusion: a focused rectangle at `[0,676][160,800]` was taken for a card
+and was the navigation rail. And the TV emulator, where screenshots do work,
+is the place to reproduce this first.
+
+What did come over from main before any of it, and is worth having on its
+own: `WatchStore` and the player's resume. A film left half-watched on the
+box carries on where it stopped.
+
 ## Over the video: one panel, not a row of buttons
 
 The button beside "open in another player" opens everything that can be
