@@ -71,7 +71,10 @@ focused programme described at the top, and the tuned channel still playing
 top right — the *same* player, resized into a corner the screen leaves
 unpainted, so it never opens a second stream. Up/down move between channels,
 right looks ahead; **left from the programme on now slides the groups out**,
-with the rail (Live TV, Home, Films, Series, Settings) beyond them, and moving
+with the rail beyond them — Home, Live TV, Films, Series, in that order
+because that is the order every other screen's rail is in, and Settings set
+apart at the foot because the other screens keep it as the cog in a top bar
+and this screen has none — and moving
 through the groups changes the rows at once — OK or right goes back in. OK
 watches the focused channel full screen; holding OK toggles it in
 Favourites (acted on at key-up, so a first repeat can mean "held"); Back

@@ -419,8 +419,27 @@ private fun GroupsPanel(
             verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            RailItem(painterResource(R.drawable.ic_nav_live), "Live TV", selected = true, onClick = onClose, modifier = Modifier.focusRequester(railEntry))
-            TvDestination.entries.forEach { d -> RailItem(d.painter(), d.label, selected = false, onClick = { onOpen(d) }) }
+            // The same order as the rail on every other screen — Home, Live TV,
+            // Films, Series — because this one being its own arrangement is
+            // exactly what the owner noticed. Settings is last and set apart:
+            // the other screens keep it as the cog in their top bar, and this
+            // screen has no top bar to keep it in.
+            val home = TvDestination.Home
+            RailItem(home.painter(), home.label, selected = false, onClick = { onOpen(home) })
+            RailItem(
+                painterResource(R.drawable.ic_nav_live),
+                "Live TV",
+                selected = true,
+                onClick = onClose,
+                // Focus arrives on the section you are in, not at the top.
+                modifier = Modifier.focusRequester(railEntry),
+            )
+            listOf(TvDestination.Films, TvDestination.Series).forEach { d ->
+                RailItem(d.painter(), d.label, selected = false, onClick = { onOpen(d) })
+            }
+            Spacer(Modifier.height(12.dp))
+            val settings = TvDestination.Settings
+            RailItem(settings.painter(), settings.label, selected = false, onClick = { onOpen(settings) })
         }
 
         Column(
