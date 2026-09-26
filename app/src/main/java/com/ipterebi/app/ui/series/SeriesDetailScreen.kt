@@ -54,7 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.ui.ScreenTopBar
-import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.focusFill
 import com.ipterebi.app.ui.nightCard
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
@@ -126,7 +126,7 @@ private fun SeriesContent(
                         // As the category chips: quiet, the chosen one cobalt.
                         val shape = Corners.control
                         FilterChip(
-                            modifier = Modifier.focusRing(shape),
+                            modifier = Modifier.focusFill(shape),
                             selected = index == selectedSeason,
                             onClick = { onSeason(index) },
                             label = { Text(entry.name, fontWeight = FontWeight.Medium) },
@@ -214,7 +214,7 @@ private fun EpisodeRow(entry: EpisodeEntry, seriesName: String, onClick: () -> U
             .fillMaxWidth()
             .padding(horizontal = 12.dp, vertical = 4.dp)
             .nightCard(card)
-            .focusRing(card)
+            .focusFill(card)
             .clickable(onClick = onClick)
             .padding(9.dp),
         verticalAlignment = Alignment.CenterVertically,

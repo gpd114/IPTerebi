@@ -43,7 +43,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.ui.SectionTopBar
-import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.focusFill
 import com.ipterebi.app.ui.nightCard
 import com.ipterebi.app.ui.channels.tileColour
 import com.ipterebi.app.ui.theme.Corners
@@ -213,7 +213,7 @@ private fun RowHeading(title: String, tag: String, onOpen: () -> Unit, row: Focu
             .padding(horizontal = 8.dp)
             .clip(Corners.control)
             .then(if (row != null) Modifier.focusProperties { down = row } else Modifier)
-            .focusRing(Corners.control)
+            .focusFill(Corners.control)
             .clickable(onClick = onOpen)
             .padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -258,10 +258,14 @@ private fun EmptyRow(title: String, detail: String) {
 private fun ChannelCard(channel: LiveStream, onClick: () -> Unit) {
     Column(
         modifier = Modifier
-            .width(76.dp)
+            .width(82.dp)
             .clip(Corners.tag)
-            .focusRing(Corners.tag)
-            .clickable(onClick = onClick),
+            .focusFill(Corners.tag)
+            .clickable(onClick = onClick)
+            // Inside the fill, so focus shows as a frame round the logo as
+            // well as behind the name: a tile paints over a background, and a
+            // card that is all picture would otherwise show focus nowhere.
+            .padding(3.dp),
     ) {
         Box(
             Modifier
@@ -309,10 +313,12 @@ private fun ChannelCard(channel: LiveStream, onClick: () -> Unit) {
 private fun WatchedCard(item: WatchedItem, width: androidx.compose.ui.unit.Dp, ratio: Float, onClick: () -> Unit) {
     Column(
         modifier = Modifier
-            .width(width)
+            .width(width + 6.dp)
             .clip(Corners.tag)
-            .focusRing(Corners.tag)
-            .clickable(onClick = onClick),
+            .focusFill(Corners.tag)
+            .clickable(onClick = onClick)
+            // As the channel card: the poster would cover a background.
+            .padding(3.dp),
     ) {
         Box(
             Modifier

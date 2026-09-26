@@ -48,7 +48,7 @@ import com.ipterebi.app.ui.ChoiceRow
 import com.ipterebi.app.ui.DpadTextField
 import com.ipterebi.app.ui.PrimaryButton
 import com.ipterebi.app.ui.fieldColours
-import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.focusFill
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.StreamFormat
 

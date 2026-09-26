@@ -40,7 +40,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
-import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.focusFill
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.OverVideo
 import java.util.Locale
@@ -350,7 +350,7 @@ private fun Line(label: String, selected: Boolean, onClick: () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
             .clip(Corners.control)
-            .focusRing(Corners.control)
+            .focusFill(Corners.control)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

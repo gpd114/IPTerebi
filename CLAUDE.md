@@ -34,8 +34,19 @@ as the accent, because the owner asked for the whole app to look like the
 guide — and **Light**, a pale page, white cards, the dark blue for what is
 selected and the main button, kept as an option on the phone at their word.
 The TV app has Dark alone (`Appearance.SWITCHABLE` is false there). The player
-is dark in both (`OverVideo`); it frames video. On Dark, focus is the guide's
-white ring, not the blue, which is lost on near-black.
+is dark in both (`OverVideo`); it frames video.
+
+**Focus is a fill, and the fill is the accent.** It was a two-pixel white ring,
+and the owner's verdict was that the white is ugly — and that where a
+component already marks focus by changing its own background, a ring on top of
+it says the same thing twice. So `Palette.focus` is a block of colour behind
+whatever has the remote: cobalt on Dark, where the near-white ink reads on it,
+and a pale blue on Light, where the dark ink does. `focusFill()` paints it over
+the element's own background and under its content, so a card that is all
+picture — a poster, a channel's logo tile — carries three device-independent
+pixels of padding inside the fill, and focus shows as a frame around the
+picture rather than not at all. One place is still a line: a text field cannot
+be filled behind its own well, so `DpadTextField` outlines in the same colour.
 
 Flat throughout: no gradients, glows, rims or sheen, and each role one colour.
 Colours are roles in a `Palette` (`Light`, `Dark`), read through `Night.*`,
@@ -565,7 +576,8 @@ survived until something was pressed.
   keyboard: tap a field, type, and the first key made the field unfocusable.
   Read `LocalInputModeManager` inside `focusProperties`.
 - **Material's focus indication is invisible from a sofa.** Anything selectable
-  gets `focusRing()`, placed before `clickable` so it sees that element's focus.
+  gets `focusFill()`, placed before `clickable` so it sees that element's focus
+  and after its own `background` so it is the one seen.
 - **Anything focusable over the video steals OK.** The overlay back button was
   the first focusable a remote reached, so the first press of OK — the one
   everyone uses to pause — left the film. It is `canFocus = false`; the remote

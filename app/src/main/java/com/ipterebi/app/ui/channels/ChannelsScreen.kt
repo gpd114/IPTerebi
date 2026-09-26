@@ -66,7 +66,7 @@ import com.ipterebi.app.ui.SectionTopBar
 import com.ipterebi.app.ui.ShelfChip
 import com.ipterebi.app.ui.SquareIconButton
 import com.ipterebi.app.ui.fieldColours
-import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.focusFill
 import com.ipterebi.app.ui.nightCard
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
@@ -240,7 +240,7 @@ private fun ResumeBar(channel: LiveStream, onClick: () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
             .nightCard(shape)
-            .focusRing(shape)
+            .focusFill(shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -288,7 +288,7 @@ private fun ChannelRow(
         modifier = Modifier
             .fillMaxWidth()
             .nightCard()
-            .focusRing(Corners.card)
+            .focusFill(Corners.card)
             .clickable(onClick = onClick)
             .padding(start = 9.dp, end = 2.dp, top = 9.dp, bottom = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
