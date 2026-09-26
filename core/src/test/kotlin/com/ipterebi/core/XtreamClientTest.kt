@@ -217,3 +217,47 @@ class XtreamClientTest {
         Unit
     }
 }
+
+/**
+ * What happens when the panel is not there at all — the case a real provider
+ * outage produces, and the one that used to leave the sign-in screen sitting
+ * for about a minute.
+ */
+class UnreachablePanelTest {
+
+    @Test
+    fun `a panel that never answers gives up inside the quick call timeout`() {
+        val server = MockWebServer()
+        // Accepts the connection and then says nothing, which is what a server
+        // that has fallen over does: a refusal would come back at once.
+        server.enqueue(MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE))
+        server.start()
+
+        try {
+            val client = XtreamClient()
+            val account = XtreamAccount(
+                base = server.url("/").toString().trimEnd('/'),
+                username = "demo",
+                password = "demo",
+            )
+
+            val started = System.currentTimeMillis()
+            val failure = assertFailsWith<XtreamException> {
+                runBlocking { client.authenticate(account) }
+            }
+            val waited = (System.currentTimeMillis() - started) / 1000
+
+            // The read timeout alone is 30 s, and before the call timeout went
+            // on, a host with several addresses spent the connect timeout on
+            // each of them. Either way this has to give up on the quick
+            // budget, not on those.
+            assertTrue(waited < QUICK_CALL_SECONDS + 5, "gave up after $waited s")
+            assertTrue(
+                failure.message.orEmpty().contains("did not answer"),
+                "message was: ${failure.message}",
+            )
+        } finally {
+            server.shutdown()
+        }
+    }
+}

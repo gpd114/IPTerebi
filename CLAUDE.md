@@ -217,6 +217,24 @@ is at fault — a panel that does not list `m3u8` will not serve it.
 - **Default the scheme to http, not https.** Panels are overwhelmingly plain
   HTTP on a high port. Assuming https fails at the handshake and produces an
   error that names TLS, which sends you looking in entirely the wrong place.
+- **A provider that has fallen over must say so in seconds, not a minute.** The
+  connect timeout is per *route*, and a host behind a CDN resolves to several
+  addresses, so a 15-second connect timeout with a retry on top left the
+  sign-in screen sitting for about a minute — long enough that the app looks
+  hung rather than the provider looking down. The short calls (sign-in, and
+  "check the line") are therefore bounded as a whole by `QUICK_CALL_SECONDS`,
+  an OkHttp `callTimeout` that covers DNS, every route and the retry; connect
+  is 8 s. The long ones are deliberately *not* bounded: a channel list on cheap
+  hosting really does take half a minute, and `xmltv.php` is 76 MB.
+
+  And the message matters as much as the wait. `describeNetworkFailure` turns
+  each failure into the thing to try — a name that will not resolve asks about
+  a typo *and* about the device being online, because a phone with no signal
+  fails identically; a refused connection points at the port; a TLS failure
+  suggests plain http. No figure is quoted for a timeout, because whichever of
+  the two budgets ran out first is not knowable from the exception: on the
+  emulator against an unroutable address it gave up at 11 seconds, and a
+  message promising 15 would have been a small lie.
 - **A default user agent gets refused by a meaningful share of panels.** Every
   mainstream IPTV client identifies as VLC or ffmpeg for exactly this reason.
   The tell is a 403 on the *stream* while every API call succeeds, which reads

@@ -72,3 +72,59 @@ fun describeOnDemandHttpError(code: Int, noun: String): String = when (code) {
 fun describeFilmHttpError(code: Int): String = describeOnDemandHttpError(code, "film")
 
 fun describeEpisodeHttpError(code: Int): String = describeOnDemandHttpError(code, "episode")
+
+/**
+ * What to say when the request never got an answer at all.
+ *
+ * The exception's own message is written for a developer reading a stack trace
+ * — "Failed to connect to /104.21.0.1:8080", "Unable to resolve host
+ * \"panel.example\": No address associated with hostname" — and putting that in
+ * front of someone whose provider has gone down tells them nothing they can
+ * act on. Each of these failures has a different cause and a different thing to
+ * try, so each gets its own sentence.
+ *
+ * This is worth getting right because it is the message people see on the two
+ * worst days: the day their provider's server falls over, and the day they
+ * type the address in wrong.
+ */
+fun describeNetworkFailure(failure: Throwable?, host: String): String {
+    val kind = failure?.let { it::class.java.simpleName }.orEmpty()
+    val detail = failure?.message.orEmpty()
+
+    return when {
+        // The name does not resolve. Either it is wrong, or there is no
+        // network at all — and the two are told apart by trying anything else,
+        // which is what the second sentence asks for.
+        kind == "UnknownHostException" || detail.contains("Unable to resolve host") ->
+            "Could not find $host. Check the address for a typo — and check " +
+                "this device is online, because a phone with no connection " +
+                "fails in exactly this way."
+
+        // Something is listening and said no, at once. A wrong port does this.
+        kind == "ConnectException" || detail.contains("ECONNREFUSED", ignoreCase = true) ->
+            "$host refused the connection. The port is the usual culprit: a " +
+                "panel's web page and its API are often on different ports."
+
+        // Connected — or tried to — and nothing came back. No figure is quoted,
+        // because the wait that ended is whichever of the connect timeout and
+        // the whole-call budget ran out first: measured on the emulator against
+        // an unroutable address it gave up at 11 seconds, and a message
+        // promising 15 would have been a small lie.
+        kind == "SocketTimeoutException" || detail.contains("timeout", ignoreCase = true) ->
+            "$host did not answer in time. The provider's server is probably " +
+                "down or overloaded — this is their end, not the app's."
+
+        // Reached the network and it said the host is not there.
+        kind == "NoRouteToHostException" || detail.contains("EHOSTUNREACH", ignoreCase = true) ->
+            "$host cannot be reached from this network. If you are on mobile " +
+                "data or a VPN, try the other one."
+
+        // Almost always https against a plain-HTTP panel.
+        kind.startsWith("SSL") || detail.contains("SSL", ignoreCase = true) ->
+            "The secure connection to $host failed. Most panels are plain " +
+                "http on a high port — try the address with http:// instead of https://."
+
+        detail.isNotBlank() -> "Could not reach $host: $detail."
+        else -> "Could not reach $host."
+    }
+}
