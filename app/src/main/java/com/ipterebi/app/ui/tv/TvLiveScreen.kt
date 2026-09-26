@@ -122,7 +122,12 @@ import kotlinx.coroutines.launch
  * channels opens one stream, not ten.
  */
 @Composable
-fun TvLiveScreen(container: AppContainer, onOpen: (TvDestination) -> Unit) {
+fun TvLiveScreen(
+    container: AppContainer,
+    onOpen: (TvDestination) -> Unit,
+    /** A channel to open on, chosen somewhere else — the home screen's row. */
+    startOn: Int = 0,
+) {
     val context = LocalContext.current
     val model: TvLiveViewModel = viewModel(factory = TvLiveViewModel.factory(container, context))
     val state by model.state.collectAsStateWithLifecycle()
@@ -133,7 +138,7 @@ fun TvLiveScreen(container: AppContainer, onOpen: (TvDestination) -> Unit) {
         }
         return
     }
-    TvLive(container, model, state, account, onOpen)
+    TvLive(container, model, state, account, onOpen, startOn)
 }
 
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
@@ -144,6 +149,8 @@ private fun TvLive(
     state: TvLiveState,
     account: XtreamAccount,
     onOpen: (TvDestination) -> Unit,
+    /** See TvLiveScreen: 0 when nothing in particular was asked for. */
+    startOn: Int,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -196,12 +203,14 @@ private fun TvLive(
         showBanner()
     }
 
-    // The channel to open on: the last one watched, else the top of the list.
+    // The channel to open on: the one the home screen asked for, else the last
+    // one watched, else the top of the list.
     // Waits for recents to be read — an empty list before then means "not read
     // yet", and the first channel would be opened over last night's.
     LaunchedEffect(state.recentsRead, state.lineup) {
         if (tunedId != 0 || !state.recentsRead) return@LaunchedEffect
-        val start = state.recents.firstOrNull()
+        val start = state.find(startOn)
+            ?: state.recents.firstOrNull()
             ?: state.savedGroup?.let { state.channelsIn(it).firstOrNull() }
             ?: state.lineup?.all?.firstOrNull()
         if (start != null) {

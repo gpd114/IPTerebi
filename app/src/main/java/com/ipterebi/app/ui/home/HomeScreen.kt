@@ -1,6 +1,7 @@
 package com.ipterebi.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -104,6 +105,10 @@ fun HomeScreen(
                     )
                 } else {
                     LazyRow(
+                        // A focus group, or a remote cannot get into it: focus
+                        // steps from one row heading to the next and the cards
+                        // are never reachable. Nothing shows this on a phone.
+                        modifier = Modifier.focusGroup(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -129,6 +134,10 @@ fun HomeScreen(
                     )
                 } else {
                     LazyRow(
+                        // A focus group, or a remote cannot get into it: focus
+                        // steps from one row heading to the next and the cards
+                        // are never reachable. Nothing shows this on a phone.
+                        modifier = Modifier.focusGroup(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -154,6 +163,10 @@ fun HomeScreen(
                     )
                 } else {
                     LazyRow(
+                        // A focus group, or a remote cannot get into it: focus
+                        // steps from one row heading to the next and the cards
+                        // are never reachable. Nothing shows this on a phone.
+                        modifier = Modifier.focusGroup(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {

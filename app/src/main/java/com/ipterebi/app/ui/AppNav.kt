@@ -48,6 +48,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.ipterebi.core.WatchKind
+import com.ipterebi.core.VodStream
+import com.ipterebi.core.EpisodeEntry
+import com.ipterebi.core.EpisodeDetails
+import com.ipterebi.core.Episode
+import com.ipterebi.app.ui.home.HomeScreen
+import com.ipterebi.app.data.EpisodeListing
 import com.ipterebi.app.AppContainer
 import androidx.annotation.DrawableRes
 import androidx.compose.ui.res.painterResource
@@ -69,9 +76,13 @@ import com.ipterebi.app.ui.tv.TvLiveScreen
 
 object Route {
     const val LOGIN = "login"
+    const val HOME = "home"
     const val CHANNELS = "channels"
     // The TV app's home: live television, full screen. See TvLiveScreen.
-    const val TV_LIVE = "tv/live"
+    const val TV_LIVE = "tv/live?channel={channel}"
+
+    /** The TV's live screen, optionally opening on a particular channel. */
+    fun tvLive(channelId: Int = 0) = "tv/live?channel=$channelId"
     const val FILMS = "films"
     const val SERIES = "series"
     const val SERIES_DETAIL = "series/{id}"
@@ -116,8 +127,16 @@ object Route {
  *
  * Live TV goes to the TV build's own home, not the phone's channel list.
  */
-private enum class Section(val route: String, val label: String, @DrawableRes val icon: Int) {
-    LIVE(Route.TV_LIVE, "Live TV", R.drawable.ic_nav_live),
+private enum class Section(
+    /** What the destination is registered as, and so what a back stack entry says. */
+    val route: String,
+    val label: String,
+    @DrawableRes val icon: Int,
+    /** What to navigate to, which differs when the route takes an argument. */
+    val go: String = route,
+) {
+    HOME(Route.HOME, "Home", R.drawable.ic_nav_home),
+    LIVE(Route.TV_LIVE, "Live TV", R.drawable.ic_nav_live, go = Route.tvLive()),
     FILMS(Route.FILMS, "Films", R.drawable.ic_nav_films),
     SERIES(Route.SERIES, "Series", R.drawable.ic_nav_series),
 }
@@ -140,7 +159,7 @@ fun AppNav(container: AppContainer) {
                 // every state change would look like it works and do nothing —
                 // the navigate calls below are what actually move us.
                 val start = remember {
-                    if (current is AccountState.SignedIn) Route.TV_LIVE else Route.LOGIN
+                    if (current is AccountState.SignedIn) Route.HOME else Route.LOGIN
                 }
 
                 val backStack by nav.currentBackStackEntryAsState()
@@ -170,7 +189,7 @@ fun AppNav(container: AppContainer) {
                     modifier = Modifier.background(Night.ground),
                     bottomBar = {
                         if (section != null && !wide) {
-                            FloatingTabBar(current = section, onSelect = { nav.switchSection(it.route) })
+                            FloatingTabBar(current = section, onSelect = { nav.switchSection(it.go) })
                         }
                     },
                 ) { padding ->
@@ -187,7 +206,7 @@ fun AppNav(container: AppContainer) {
                                 Section.entries.forEach { item ->
                                     NavigationRailItem(
                                         selected = item == section,
-                                        onClick = { nav.switchSection(item.route) },
+                                        onClick = { nav.switchSection(item.go) },
                                         icon = { Icon(painterResource(item.icon), contentDescription = null) },
                                         label = { Text(item.label) },
                                         colors = NavigationRailItemDefaults.colors(
@@ -215,16 +234,81 @@ fun AppNav(container: AppContainer) {
                                 LoginScreen(
                                     container = container,
                                     onSignedIn = {
-                                        nav.navigate(Route.TV_LIVE) {
+                                        nav.navigate(Route.HOME) {
                                             popUpTo(Route.LOGIN) { inclusive = true }
                                         }
                                     },
                                 )
                             }
 
-                            composable(Route.TV_LIVE) {
+                            // The same home screen the phone has, and the box
+                            // opens on it. Its Live TV row leads to the TV's
+                            // own live screen, not the phone's channel list:
+                            // that screen is where television actually plays
+                            // here, and the channel it was asked for goes with
+                            // it rather than through the phone's player.
+                            composable(Route.HOME) {
+                                HomeScreen(
+                                    container = container,
+                                    onSettings = { nav.navigate(Route.SETTINGS) },
+                                    onChannels = { nav.switchSection(Route.tvLive()) },
+                                    onFilms = { nav.switchSection(Route.FILMS) },
+                                    onSeries = { nav.switchSection(Route.SERIES) },
+                                    onPlayChannel = { channel ->
+                                        nav.switchSection(Route.tvLive(channel.streamId))
+                                    },
+                                    onResume = { item ->
+                                        when (item.kind) {
+                                            WatchKind.FILM -> {
+                                                val id = item.id.toIntOrNull() ?: 0
+                                                container.films.publish(
+                                                    listOf(
+                                                        VodStream(
+                                                            streamId = id,
+                                                            name = item.name,
+                                                            icon = item.poster,
+                                                            containerExtension = item.extension,
+                                                        )
+                                                    )
+                                                )
+                                                nav.navigate(Route.playFilm(id, item.extension))
+                                            }
+                                            WatchKind.EPISODE -> {
+                                                container.episodes.publish(
+                                                    listOf(
+                                                        EpisodeListing(
+                                                            seriesName = item.name,
+                                                            entry = EpisodeEntry(
+                                                                episode = Episode(
+                                                                    id = item.id,
+                                                                    title = item.detail,
+                                                                    containerExtension = item.extension,
+                                                                ),
+                                                                details = EpisodeDetails(image = item.poster),
+                                                                seasonNumber = 0,
+                                                            ),
+                                                        )
+                                                    )
+                                                )
+                                                nav.navigate(Route.playEpisode(item.id, item.extension))
+                                            }
+                                        }
+                                    },
+                                )
+                            }
+
+                            composable(
+                                route = Route.TV_LIVE,
+                                arguments = listOf(
+                                    navArgument("channel") {
+                                        type = NavType.IntType
+                                        defaultValue = 0
+                                    }
+                                ),
+                            ) { entry ->
                                 TvLiveScreen(
                                     container = container,
+                                    startOn = entry.arguments?.getInt("channel") ?: 0,
                                     onOpen = { destination ->
                                         when (destination) {
                                             TvDestination.Films -> nav.switchSection(Route.FILMS)
@@ -432,7 +516,7 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
  */
 private fun NavController.switchSection(route: String) {
     navigate(route) {
-        popUpTo(Route.TV_LIVE) { saveState = true }
+        popUpTo(Route.HOME) { saveState = true }
         launchSingleTop = true
         restoreState = true
     }
