@@ -599,34 +599,29 @@ is read from the key event's repeat count, and `okHeld` carries the fact
 between the repeat and the release, so the release that ends a hold does not
 also open the channel list.
 
-### The box opens on Home too — but a remote cannot yet reach its rows
+### The box opens on Home too
 
 The TV build used to open on `TvLiveScreen`, on the grounds that the channel
-list with its guide is what the owner asked for. They then asked for Home
-here as well, so the shared `HomeScreen` is the TV build's start, `HOME` is
-first in the rail, and `AppNav.kt` on this side routes a channel card to
-`tv/live?channel={id}` — the TV's own screen, tuned to that channel, never
-the phone's player. There is still no separate guide section: Live TV is the
-guide.
+list with its guide is what the owner asked for. They then asked for Home here
+as well, so the shared `HomeScreen` is the TV build's start, `HOME` is first in
+the rail, and `AppNav.kt` on this side routes a channel card to
+`tv/live?channel={id}` — the TV's own screen, tuned to that channel, never the
+phone's player. There is still no separate guide section: Live TV is the guide.
 
-**What does not work yet: the rows are unreachable with a D-pad.** Down from
-the Live TV heading goes to the Films heading, then the Series heading, and
-never into a `LazyRow`. Three things have been tried on the box and none of
-them moved focus into a card: `focusGroup()` on the rows, a `FocusRequester`
-per row with `focusProperties { down = row }` on the heading above it, and
-both together. So on the box Home is a set of three headings that open the
-full sections, which is usable but is not what it looks like.
+Getting a remote into the rows took an explicit hand-off; the D-pad note about
+full-width headings says why. Walking Down on the Google TV emulator now goes
+cog → Live TV → the first channel card → Films → Series, and Up retraces it.
+OK on a card tunes the TV's own screen: the log shows `tv open channel 106`,
+which is the stream behind the card numbered 8.
 
-Two things to know before trying again. The box gives back **blank
-screenshots** — `uiautomator dump` and element bounds are the only view of
-it, and reading focus off bounds alone has already produced one wrong
-conclusion: a focused rectangle at `[0,676][160,800]` was taken for a card
-and was the navigation rail. And the TV emulator, where screenshots do work,
-is the place to reproduce this first.
+**Back takes one press now.** It used to take two — "Press Back again to
+leave" — because live television was the bottom of the stack and Back ended
+the evening. Home is under it now, so Back goes there, and a warning about
+leaving would have been a warning about nothing.
 
-What did come over from main before any of it, and is worth having on its
-own: `WatchStore` and the player's resume. A film left half-watched on the
-box carries on where it stopped.
+What came over from main before any of it, and is worth having on its own:
+`WatchStore` and the player's resume. A film left half-watched on the box
+carries on where it stopped.
 
 ## Over the video: one panel, not a row of buttons
 
@@ -748,11 +743,34 @@ survived until something was pressed.
   ones. Accepted: phone and tablet first. If it matters on a TV, give the chips
   a `focusProperties { down = … }` to the list and keep left and right for the
   shelf.
+- **A heading the width of the screen beats the small card under it.** Down
+  from a Home row heading went to the *next heading*, never into the row. The
+  cards were focusable all along and were candidates in the search: they
+  simply never won it. Compose picks the next focus by Android's old
+  weighting, which counts the sideways distance between the two centres as
+  well as the distance in the direction pressed — and a full-width heading's
+  centre is most of the screen away from a 76dp card's, while the next
+  heading's is directly below. The two scores came out close, and the heading
+  won. So each heading names its own row with `focusProperties { down = … }`
+  and the row is a `focusGroup()`, which passes the request on to its first
+  card. Anything shaped like a row of cards under a wide heading needs the
+  same.
+
+  Two things about finding it, both of which cost time here. The box returns
+  **blank screenshots**, so `uiautomator dump` and element bounds are the only
+  view of it, and a focused rectangle at `[0,676][160,800]` was taken for a
+  card when it was the navigation rail. And a **stale APK looks exactly like a
+  fix that did not work** — the build had failed on a bad `JAVA_HOME` and
+  installed the morning's APK without complaint. Three attempts on the box
+  proved nothing; the Google TV emulator, where screenshots work, showed it in
+  one pass. Check the APK's timestamp before believing a device.
 - **A TV needs `android.hardware.touchscreen` required="false"**, or it counts
   as unable to run the app, plus `LEANBACK_LAUNCHER` and a banner to appear on
-  its home screen. Those three are in the manifest but have not been checked on
-  a real Android TV image — the emulator used is a TV-shaped phone image, which
-  tests the D-pad and the layout but not the TV launcher.
+  its home screen. All three are in the manifest, and on the `googletv34` image
+  `cmd package resolve-activity -c android.intent.category.LEANBACK_LAUNCHER`
+  does answer `com.ipterebi.tv/…MainActivity`, so the TV entry point is real.
+  What is still unseen is the banner as a launcher draws it, on a home screen
+  rather than in a manifest.
 
 ## Working notes
 

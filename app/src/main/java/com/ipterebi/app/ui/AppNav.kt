@@ -507,12 +507,12 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
 /**
  * Moves between top-level sections without stacking them.
  *
- * Anchored on live television rather than on the graph's start destination:
- * that is LOGIN for anyone who was signed out at launch, and it is no longer on
- * the back stack once they sign in, so popping to it would pop nothing and each
- * switch would push another screen on top. Live television is always the root
- * of the signed-in stack on the TV. Saving and restoring state is what keeps the film
- * library's loaded category and scroll position when switching away and back.
+ * Anchored on Home rather than on the graph's start destination: that is LOGIN
+ * for anyone who was signed out at launch, and it is no longer on the back
+ * stack once they sign in, so popping to it would pop nothing and each switch
+ * would push another screen on top. Home is always the root of the signed-in
+ * stack. Saving and restoring state is what keeps the film library's loaded
+ * category and scroll position when switching away and back.
  */
 private fun NavController.switchSection(route: String) {
     navigate(route) {

@@ -114,7 +114,7 @@ import kotlinx.coroutines.launch
  * - **Left**: back to the channel before — the flip between two.
  * - **Right**: what is on, and next.
  * - **Number keys**: straight to a channel.
- * - **Back**: twice to leave, so one stray press does not end the evening.
+ * - **Back**: the banner, then the channel list, then Home.
  *
  * One player for the whole screen, reused from channel to channel: each change
  * stops the stream first and asks for the next a moment later, so a line that
@@ -184,7 +184,6 @@ private fun TvLive(
     var bannerShown by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
     var noSuchNumber by remember { mutableStateOf<String?>(null) }
-    var armedToLeave by remember { mutableStateOf(false) }
 
     fun showBanner() {
         bannerShown = true
@@ -454,12 +453,6 @@ private fun TvLive(
         delay(BANNER_MS)
         bannerShown = false
     }
-    LaunchedEffect(armedToLeave) {
-        if (armedToLeave) {
-            delay(2_500)
-            armedToLeave = false
-        }
-    }
 
     val rootFocus = remember { FocusRequester() }
     LaunchedEffect(covered, error, released) {
@@ -470,8 +463,11 @@ private fun TvLive(
     // focus group": pressed in the channel list or on Try again, it moved
     // focus out to the screen and was used up doing so — the list stayed open
     // and the press did nothing visible. So this screen answers Back itself:
-    // the list closes, then the banner, then one press arms leaving and the
-    // second, within a moment, leaves.
+    // the list closes, then the banner, then the screen.
+    //
+    // It used to take two presses to leave, because live television was the
+    // bottom of the stack and Back ended the evening. Home is under it now,
+    // so one press goes there and arming was a warning about nothing.
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     fun onBack() {
         when {
@@ -481,13 +477,8 @@ private fun TvLive(
                 bannerShown = false
                 typed = ""
             }
-            !armedToLeave -> armedToLeave = true
-            // Nothing on this screen is listening now, and live television
-            // is the bottom of the stack: Android takes the app to the back.
-            else -> {
-                armedToLeave = false
-                backDispatcher?.onBackPressed()
-            }
+            // Nothing on this screen is listening now, so Back means Home.
+            else -> backDispatcher?.onBackPressed()
         }
     }
 
@@ -704,20 +695,6 @@ private fun TvLive(
             )
         }
 
-        if (armedToLeave) {
-            Text(
-                "Press Back again to leave",
-                style = MaterialTheme.typography.labelLarge,
-
-                color = TvInk,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 32.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(TvPanel)
-                    .padding(horizontal = 18.dp, vertical = 9.dp),
-            )
-        }
 
         // Over the picture, and taking the remote while it is up — which is
         // allowed because it is only here when asked for. The rule it would
