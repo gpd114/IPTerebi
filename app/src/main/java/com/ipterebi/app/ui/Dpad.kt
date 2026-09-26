@@ -1,10 +1,10 @@
 package com.ipterebi.app.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,23 +45,29 @@ import com.ipterebi.app.ui.theme.Night
 private val activateKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
 
 /**
- * Draws a ring around an element while it has focus.
+ * Fills an element while it has focus.
  *
- * Under touch nothing is ever focused, so this never draws. Under a remote it is
- * the only way to know where you are: Material's own focus indication is a faint
- * tint made for a keyboard at arm's length, and invisible from a sofa.
+ * Under touch nothing is ever focused, so this never draws. Under a remote it
+ * is the only way to know where you are: Material's own focus indication is a
+ * faint tint made for a keyboard at arm's length, and invisible from a sofa.
+ *
+ * It was a two-pixel ring, and the owner's verdict was that a white outline is
+ * ugly — and that where Material's own faint tint showed through underneath,
+ * the outline on top of it looked like two things marking the same thing. A
+ * fill is what the TV screens already use, and it is the app's own language:
+ * what is chosen is solid. It paints over whatever the element set as its own
+ * background, and under its content, so a card whose picture fills it shows
+ * the fill around the picture rather than over it.
  *
  * Place it *before* `clickable` in the chain, so that it observes the focus of
- * the element it outlines.
+ * the element it fills, and *after* that element's own `background`, so it is
+ * the one seen.
  */
-fun Modifier.focusRing(shape: Shape = Corners.control): Modifier = composed {
+fun Modifier.focusFill(shape: Shape = Corners.control): Modifier = composed {
     var focused by remember { mutableStateOf(false) }
-    // On the dark page, the guide's white focus: the blue accent is a ring
-    // nobody sees on near-black from a sofa. On Light, the accent.
-    val colour = if (Night.palette.dark) Night.ink else MaterialTheme.colorScheme.primary
     this
         .onFocusChanged { focused = it.isFocused }
-        .then(if (focused) Modifier.border(2.dp, colour, shape) else Modifier)
+        .then(if (focused) Modifier.background(Night.palette.focus, shape) else Modifier)
 }
 
 /**
@@ -94,7 +100,9 @@ fun DpadTextField(
     val field = remember { FocusRequester() }
     var editing by remember { mutableStateOf(false) }
     var wrapperFocused by remember { mutableStateOf(false) }
-    val ring = if (Night.palette.dark) Night.ink else MaterialTheme.colorScheme.primary
+    // The same colour as a focus fill, as an outline: a field cannot be filled
+    // behind its own well, so this is the one place focus is still a line.
+    val ring = Night.palette.focus
 
     // Read when focus is being decided, never captured when the screen was
     // drawn. The mode changes on the input itself — a tap makes it touch, a key

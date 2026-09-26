@@ -92,7 +92,7 @@ fun PrimaryButton(
             .height(height)
             .clip(shape)
             .background(if (enabled) fill else Night.quiet)
-            .focusRing(shape)
+            .focusFill(shape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -123,7 +123,7 @@ fun SecondaryButton(
             .height(height)
             .clip(shape)
             .background(Night.glass)
-            .focusRing(shape)
+            .focusFill(shape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,
@@ -151,7 +151,7 @@ fun SquareIconButton(
             .size(size)
             .clip(shape)
             .background(Night.glass)
-            .focusRing(shape)
+            .focusFill(shape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -194,7 +194,7 @@ fun <T> ChoiceRow(
                     .height(42.dp)
                     .clip(shape)
                     .background(if (on) Night.cobalt else Night.quiet)
-                    .focusRing(shape)
+                    .focusFill(shape)
                     .clickable { onSelect(value) },
                 contentAlignment = Alignment.Center,
             ) {

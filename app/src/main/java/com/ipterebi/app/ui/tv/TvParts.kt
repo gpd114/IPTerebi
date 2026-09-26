@@ -53,8 +53,11 @@ internal val TvInkSoft = Color(0xFFA3A8B8)
 internal val TvAccent = Color(0xFF9DB5FF)
 internal val TvCobalt = Color(0xFF2F5FE0)
 internal val TvPink = Color(0xFFFF8FA3)
-internal val TvFocusFill = Color(0xFFF1F3F8)
-internal val TvFocusInk = Color(0xFF141A30)
+// Focus is the accent, the same block the phone screens fill with: the owner's
+// word on the white one it used to be was that it is ugly, and white was two
+// things at once anyway — the focus pill here and the ring over there.
+internal val TvFocusFill = TvCobalt
+internal val TvFocusInk = Color.White
 
 /**
  * A row in a list the remote moves through: transparent until focused, then

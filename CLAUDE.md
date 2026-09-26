@@ -41,7 +41,8 @@ The home screen once signed in: the channel left on last time (the newest
 recent — recorded when a channel *plays*, not when it is chosen), full screen,
 playing. Up/down zap through the group it was chosen in; OK opens the
 channels with their guide (below); Left flips to the previous channel;
-Right shows the banner; digits jump by number; Back twice leaves. Films, Series and Settings are still the phone's screens.
+Right shows the banner; digits jump by number; Back goes to Home. Home, Films,
+Series and Settings are the phone's screens.
 
 - **One ExoPlayer for the screen.** A change of channel stops the stream at
   once and asks for the next 300 ms later; another press inside that cancels
@@ -70,7 +71,7 @@ focused programme described at the top, and the tuned channel still playing
 top right — the *same* player, resized into a corner the screen leaves
 unpainted, so it never opens a second stream. Up/down move between channels,
 right looks ahead; **left from the programme on now slides the groups out**,
-with the rail (Live TV, Films, Series, Settings) beyond them, and moving
+with the rail (Live TV, Home, Films, Series, Settings) beyond them, and moving
 through the groups changes the rows at once — OK or right goes back in. OK
 watches the focused channel full screen; holding OK toggles it in
 Favourites (acted on at key-up, so a first repeat can mean "held"); Back
@@ -123,8 +124,20 @@ as the accent, because the owner asked for the whole app to look like the
 guide — and **Light**, a pale page, white cards, the dark blue for what is
 selected and the main button, kept as an option on the phone at their word.
 The TV app has Dark alone (`Appearance.SWITCHABLE` is false there). The player
-is dark in both (`OverVideo`); it frames video. On Dark, focus is the guide's
-white ring, not the blue, which is lost on near-black.
+is dark in both (`OverVideo`); it frames video.
+
+**Focus is a fill, and the fill is the accent.** It was a two-pixel white ring
+on the phone screens and a white pill on the TV ones, and the owner's verdict
+was that the white is ugly — and that where a component already marks focus by
+changing its own background, a ring on top of it says the same thing twice. So
+`Palette.focus` is a block of colour behind whatever has the remote: cobalt on
+Dark, where the near-white ink reads on it, and a pale blue on Light, where the
+dark ink does. `focusFill()` paints it over the element's own background and
+under its content, so a card that is all picture — a poster, a channel's logo
+tile — carries three device-independent pixels of padding inside the fill, and
+focus shows as a frame around the picture rather than not at all. One place is
+still a line: a text field cannot be filled behind its own well, so
+`DpadTextField` outlines in the same colour.
 
 Flat throughout: no gradients, glows, rims or sheen, and each role one colour.
 Colours are roles in a `Palette` (`Light`, `Dark`), read through `Night.*`,
@@ -713,7 +726,8 @@ survived until something was pressed.
   keyboard: tap a field, type, and the first key made the field unfocusable.
   Read `LocalInputModeManager` inside `focusProperties`.
 - **Material's focus indication is invisible from a sofa.** Anything selectable
-  gets `focusRing()`, placed before `clickable` so it sees that element's focus.
+  gets `focusFill()`, placed before `clickable` so it sees that element's focus
+  and after its own `background` so it is the one seen.
 - **Back is also a focus key.** Compose turns an unused Back into "leave this
   focus group": pressed on a row of the TV channel list, it moved focus out to
   the screen and was used up doing it, so the list stayed open and Back did

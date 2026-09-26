@@ -67,6 +67,13 @@ data class Palette(
     val pink: Color,
     /** The translucent score pill over posters. White goes on it. */
     val badge: Color,
+    /**
+     * Where the remote is. A fill, not a ring: focus has to be the loudest
+     * thing on a screen from across a room, and it has to keep whatever text
+     * the caller already chose legible, so it is dark enough for ink on Dark
+     * and pale enough for ink on Light.
+     */
+    val focus: Color,
 )
 
 /** Pale, with IPTerebi's dark blue as the accent. The default until the app took the guide's look. */
@@ -78,6 +85,7 @@ val Light = Palette(
     cobalt = Color(0xFF1B3478), accent = Color(0xFF1B3478),
     ink = Color(0xFF141A30), inkSoft = Color(0xFF6A7494),
     pink = Color(0xFFC2456B), badge = Color(0xB3142A66),
+    focus = Color(0xFFC3D2F2),
 )
 
 /**
@@ -97,6 +105,7 @@ val Dark = Palette(
     cobalt = Color(0xFF2F5FE0), accent = Color(0xFF9DB5FF),
     ink = Color(0xFFF1F3F8), inkSoft = Color(0xFFA3A8B8),
     pink = Color(0xFFFF8FA3), badge = Color(0xB31F3C8C),
+    focus = Color(0xFF2F5FE0),
 )
 
 /**

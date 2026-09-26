@@ -308,7 +308,6 @@ private fun Cell(title: String, left: Dp, width: Dp, focused: Boolean, onNow: Bo
                     else -> CellFill
                 }
             )
-            .then(if (focused) Modifier.border(2.dp, TvFocusFill, RoundedCornerShape(8.dp)) else Modifier)
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.CenterStart,
     ) {

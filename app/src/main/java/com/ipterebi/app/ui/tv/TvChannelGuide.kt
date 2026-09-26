@@ -45,6 +45,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -55,6 +58,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ipterebi.app.R
 import com.ipterebi.app.AppContainer
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XmltvProgramme
@@ -71,10 +75,23 @@ import java.time.Instant
 import java.time.ZoneId
 
 /** Where the rail at the groups' left edge goes, besides back to the channel playing. */
-enum class TvDestination(val label: String, val icon: ImageVector) {
-    Films("Films", Icons.Filled.Movie),
-    Series("Series", Icons.Filled.VideoLibrary),
-    Settings("Settings", Icons.Filled.Settings),
+enum class TvDestination(val label: String) {
+    // Home is here because the app opens on it now. Without it the guide was
+    // a room with no door back to the screen the box starts on.
+    Home("Home"),
+    Films("Films"),
+    Series("Series"),
+    Settings("Settings"),
+    ;
+
+    /** The app's own nav icons, so this rail and the phone's are one set. */
+    @Composable
+    fun painter(): Painter = when (this) {
+        Home -> painterResource(R.drawable.ic_nav_home)
+        Films -> painterResource(R.drawable.ic_nav_films)
+        Series -> painterResource(R.drawable.ic_nav_series)
+        Settings -> rememberVectorPainter(Icons.Filled.Settings)
+    }
 }
 
 /**
@@ -402,8 +419,8 @@ private fun GroupsPanel(
             verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            RailItem(Icons.Filled.LiveTv, "Live TV", selected = true, onClick = onClose, modifier = Modifier.focusRequester(railEntry))
-            TvDestination.entries.forEach { d -> RailItem(d.icon, d.label, selected = false, onClick = { onOpen(d) }) }
+            RailItem(painterResource(R.drawable.ic_nav_live), "Live TV", selected = true, onClick = onClose, modifier = Modifier.focusRequester(railEntry))
+            TvDestination.entries.forEach { d -> RailItem(d.painter(), d.label, selected = false, onClick = { onOpen(d) }) }
         }
 
         Column(
@@ -468,7 +485,7 @@ private fun GroupsPanel(
 }
 
 @Composable
-private fun RailItem(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun RailItem(icon: Painter, label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     // Named under the icon, small, as the phone's rail is: an icon alone is a
     // guess, and a name only on focus is found by pressing.
     Column(horizontalAlignment = Alignment.CenterHorizontally) {

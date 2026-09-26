@@ -59,7 +59,7 @@ import com.ipterebi.app.ui.QuietPill
 import com.ipterebi.app.ui.ScreenTopBar
 import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.channels.tileColour
-import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.focusFill
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.theme.tabular
@@ -318,7 +318,7 @@ private fun GuideRow(
                 .fillMaxHeight()
                 .clip(Corners.tag)
                 .background(Night.veil)
-                .focusRing(Corners.tag)
+                .focusFill(Corners.tag)
                 .clickable(onClick = onChannel),
             contentAlignment = Alignment.Center,
         ) {
@@ -354,7 +354,7 @@ private fun GuideRow(
                         .padding(end = 3.dp)
                         .clip(Corners.tag)
                         .background(if (onNow) Night.quiet else Night.veil)
-                        .focusRing(Corners.tag)
+                        .focusFill(Corners.tag)
                         .clickable { onProgramme(p) }
                         .padding(horizontal = 8.dp),
                     contentAlignment = Alignment.CenterStart,

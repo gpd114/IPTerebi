@@ -216,7 +216,7 @@ fun AppNav(container: AppContainer) {
                                             unselectedIconColor = Night.inkSoft,
                                             unselectedTextColor = Night.inkSoft,
                                         ),
-                                        modifier = Modifier.focusRing(),
+                                        modifier = Modifier.focusFill(),
                                     )
                                 }
                                 Spacer(Modifier.weight(1f))
@@ -311,6 +311,7 @@ fun AppNav(container: AppContainer) {
                                     startOn = entry.arguments?.getInt("channel") ?: 0,
                                     onOpen = { destination ->
                                         when (destination) {
+                                            TvDestination.Home -> nav.switchSection(Route.HOME)
                                             TvDestination.Films -> nav.switchSection(Route.FILMS)
                                             TvDestination.Series -> nav.switchSection(Route.SERIES)
                                             TvDestination.Settings -> nav.navigate(Route.SETTINGS)
@@ -485,7 +486,7 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
                 modifier = Modifier
                     .clip(tab)
                     .background(if (selected) Night.cobalt else Color.Transparent)
-                    .focusRing(tab)
+                    .focusFill(tab)
                     .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(item) })
                     .height(42.dp)
                     .padding(horizontal = 14.dp),
