@@ -1,6 +1,7 @@
 package com.ipterebi.app.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,9 +26,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
@@ -77,6 +82,17 @@ fun HomeScreen(
     val showingRecent = HomeChannels.source == HomeChannels.Source.RECENT
     val channels = if (showingRecent) state.recents else state.favourites
 
+    // Down from a heading has to be told where to go. A heading is the width
+    // of the screen and a card is 76dp of it, so Compose weighs the card's
+    // centre — seven hundred pixels off to the left — against the next
+    // heading's, which is directly below, and the heading wins. Measured on
+    // the TV emulator: the cards are focusable and are candidates in the
+    // search; they simply never win it. So each heading hands Down to its own
+    // row, and the row, being a focus group, passes it to the first card.
+    val channelRow = remember { FocusRequester() }
+    val filmRow = remember { FocusRequester() }
+    val episodeRow = remember { FocusRequester() }
+
     Scaffold(
         topBar = { SectionTopBar("Home", onSettings) },
         containerColor = Night.ground,
@@ -90,6 +106,7 @@ fun HomeScreen(
                     title = "Live TV",
                     tag = if (showingRecent) "Recent" else "Favourites",
                     onOpen = onChannels,
+                    row = channelRow.takeIf { channels.isNotEmpty() },
                 )
             }
             item {
@@ -104,6 +121,10 @@ fun HomeScreen(
                     )
                 } else {
                     LazyRow(
+                        // The heading above hands Down to this requester, and
+                        // the group passes it on to the first card. Both halves
+                        // are needed; nothing shows any of it on a phone.
+                        modifier = Modifier.focusRequester(channelRow).focusGroup(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -119,6 +140,7 @@ fun HomeScreen(
                     title = "Films",
                     tag = if (state.films.isEmpty()) "" else "Continue watching",
                     onOpen = onFilms,
+                    row = filmRow.takeIf { state.films.isNotEmpty() },
                 )
             }
             item {
@@ -129,6 +151,10 @@ fun HomeScreen(
                     )
                 } else {
                     LazyRow(
+                        // The heading above hands Down to this requester, and
+                        // the group passes it on to the first card. Both halves
+                        // are needed; nothing shows any of it on a phone.
+                        modifier = Modifier.focusRequester(filmRow).focusGroup(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -144,6 +170,7 @@ fun HomeScreen(
                     title = "Series",
                     tag = if (state.episodes.isEmpty()) "" else "Continue watching",
                     onOpen = onSeries,
+                    row = episodeRow.takeIf { state.episodes.isNotEmpty() },
                 )
             }
             item {
@@ -154,6 +181,10 @@ fun HomeScreen(
                     )
                 } else {
                     LazyRow(
+                        // The heading above hands Down to this requester, and
+                        // the group passes it on to the first card. Both halves
+                        // are needed; nothing shows any of it on a phone.
+                        modifier = Modifier.focusRequester(episodeRow).focusGroup(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -167,14 +198,21 @@ fun HomeScreen(
     }
 }
 
-/** A section's name, what the row is showing, and the way into the full list. */
+/**
+ * A section's name, what the row is showing, and the way into the full list.
+ *
+ * [row] is the row of cards beneath it, or null when there is none to go to.
+ * Down is sent there explicitly because Compose will not send it there on its
+ * own — see the note where the requesters are made.
+ */
 @Composable
-private fun RowHeading(title: String, tag: String, onOpen: () -> Unit) {
+private fun RowHeading(title: String, tag: String, onOpen: () -> Unit, row: FocusRequester? = null) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
             .clip(Corners.control)
+            .then(if (row != null) Modifier.focusProperties { down = row } else Modifier)
             .focusRing(Corners.control)
             .clickable(onClick = onOpen)
             .padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
