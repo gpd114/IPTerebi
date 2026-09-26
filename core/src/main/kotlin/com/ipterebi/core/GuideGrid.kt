@@ -78,3 +78,43 @@ fun windowFor(windowStart: Long, visible: Long, slot: GuideSlot, earliest: Long)
  * whatever was on when the film began.
  */
 fun anchorOf(slot: GuideSlot, windowStart: Long): Long = maxOf(slot.start, windowStart)
+
+/** What a press of left in the guide means, given where the cursor is. */
+enum class GuideLeft {
+    /** Move to the programme before this one. */
+    StepBack,
+
+    /** Slide the groups out: the way to another category. */
+    OpenGroups,
+
+    /** Nothing to go back to — the end of what the provider keeps. */
+    Nothing,
+}
+
+/**
+ * Which of those a press of left is.
+ *
+ * Left has to be two things on a remote whose every key is already spoken for:
+ * the way to the groups, which is frequent, and the way into the past, which
+ * is not. So a tap at what is on now opens the groups and **a hold goes back**,
+ * which is how TiviMate does it and the only convention a viewer might already
+ * know. Once the cursor is in the past a tap keeps going back, because there
+ * the groups would be the surprise.
+ *
+ * [earliest] is as far back as the cursor may go: for a channel that keeps a
+ * recording, the start of that window; for one that does not, [now].
+ */
+fun guideLeft(
+    here: GuideSlot,
+    previous: GuideSlot,
+    now: Long,
+    earliest: Long,
+    held: Boolean,
+): GuideLeft {
+    // The programme before has not finished: this is the one on now, or the
+    // cursor is somewhere ahead of it. Going back is ordinary movement.
+    if (previous.stop > now) return GuideLeft.StepBack
+    val inPast = here.stop <= now
+    if (!inPast && !held) return GuideLeft.OpenGroups
+    return if (previous.start >= earliest) GuideLeft.StepBack else GuideLeft.Nothing
+}

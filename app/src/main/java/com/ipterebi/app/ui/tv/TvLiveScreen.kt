@@ -125,6 +125,8 @@ import kotlinx.coroutines.launch
 fun TvLiveScreen(
     container: AppContainer,
     onOpen: (TvDestination) -> Unit,
+    /** Play a recording of something that has already been on. */
+    onCatchUp: (LiveStream, Long, Int) -> Unit,
     /** A channel to open on, chosen somewhere else — the home screen's row. */
     startOn: Int = 0,
 ) {
@@ -138,7 +140,7 @@ fun TvLiveScreen(
         }
         return
     }
-    TvLive(container, model, state, account, onOpen, startOn)
+    TvLive(container, model, state, account, onOpen, onCatchUp, startOn)
 }
 
 @androidx.annotation.OptIn(markerClass = [UnstableApi::class])
@@ -149,6 +151,7 @@ private fun TvLive(
     state: TvLiveState,
     account: XtreamAccount,
     onOpen: (TvDestination) -> Unit,
+    onCatchUp: (LiveStream, Long, Int) -> Unit,
     /** See TvLiveScreen: 0 when nothing in particular was asked for. */
     startOn: Int,
 ) {
@@ -738,6 +741,10 @@ private fun TvLive(
                     if (channel.streamId == tunedId && (error != null || released)) attempt++
                 },
                 onFavourite = model::toggleFavourite,
+                onCatchUp = { channel, start, minutes ->
+                    listOpen = false
+                    onCatchUp(channel, start, minutes)
+                },
                 onOpen = { listOpen = false; onOpen(it) },
                 onClose = { listOpen = false },
                 onRetry = model::retry,

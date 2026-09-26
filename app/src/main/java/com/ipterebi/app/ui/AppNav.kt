@@ -317,6 +317,9 @@ fun AppNav(container: AppContainer) {
                                             TvDestination.Settings -> nav.navigate(Route.SETTINGS)
                                         }
                                     },
+                                    onCatchUp = { channel, start, minutes ->
+                                        nav.navigate(Route.playCatchUp(channel.streamId, start, minutes))
+                                    },
                                 )
                             }
 

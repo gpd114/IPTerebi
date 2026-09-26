@@ -91,8 +91,16 @@ box, and put back to this on their word.
   programme, up/down keeping the point in time, empty stretches stepped in
   half-hours, the window following. Keys are worked out from the live cursor,
   not the last frame: bursts sent to the real box landed wrong until they were.
-- **Left stops at now**, which is what makes it the way to the groups. When
-  catch-up arrives the past needs another way in.
+- **A tap of left stops at now**, which is what makes it the way to the groups.
+  **Holding it goes back** through what has already been on, as far as the
+  provider keeps a recording of that channel — TiviMate's convention, and the
+  only one left on a remote whose every key is spoken for. OK on a finished
+  programme plays the recording; where there is none the hint line says so
+  rather than offering it. The rule is `guideLeft` in `core/`, tested, because
+  the TV emulator does not deliver a held key to the app at all — not this one
+  and not the hold on OK that has worked on a real remote since the guide was
+  written. Rows for a channel with an archive are loaded from as far back as
+  it keeps, rather than the hour behind that a channel without one gets.
 - **From the full guide on the device only.** Rows are loaded from
   `GuideStore` as they come near the cursor; a channel it does not cover is a
   row of empty half-hours, not a `get_short_epg` request per row.

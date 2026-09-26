@@ -61,10 +61,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ipterebi.app.R
 import com.ipterebi.app.AppContainer
 import com.ipterebi.core.LiveStream
+import com.ipterebi.core.canCatchUp
+import com.ipterebi.core.catchUpFrom
+import com.ipterebi.core.catchUpMinutes
 import com.ipterebi.core.XmltvProgramme
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.anchorOf
 import com.ipterebi.core.floorToGuideStep
+import com.ipterebi.core.GuideLeft
+import com.ipterebi.core.guideLeft
 import com.ipterebi.core.nextSlot
 import com.ipterebi.core.previousSlot
 import com.ipterebi.core.slotAt
@@ -98,7 +103,7 @@ enum class TvDestination(val label: String) {
  * The channels, with their guide: OK from full screen brings it up.
  *
  * One screen rather than a channel list and a separate guide, as the owner
- * asked — a group is chosen and its channels are the guide's rows: channels
+ * asked â a group is chosen and its channels are the guide's rows: channels
  * down, time across, the focused programme described at the top, and the
  * channel playing still on in the top right. That is the *same* player, resized
  * into a corner this screen leaves unpainted, so it never costs a second
@@ -106,15 +111,18 @@ enum class TvDestination(val label: String) {
  *
  * - Up and down move between channels, right looks ahead along a channel's
  *   programmes, and the window follows (the rules are `GuideGrid` in `core/`).
- * - Left from the programme on now slides the groups out — and the rail to
+ * - Left from the programme on now slides the groups out â and the rail to
  *   Films, Series and Settings beyond them. Moving through the groups changes
  *   the rows at once; OK or right goes back into them.
  * - OK watches the focused channel, full screen. Holding OK adds it to
  *   Favourites or takes it off. Back closes.
  *
- * The past is not reachable yet: until catch-up, there is nothing to do with a
- * programme that has finished, and stopping left at "now" is what makes left
- * the way to the groups.
+ * The past is reachable by **holding** left, which is how TiviMate does it —
+ * a tap there is the way to the groups, and that is the frequent one. OK on a
+ * programme that has finished plays the provider's recording of it when there
+ * is one, and says which reason there is not when there is not. The rule for
+ * left is `guideLeft` in core, because the emulator will not deliver a held
+ * key to the app at all.
  */
 @Composable
 internal fun TvChannelGuide(
@@ -126,6 +134,8 @@ internal fun TvChannelGuide(
     tunedId: Int,
     onTune: (LiveStream, TvGroup) -> Unit,
     onFavourite: (LiveStream) -> Unit,
+    /** Play a recording of a programme that has finished. */
+    onCatchUp: (LiveStream, Long, Int) -> Unit,
     onOpen: (TvDestination) -> Unit,
     onClose: () -> Unit,
     onRetry: () -> Unit,
@@ -139,6 +149,13 @@ internal fun TvChannelGuide(
         }
     }
     val latest = remember { now + 4 * 24 * 3600 }
+
+    // How far back this channel is worth reading. A channel with no recording
+    // has nothing to do with its past, so it loads the hour behind it and
+    // stops there, as it always did; one with a recording loads as far back as
+    // the provider keeps it, which is what the cursor is then allowed to reach.
+    fun pastOf(channel: LiveStream): Long =
+        if (channel.hasCatchUp) minOf(channel.tvArchiveDays, 7) * 24L * 3600L else 3600L
 
     val groups = buildList {
         add(TvGroup.Favourites)
@@ -165,6 +182,20 @@ internal fun TvChannelGuide(
     val focusedChannel = channels.getOrNull(row)
     val currentSlot = focusedChannel?.let { slotAt(programmesOf(it), anchor) }
 
+    // What the buttons do here, which is not the same once the cursor is in
+    // the past. Hold-left is only advertised on a channel that keeps something,
+    // because on any other it leads nowhere.
+    val finished = currentSlot?.takeIf { it.stop <= now }
+    val footerHint = when {
+        finished != null && focusedChannel != null &&
+            canCatchUp(focusedChannel, finished.start, finished.stop, now) ->
+            "OK  Watch from the start      ▶  Back to now"
+        finished != null -> "Nothing kept from then      ▶  Back to now"
+        focusedChannel?.hasCatchUp == true ->
+            "◀  Groups      Hold ◀  Earlier      OK  Watch      Hold OK  Favourite"
+        else -> "◀  Groups      OK  Watch      Hold OK  Favourite"
+    }
+
     val rows = remember(shown) { LazyListState((row - 2).coerceAtLeast(0)) }
     LaunchedEffect(row, shown) {
         val visible = rows.layoutInfo.visibleItemsInfo
@@ -180,7 +211,8 @@ internal fun TvChannelGuide(
         for (i in range) {
             val channel = channels[i]
             if (channel.epgChannelId.isBlank() || schedules.containsKey(channel.epgChannelId)) continue
-            schedules[channel.epgChannelId] = container.guide.schedule(account, channel.epgChannelId, now - 3600, latest)
+            schedules[channel.epgChannelId] =
+                container.guide.schedule(account, channel.epgChannelId, now - pastOf(channel), latest)
         }
     }
 
@@ -229,7 +261,22 @@ internal fun TvChannelGuide(
                             }
                             KeyEventType.KeyUp -> if (okHeld[0]) {
                                 okHeld[0] = false
-                                onTune(channel, shown)
+                                val slot = slotAt(programmesOf(channel), anchor)
+                                when {
+                                    // Still to come, or on now: watch it.
+                                    slot.stop > now -> onTune(channel, shown)
+                                    canCatchUp(channel, slot.start, slot.stop, now) -> {
+                                        val from = catchUpFrom(channel, slot.start, slot.stop, now) ?: slot.start
+                                        onCatchUp(channel, from, catchUpMinutes(from, slot.stop))
+                                    }
+                                    // Finished, and nothing kept. Say which of
+                                    // the two reasons it is, because they are
+                                    // different problems: one is the provider's
+                                    // choice of channel, the other is time.
+                                    !channel.hasCatchUp ->
+                                        note = "Your provider keeps no recording of " + channel.name
+                                    else -> note = "That is older than the " + channel.tvArchiveDays + " days kept"
+                                }
                             }
                         }
                         return@onKeyEvent true
@@ -263,18 +310,27 @@ internal fun TvChannelGuide(
                             val next = nextSlot(programmesOf(channel), here)
                             if (next.start < latest) {
                                 anchor = next.start
-                                windowStart = windowFor(windowStart, VISIBLE_SECONDS, next, floorToGuideStep(now))
+                                windowStart = windowFor(windowStart, VISIBLE_SECONDS, next, floorToGuideStep(now - pastOf(channel)))
                             }
                             true
                         }
                         Key.DirectionLeft -> {
+                            // A tap at what is on now opens the groups; a hold
+                            // goes back through what has been on. The rule is
+                            // `guideLeft` in core, where a hold is a boolean —
+                            // the TV emulator will not deliver a real one.
                             val previous = previousSlot(programmesOf(channel), here)
-                            if (previous.stop > now) {
-                                anchor = previous.start
-                                windowStart = windowFor(windowStart, VISIBLE_SECONDS, previous, floorToGuideStep(now))
-                            } else {
-                                // At what is on now: left is the way to the groups.
-                                groupsOpen = true
+                            val earliest = floorToGuideStep(now - pastOf(channel))
+                            val held = e.nativeKeyEvent.repeatCount > 0
+                            when (guideLeft(here, previous, now, earliest, held)) {
+                                GuideLeft.StepBack -> {
+                                    anchor = previous.start
+                                    windowStart = windowFor(windowStart, VISIBLE_SECONDS, previous, earliest)
+                                }
+                                GuideLeft.OpenGroups -> groupsOpen = true
+                                GuideLeft.Nothing -> if (channel.hasCatchUp) {
+                                    note = "That is as far back as " + channel.name + " is kept"
+                                }
                             }
                             true
                         }
@@ -289,7 +345,7 @@ internal fun TvChannelGuide(
                     slot = currentSlot,
                     now = now,
                     zone = zone,
-                    footer = note ?: "◀  Groups      OK  Watch      Hold OK  Favourite",
+                    footer = note ?: footerHint,
                     footerColour = if (note != null) TvPink else TvInkSoft,
                     modifier = Modifier
                         .weight(1f)
@@ -308,7 +364,7 @@ internal fun TvChannelGuide(
                         when {
                             shown == TvGroup.Favourites -> "No favourites yet. Hold OK on any channel to add it."
                             shown == TvGroup.Recent -> "Channels you watch will appear here."
-                            state.lineup == null -> "Loading channels…"
+                            state.lineup == null -> "Loading channelsâ¦"
                             else -> "No channels in this group."
                         },
                         style = MaterialTheme.typography.bodyLarge,
@@ -353,7 +409,7 @@ internal fun TvChannelGuide(
 /**
  * The groups, slid out over the guide's left side, with the rail beyond them.
  * Focus moving through them shows each group's channels behind at once, as
- * TiviMate does — clicking into a group to see inside it would be a press per
+ * TiviMate does â clicking into a group to see inside it would be a press per
  * group for nothing.
  */
 @Composable
@@ -385,7 +441,7 @@ private fun GroupsPanel(
      * not composed yet, requestFocus threw into a runCatching that swallowed
      * it, and *nothing* held focus. The grid had already stopped taking keys
      * because the panel was open, so the remote went dead until the guide was
-     * closed and opened again — which is what a real line actually did.
+     * closed and opened again â which is what a real line actually did.
      */
     fun focusGroups() {
         scope.launch {
@@ -419,8 +475,8 @@ private fun GroupsPanel(
             verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // The same order as the rail on every other screen — Home, Live TV,
-            // Films, Series — because this one being its own arrangement is
+            // The same order as the rail on every other screen â Home, Live TV,
+            // Films, Series â because this one being its own arrangement is
             // exactly what the owner noticed. Settings is last and set apart:
             // the other screens keep it as the cog in their top bar, and this
             // screen has no top bar to keep it in.
@@ -552,7 +608,7 @@ private fun LineupStatus(state: TvLiveState, onRetry: () -> Unit) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             CircularProgressIndicator(Modifier.size(16.dp), color = TvAccent, strokeWidth = 2.dp)
             Spacer(Modifier.width(10.dp))
-            Text("Loading every channel…", style = MaterialTheme.typography.bodySmall, color = TvInkSoft)
+            Text("Loading every channelâ¦", style = MaterialTheme.typography.bodySmall, color = TvInkSoft)
         }
     }
 }
