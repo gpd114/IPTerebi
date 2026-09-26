@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +19,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -260,6 +264,20 @@ internal fun GuideRow(
             if (favourite) {
                 Spacer(Modifier.width(4.dp))
                 Text("★", style = MaterialTheme.typography.labelMedium, color = TvPink)
+            }
+            // Says the provider keeps a recording of this one, which is the
+            // only way to tell it from the channel under it — the same mark
+            // the phone puts on a channel row, for the same reason. Without
+            // it, holding left works on one row and not the next and there is
+            // nothing on screen to say why.
+            if (channel.hasCatchUp) {
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    Icons.Filled.Replay,
+                    contentDescription = null,
+                    tint = TvAccent,
+                    modifier = Modifier.size(14.dp),
+                )
             }
         }
         androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxHeight().clipToBounds()) {

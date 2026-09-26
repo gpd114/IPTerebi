@@ -104,6 +104,13 @@ box, and put back to this on their word.
   Coming back is a hold of right, which returns to now in one go rather than
   a press per programme walked back; ahead of now a hold still steps, because
   that is how tonight is browsed.
+  Which channels keep one is marked on the row, the same replay mark the
+  phone puts on a channel row: on a real line the channel above keeps seven
+  days and the one below keeps nothing, and without the mark holding left
+  works on one row and not the next with nothing on screen to say why. When
+  there is nothing to go back to it now says which reason — no recording at
+  all, or older than what is kept. That was silent, and silence reads as a
+  fault.
 - **From the full guide on the device only.** Rows are loaded from
   `GuideStore` as they come near the cursor; a channel it does not cover is a
   row of empty half-hours, not a `get_short_epg` request per row.

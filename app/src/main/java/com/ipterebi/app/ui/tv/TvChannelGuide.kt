@@ -339,8 +339,13 @@ internal fun TvChannelGuide(
                                     windowStart = windowFor(windowStart, VISIBLE_SECONDS, previous, earliest)
                                 }
                                 GuideLeft.OpenGroups -> groupsOpen = true
-                                GuideLeft.Nothing -> if (channel.hasCatchUp) {
-                                    note = "That is as far back as " + channel.name + " is kept"
+                                // Say why nothing happened. This was silent,
+                                // and a channel that will not go back while
+                                // the one under it does looks like a fault.
+                                GuideLeft.Nothing -> note = if (channel.hasCatchUp) {
+                                    "That is as far back as " + channel.name + " is kept"
+                                } else {
+                                    "Your provider keeps no recording of " + channel.name
                                 }
                             }
                             true
