@@ -590,6 +590,17 @@ survived until something was pressed.
   ones. Accepted: phone and tablet first. If it matters on a TV, give the chips
   a `focusProperties { down = … }` to the list and keep left and right for the
   shelf.
+- **A heading the width of the screen beats the small card under it.** On
+  Home, Down from a row heading went to the *next heading* and never into the
+  row. The cards were focusable all along and were candidates in the search;
+  they simply never won it. Compose weighs the sideways distance between the
+  two centres as well as the distance in the direction pressed, and a
+  full-width heading's centre is most of the screen away from a 76dp card's,
+  while the next heading's is directly below. So each heading names its own
+  row with `focusProperties { down = … }` and the row is a `focusGroup()`,
+  which passes the request on to its first card. Anything shaped like a row of
+  cards under a wide heading needs the same. Found on the `googletv34`
+  emulator with `uiautomator dump`; nothing shows it under touch.
 - **A TV needs `android.hardware.touchscreen` required="false"**, or it counts
   as unable to run the app, plus `LEANBACK_LAUNCHER` and a banner to appear on
   its home screen. Those three are in the manifest but have not been checked on
