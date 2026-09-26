@@ -553,6 +553,19 @@ back as far as the recording does. It goes no further than the guide itself
 knows, though, and that is usually less: `xmltv.php` generally starts at about
 now, so the past is only as deep as what that download happened to include.
 
+**A provider carries the same channel twice, and only one copy keeps a
+recording.** On the first real line, `get_live_streams` for the whole line
+answered 21,077 channels of which **365 kept seven days** — and the category
+anyone would actually go to, `### UK GENERAL HEVC/HD ###`, had **none at
+all**. So the BBC One you find by browsing is the BBC One that cannot be
+caught up, and nothing on any screen said so: the only place an archive
+showed was the button on a finished programme, which you would have to find
+first. Hence the mark on the channel row — a small replay icon in the accent,
+on the row and so on every search result — and it is the only way to tell the
+two copies apart. The guide's reach into the past follows the same field, so
+on a channel with no archive it still stops at two hours; that is what "the
+guide only goes back two and a half hours on BBC" turned out to be.
+
 The fake panel serves all of it: channel 101 keeps four days, channel 102
 claims an archive for zero days, `/timeshift/` streams what is inside the
 window and 404s what is outside, and the log prints how long ago each request
