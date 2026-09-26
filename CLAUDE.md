@@ -651,7 +651,18 @@ misbehaves in the ways already written down here.
 The first real line was on a Pixel 10 (Android 17): sign-in, live at 720p,
 an mkv film with seeking, series, picture-in-picture, playing on with the
 screen off, and a reconnect from Wi-Fi to mobile data all worked, and it
-turned up the 458 above. That is one provider. The next one will differ, and
+turned up the 458 above.
+
+**Catch-up has now played on that line too**, which until 26 September it
+never had. A channel in `#### GENERAL HD/4K ####` — 191 of its 199 keep
+three days — a programme picked out of the night before, and
+`/timeshift/u/p/50/2026-09-26:03-25/162115.ts` came back at 1920x1080. The
+time in that path is the point: the guide had the programme at 01:25 UTC, the
+panel is two hours ahead of UTC, and 03:25 is what it was therefore asked for.
+That is `GuideClock`'s learned shift being undone, and it is the one part of
+catch-up that fails silently rather than loudly.
+
+That is one provider. The next one will differ, and
 the surprises will be in what it returns.
 
 An emulator run is worth doing for any change to `app/` — the SDK on the dev
