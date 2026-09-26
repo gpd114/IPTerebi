@@ -56,7 +56,7 @@ import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.SearchFieldShape
 import com.ipterebi.app.ui.SectionTopBar
 import com.ipterebi.app.ui.ShelfChip
-import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.focusFill
 import com.ipterebi.app.ui.fieldColours
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
@@ -187,7 +187,14 @@ fun PosterTile(
     // Rounded, with a faint rim so a dark cover still has an edge against the
     // page — Debritsu's PosterArt, which every cover there is drawn with.
     val poster = Corners.card
-    Column(modifier = Modifier.focusRing(poster).clickable(onClick = onClick)) {
+    Column(
+        modifier = Modifier
+            .focusFill(poster)
+            .clickable(onClick = onClick)
+            // Inside the fill: a poster paints over a background, so without
+            // this focus would show only behind the title under it.
+            .padding(3.dp),
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()

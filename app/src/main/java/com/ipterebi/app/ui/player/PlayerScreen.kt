@@ -83,7 +83,7 @@ import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.app.playback.ActivePlayback
 import com.ipterebi.app.ui.PrimaryButton
-import com.ipterebi.app.ui.focusRing
+import com.ipterebi.app.ui.focusFill
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.theme.OverVideo

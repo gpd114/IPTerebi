@@ -199,7 +199,7 @@ fun AppNav(container: AppContainer) {
                                             unselectedIconColor = Night.inkSoft,
                                             unselectedTextColor = Night.inkSoft,
                                         ),
-                                        modifier = Modifier.focusRing(),
+                                        modifier = Modifier.focusFill(),
                                     )
                                 }
                                 Spacer(Modifier.weight(1f))
@@ -460,7 +460,7 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
                     .weight(1f)
                     .clip(tab)
                     .background(if (selected) Night.cobalt else Color.Transparent)
-                    .focusRing(tab)
+                    .focusFill(tab)
                     .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(item) })
                     .padding(vertical = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,

@@ -82,7 +82,7 @@ fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
                     FilterChip(
                         modifier = Modifier
                             .bringIntoViewRequester(bringIntoView)
-                            .focusRing(ChipShape),
+                            .focusFill(ChipShape),
                         selected = chip.selected,
                         onClick = chip.onClick,
                         label = {
