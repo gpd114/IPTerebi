@@ -189,8 +189,8 @@ internal fun TvChannelGuide(
     val footerHint = when {
         finished != null && focusedChannel != null &&
             canCatchUp(focusedChannel, finished.start, finished.stop, now) ->
-            "OK  Watch from the start      ▶  Back to now"
-        finished != null -> "Nothing kept from then      ▶  Back to now"
+            "OK  Watch from the start      Hold ▶  Back to now"
+        finished != null -> "Nothing kept from then      Hold ▶  Back to now"
         focusedChannel?.hasCatchUp == true ->
             "◀  Groups      Hold ◀  Earlier      OK  Watch      Hold OK  Favourite"
         else -> "◀  Groups      OK  Watch      Hold OK  Favourite"
@@ -307,6 +307,17 @@ internal fun TvChannelGuide(
                             true
                         }
                         Key.DirectionRight -> {
+                            // Held while in the past: come back to now in one
+                            // go. Walking back an evening takes one hold; it
+                            // should not take a dozen presses to undo, and on
+                            // the way forward there is nothing else a hold in
+                            // the past could usefully mean. Ahead of now it
+                            // still steps, which is how tonight is browsed.
+                            if (here.stop <= now && e.nativeKeyEvent.repeatCount > 0) {
+                                anchor = now
+                                windowStart = floorToGuideStep(now)
+                                return@onKeyEvent true
+                            }
                             val next = nextSlot(programmesOf(channel), here)
                             if (next.start < latest) {
                                 anchor = next.start

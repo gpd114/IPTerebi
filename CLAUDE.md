@@ -101,6 +101,9 @@ box, and put back to this on their word.
   and not the hold on OK that has worked on a real remote since the guide was
   written. Rows for a channel with an archive are loaded from as far back as
   it keeps, rather than the hour behind that a channel without one gets.
+  Coming back is a hold of right, which returns to now in one go rather than
+  a press per programme walked back; ahead of now a hold still steps, because
+  that is how tonight is browsed.
 - **From the full guide on the device only.** Rows are loaded from
   `GuideStore` as they come near the cursor; a channel it does not cover is a
   row of empty half-hours, not a `get_short_epg` request per row.
