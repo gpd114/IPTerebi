@@ -155,3 +155,52 @@ class CatchUpUrlTest {
         assertTrue(url.contains("/2026-09-24:21-00/"), url)
     }
 }
+
+/**
+ * The panel stating its own clock, which is the only source that does not
+ * need `get_short_epg` to answer — and on the owner's box it never does.
+ */
+class PanelClockTest {
+
+    @Test
+    fun `a panel two hours ahead of UTC says so in its own two fields`() {
+        // 2026-09-27 07:46:00 UTC, which this panel calls 09:46.
+        val stamp = 1790495160L
+        assertEquals(-7200L, panelClockShift("2026-09-27 09:46:00", stamp.toString()))
+    }
+
+    @Test
+    fun `a panel telling the truth gives zero, and is then never shifted`() {
+        val stamp = 1790495160L
+        assertEquals(0L, panelClockShift("2026-09-27 07:46:00", stamp.toString()))
+    }
+
+    @Test
+    fun `a panel behind UTC goes the other way`() {
+        val stamp = 1790495160L
+        assertEquals(18000L, panelClockShift("2026-09-27 02:46:00", stamp.toString()))
+    }
+
+    @Test
+    fun `it is the shift catch-up wants, in the direction catch-up wants it`() {
+        // Round trip: a panel two hours ahead, a programme at 19:00 UTC, and
+        // the label that panel must be asked for.
+        val shift = panelClockShift("2026-09-27 09:46:00", "1790495160")!!
+        assertEquals("2026-09-24:21-00", catchUpStartLabel(1790276400L, shift))
+    }
+
+    @Test
+    fun `anything missing or unreadable answers null rather than a guess`() {
+        assertNull(panelClockShift("", "1790495160"))
+        assertNull(panelClockShift("2026-09-27 09:46:00", ""))
+        assertNull(panelClockShift("not a time", "1790495160"))
+        assertNull(panelClockShift("2026-09-27 09:46:00", "not a number"))
+    }
+
+    @Test
+    fun `a pair that disagrees by more than half a day is not an offset`() {
+        // No timezone is thirteen hours from UTC in this direction, so the
+        // panel is broken rather than distant, and 0 beats a day out.
+        assertNull(panelClockShift("2026-09-27 20:46:00", "1790495160"))
+    }
+}

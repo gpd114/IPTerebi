@@ -70,7 +70,38 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
     /** A refresh is under way, for a screen that offered one. */
     val downloading: StateFlow<Boolean> = _downloading.asStateFlow()
 
+    private val clockAsked = ConcurrentHashMap.newKeySet<String>()
+
+    /**
+     * Asks the panel what time it thinks it is, once per line per launch.
+     *
+     * `server_info` states the panel's own wall clock, and the gap to the unix
+     * timestamp beside it is the offset catch-up has to write into its URLs.
+     * [GuideClock] can also work that out from a programme found in both the
+     * short answer and the full guide — but only where `get_short_epg` answers
+     * at all, and on the owner's box it answers nothing for the channels the
+     * TV screen tunes. Nothing was ever learned there, the shift stayed zero,
+     * and every recording was asked for in UTC from a panel two hours ahead of
+     * it: it played, and it played the wrong two hours.
+     *
+     * One request, and it is the same call the sign-in screen makes.
+     */
+    fun learnPanelClock(account: XtreamAccount) {
+        val line = account.lineKey
+        if (!clockAsked.add(line)) return
+        scope.launch {
+            runCatching { xtream.authenticate(account) }
+                .onSuccess { status -> status.clockShift?.let { clock.statedBy(line, it) } }
+                // Not remembered as asked, so the next screen tries again:
+                // this is worth having and one failed request costs nothing.
+                .onFailure { clockAsked.remove(line) }
+        }
+    }
+
     private fun refresh(account: XtreamAccount, channels: Collection<LiveStream>?, onMetered: Boolean, asked: Boolean) {
+        // Before the early returns below: the guide may be fresh, or the
+        // network metered, and the clock is still wanted.
+        learnPanelClock(account)
         scope.launch {
             val line = account.lineKey
             val now = System.currentTimeMillis()

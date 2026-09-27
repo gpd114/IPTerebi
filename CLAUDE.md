@@ -730,9 +730,27 @@ when it was on: `/timeshift/user/pass/{minutes}/{yyyy-MM-dd:HH-mm}/{id}.{ext}`.
 Three things follow, and `core/CatchUp.kt` holds all three with tests:
 
 - **The time in that URL is the panel's wall clock**, like everything else a
-  panel says about time. So the shift `GuideClock` learned from evidence is
-  applied *in reverse* when building it. Get this wrong and nothing fails —
-  it plays the wrong hour, which is much harder to notice than an error.
+  panel says about time. So the shift is applied *in reverse* when building
+  it. Get this wrong and nothing fails — it plays the wrong hour, which is
+  much harder to notice than an error, and it is exactly what happened on the
+  box: every recording played two hours early while looking perfectly healthy.
+
+  **Ask the panel what time it thinks it is; do not only infer it.**
+  `server_info` carries `time_now`, the panel's wall clock, beside
+  `timestamp_now`, the same instant in unix seconds. The gap between them is
+  the offset, stated rather than worked out, and it arrives on the first call
+  the app makes. `panelClockShift` reads it, `Guide.learnPanelClock` asks for
+  it once per line per launch, and `GuideClock` keeps it under the evidence
+  from the full guide and above everything else.
+
+  That was learnt the hard way. `GuideClock` could already work the error out
+  from a programme found in both `get_short_epg` and `xmltv.php` — but only
+  where the short answer answers. On the box it answers *nothing* for the
+  channels the TV screen tunes: nine empty answers in one sitting, so nothing
+  was ever learned, the shift stayed 0, and catch-up asked a UTC+2 panel for
+  UTC. On the phone the same line worked, because the channels browsed there
+  did answer. A fault that follows the device rather than the line is a fault
+  in what the device happened to see.
 - **The programme must have finished.** A panel will serve a catch-up that
   runs into the future, and what comes back stops dead at the live edge with
   the player waiting for more.
@@ -753,10 +771,29 @@ back as far as the recording does. It goes no further than the guide itself
 knows, though, and that is usually less: `xmltv.php` generally starts at about
 now, so the past is only as deep as what that download happened to include.
 
+**A provider carries the same channel twice, and only one copy keeps a
+recording.** On the first real line, `get_live_streams` for the whole line
+answered 21,077 channels of which **365 kept seven days** — and the category
+anyone would actually go to, `### UK GENERAL HEVC/HD ###`, had **none at
+all**. So the BBC One you find by browsing is the BBC One that cannot be
+caught up, and nothing on any screen said so: the only place an archive
+showed was the button on a finished programme, which you would have to find
+first. Hence the mark on the channel row — a small replay icon in the accent,
+on the row and so on every search result — and it is the only way to tell the
+two copies apart. The guide's reach into the past follows the same field, so
+on a channel with no archive it still stops at two hours; that is what "the
+guide only goes back two and a half hours on BBC" turned out to be.
+
 The fake panel serves all of it: channel 101 keeps four days, channel 102
 claims an archive for zero days, `/timeshift/` streams what is inside the
 window and 404s what is outside, and the log prints how long ago each request
 was for — which is the check that catches a wrong clock.
+
+**Its clock is two hours ahead of UTC, as the first real line's was**, stated
+in `server_info` and used when reading a `/timeshift/` path back. So a client
+that sends UTC lands two hours early and the panel's log says so, in the
+"(N h ago)" it prints beside every request. That is the fault the box had,
+made reproducible.
 
 ## Things that are true about a D-pad
 
@@ -855,7 +892,20 @@ misbehaves in the ways already written down here.
 The first real line was on a Pixel 10 (Android 17): sign-in, live at 720p,
 an mkv film with seeking, series, picture-in-picture, playing on with the
 screen off, and a reconnect from Wi-Fi to mobile data all worked, and it
-turned up the 458 above. That is one provider. The next one will differ, and
+turned up the 458 above.
+
+**Catch-up has now played on that line too**, which until 26 September it
+never had. A channel in `#### GENERAL HD/4K ####` — 191 of its 199 keep
+three days — a programme picked out of the night before, and
+`/timeshift/u/p/50/2026-09-26:03-25/162115.ts` came back at 1920x1080. The
+time in that path is the point: the guide had the programme at 01:25 UTC, the
+panel is two hours ahead of UTC, and 03:25 is what it was therefore asked for.
+That is `GuideClock`'s learned shift being undone, and it is the one part of
+catch-up that fails silently rather than loudly — so it was checked the only
+way it can be: the viewer confirmed that what played was the programme they
+had tapped, not the one an hour either side of it.
+
+That is one provider. The next one will differ, and
 the surprises will be in what it returns.
 
 An emulator run is worth doing for any change to `app/` — the SDK on the dev

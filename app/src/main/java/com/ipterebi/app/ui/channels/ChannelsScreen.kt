@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
@@ -334,6 +335,20 @@ private fun ChannelRow(
                     gapSize = 0.dp,
                 )
             }
+        }
+
+        // A line can carry a recording of a channel for days and say so on no
+        // screen at all: the only place it showed was a finished programme in
+        // the guide, which you would have to find first. On a line of 21,000
+        // channels where 365 keep an archive, that is unfindable. So the row
+        // says it, and so does a search result, which is the same row.
+        if (channel.hasCatchUp) {
+            Icon(
+                imageVector = Icons.Filled.Replay,
+                contentDescription = "Catch-up, " + channel.tvArchiveDays + " days",
+                tint = Night.accent,
+                modifier = Modifier.padding(start = 8.dp).size(16.dp),
+            )
         }
 
         if (channel.number > 0) {

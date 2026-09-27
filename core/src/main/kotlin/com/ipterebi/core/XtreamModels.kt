@@ -176,9 +176,43 @@ data class UserInfo(
     val isActive: Boolean get() = status.equals("Active", ignoreCase = true)
 }
 
+/**
+ * What the panel says about itself, and the only place it states its own
+ * clock.
+ *
+ * That clock is the whole problem catch-up has: the time in a `/timeshift/`
+ * URL is the panel's wall clock, not UTC and not the viewer's, and getting it
+ * wrong plays the wrong hour rather than failing. [GuideClock] can work the
+ * error out from evidence, but only where `get_short_epg` answers at all — on
+ * the owner's box it answers nothing for the channels the TV screen tunes, so
+ * nothing was ever learned and every recording played two hours early.
+ *
+ * Here the panel simply tells us: [timeNow] is its wall clock and
+ * [timestampNow] is the same instant in unix seconds. The gap between them is
+ * its offset, measured rather than inferred, on the first call the app makes.
+ * Both are optional like everything else a panel sends.
+ */
+@Serializable
+data class ServerInfo(
+    /** The panel's wall clock, `"Y-m-d H:i:s"`. */
+    @SerialName("time_now")
+    @Serializable(with = FlexibleStringSerializer::class)
+    val timeNow: String = "",
+
+    /** The same instant in unix seconds. Some forks send it as a string. */
+    @SerialName("timestamp_now")
+    @Serializable(with = FlexibleStringSerializer::class)
+    val timestampNow: String = "",
+
+    /** e.g. "Europe/Amsterdam". Free text, and often absent or wrong. */
+    @Serializable(with = FlexibleStringSerializer::class)
+    val timezone: String = "",
+)
+
 @Serializable
 data class AuthResponse(
     @SerialName("user_info") val userInfo: UserInfo = UserInfo(),
+    @SerialName("server_info") val serverInfo: ServerInfo = ServerInfo(),
 )
 
 /**
@@ -206,3 +240,18 @@ fun List<LiveStream>.playableChannels(): List<LiveStream> =
  */
 fun List<XtreamCategory>.usableCategories(): List<XtreamCategory> =
     filter { it.id.isNotBlank() }.distinctBy { it.id }
+
+/**
+ * What a sign-in call answers: what the panel says about the line, and what it
+ * says about its own clock.
+ *
+ * The clock is here rather than inside [UserInfo] because it is not about the
+ * user at all — it is the one number catch-up cannot do without and cannot
+ * work out for itself on a line whose `get_short_epg` answers nothing. Null
+ * when the panel did not state it, or stated nonsense; see [panelClockShift].
+ */
+data class LineStatus(
+    val info: UserInfo,
+    /** Seconds to add to this panel's own timestamps to get real time. */
+    val clockShift: Long?,
+)
