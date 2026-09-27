@@ -97,24 +97,32 @@ box, and put back to this on their word.
   only one left on a remote whose every key is spoken for. OK on a finished
   programme plays the recording; where there is none the hint line says so
   rather than offering it. The rule is `guideLeft` in `core/`, tested, because
-  the TV emulator does not deliver a held key to the app at all — not this one
-  and not the hold on OK that has worked on a real remote since the guide was
-  written. Rows for a channel with an archive are loaded from as far back as
-  it keeps, rather than the hour behind that a channel without one gets.
+  a hold there is a boolean. Rows for a channel with an archive are loaded
+  from as far back as it keeps, rather than the hour behind that a channel
+  without one gets.
 
-  **It does not work yet, and the reason is the remote.** A hold is read from
-  the key event's repeat count, which is what Android gives a held key — and
-  on the owner's box the arrow keys *never* repeat: every press of left
-  arrives as one event with `repeatCount=0` however long it is held, measured
-  in the log on the box itself. So the hold is invisible and left opens the
-  groups as it always did. The hold on **OK** does work there, so this is per
-  key, not per remote, and not something to generalise from.
+  **A hold is timed, not counted, and that is the whole reason it works.** It
+  was read from the key event's repeat count, which is what Android gives a
+  held key — and on the owner's box the arrow keys *never* repeat: every press
+  of left arrives as one event with `repeatCount=0` however long it is held,
+  measured in the log on the box itself. So the hold was invisible and left
+  opened the groups every time, on every channel, which read as catch-up being
+  broken. Its **OK** key does repeat, which is why holding OK for a favourite
+  has always worked there and why the fault looked like anything but a key.
 
-  The fix, written and then lost to a careless `git checkout --` before it was
-  committed, is to time the key instead: record the moment it goes down, act
-  when it comes up, and call anything over about 400 ms a hold — for OK as
-  well, so there is one way of asking rather than two, with a repeat still
-  acted on the moment one arrives for remotes that send them.
+  So the key is timed: the moment it goes down is recorded, the press is acted
+  on when it comes up, and anything over 400 ms is a hold. OK, left and right
+  all go through that one place, and a repeat, where a remote sends one, is
+  still acted on the moment it arrives. Time is the one thing every remote
+  has.
+
+  It also made the thing testable. `adb shell input keyevent --longpress`
+  never registered against the repeat count, and against a timed key it lands
+  as a hold — so the whole path can be driven on the `googletv34` emulator,
+  and on the first run it caught a real bug: a channel with **no** recording
+  walked into the past anyway, because the hour of guide loaded behind it for
+  context was being used as the cursor's limit as well. How much is loaded and
+  how far the cursor may go are two different numbers now.
   Coming back is a hold of right, which returns to now in one go rather than
   a press per programme walked back; ahead of now a hold still steps, because
   that is how tonight is browsed.

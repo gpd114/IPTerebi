@@ -287,7 +287,14 @@ internal fun TvChannelGuide(
 
                         fun sideways(held: Boolean) {
                             val here = slotAt(programmesOf(channel), anchor)
-                            val earliest = floorToGuideStep(now - pastOf(channel))
+                            // How far back the cursor may go, which is not the
+                            // same as how much guide was loaded: a channel with
+                            // no recording loads the hour behind it for context
+                            // and may not be walked into at all. Holding left
+                            // on one stepped back into an hour of programmes it
+                            // could never play, which the emulator showed the
+                            // moment a hold could be seen at all.
+                            val earliest = if (channel.hasCatchUp) floorToGuideStep(now - pastOf(channel)) else now
                             if (e.key == Key.DirectionRight) {
                                 // Held in the past: back to now in one go,
                                 // rather than a press per programme walked
