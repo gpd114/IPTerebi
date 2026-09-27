@@ -101,6 +101,20 @@ box, and put back to this on their word.
   and not the hold on OK that has worked on a real remote since the guide was
   written. Rows for a channel with an archive are loaded from as far back as
   it keeps, rather than the hour behind that a channel without one gets.
+
+  **It does not work yet, and the reason is the remote.** A hold is read from
+  the key event's repeat count, which is what Android gives a held key — and
+  on the owner's box the arrow keys *never* repeat: every press of left
+  arrives as one event with `repeatCount=0` however long it is held, measured
+  in the log on the box itself. So the hold is invisible and left opens the
+  groups as it always did. The hold on **OK** does work there, so this is per
+  key, not per remote, and not something to generalise from.
+
+  The fix, written and then lost to a careless `git checkout --` before it was
+  committed, is to time the key instead: record the moment it goes down, act
+  when it comes up, and call anything over about 400 ms a hold — for OK as
+  well, so there is one way of asking rather than two, with a repeat still
+  acted on the moment one arrives for remotes that send them.
   Coming back is a hold of right, which returns to now in one go rather than
   a press per programme walked back; ahead of now a hold still steps, because
   that is how tonight is browsed.
