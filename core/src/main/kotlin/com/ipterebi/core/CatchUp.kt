@@ -1,9 +1,11 @@
 package com.ipterebi.core
 
 import java.time.Instant
+import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
 
 /**
  * Watching a programme that has already been on.
@@ -95,3 +97,39 @@ fun canCatchUp(
     stopSeconds: Long,
     nowSeconds: Long,
 ): Boolean = catchUpFrom(channel, startSeconds, stopSeconds, nowSeconds) != null
+
+/**
+ * The shift for a panel that states its own clock, or null when it does not.
+ *
+ * `server_info` carries `time_now`, the panel's wall clock, and
+ * `timestamp_now`, the same instant in unix seconds. Read the first as though
+ * it were UTC and the gap to the second is exactly how far the panel's clock
+ * runs from UTC — the number [catchUpStartLabel] and [GuideClock] both want,
+ * in [GuideClock]'s direction: the correction *added* to a panel's timestamps
+ * to get real time.
+ *
+ * This matters because the other way of learning it needs `get_short_epg` to
+ * answer something. On the owner's box it answers nothing at all for the
+ * channels the TV screen tunes — nine empty answers in one sitting — so
+ * nothing was ever learned, the shift stayed 0, and every recording was asked
+ * for in UTC from a panel two hours ahead of it. It played, and it played the
+ * wrong two hours.
+ *
+ * Nonsense is rejected rather than trusted: a panel whose two fields disagree
+ * by more than half a day is not stating an offset, it is broken, and 0 is a
+ * better guess than a day out.
+ */
+fun panelClockShift(timeNow: String, timestampNow: String): Long? {
+    val stamp = timestampNow.trim().toLongOrNull() ?: return null
+    val wall = parsePanelWallClock(timeNow) ?: return null
+    val shift = stamp - wall
+    return shift.takeIf { abs(it) <= 12 * 60 * 60 }
+}
+
+/** `"2026-09-27 09:46:00"` read as though it were UTC, in unix seconds. */
+private fun parsePanelWallClock(text: String): Long? {
+    val trimmed = text.trim().ifBlank { return null }
+    return runCatching {
+        LocalDateTime.parse(trimmed.replace(' ', 'T')).toEpochSecond(ZoneOffset.UTC)
+    }.getOrNull()
+}

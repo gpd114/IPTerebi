@@ -530,9 +530,27 @@ when it was on: `/timeshift/user/pass/{minutes}/{yyyy-MM-dd:HH-mm}/{id}.{ext}`.
 Three things follow, and `core/CatchUp.kt` holds all three with tests:
 
 - **The time in that URL is the panel's wall clock**, like everything else a
-  panel says about time. So the shift `GuideClock` learned from evidence is
-  applied *in reverse* when building it. Get this wrong and nothing fails —
-  it plays the wrong hour, which is much harder to notice than an error.
+  panel says about time. So the shift is applied *in reverse* when building
+  it. Get this wrong and nothing fails — it plays the wrong hour, which is
+  much harder to notice than an error, and it is exactly what happened on the
+  box: every recording played two hours early while looking perfectly healthy.
+
+  **Ask the panel what time it thinks it is; do not only infer it.**
+  `server_info` carries `time_now`, the panel's wall clock, beside
+  `timestamp_now`, the same instant in unix seconds. The gap between them is
+  the offset, stated rather than worked out, and it arrives on the first call
+  the app makes. `panelClockShift` reads it, `Guide.learnPanelClock` asks for
+  it once per line per launch, and `GuideClock` keeps it under the evidence
+  from the full guide and above everything else.
+
+  That was learnt the hard way. `GuideClock` could already work the error out
+  from a programme found in both `get_short_epg` and `xmltv.php` — but only
+  where the short answer answers. On the box it answers *nothing* for the
+  channels the TV screen tunes: nine empty answers in one sitting, so nothing
+  was ever learned, the shift stayed 0, and catch-up asked a UTC+2 panel for
+  UTC. On the phone the same line worked, because the channels browsed there
+  did answer. A fault that follows the device rather than the line is a fault
+  in what the device happened to see.
 - **The programme must have finished.** A panel will serve a catch-up that
   runs into the future, and what comes back stops dead at the live edge with
   the player waiting for more.
@@ -570,6 +588,12 @@ The fake panel serves all of it: channel 101 keeps four days, channel 102
 claims an archive for zero days, `/timeshift/` streams what is inside the
 window and 404s what is outside, and the log prints how long ago each request
 was for — which is the check that catches a wrong clock.
+
+**Its clock is two hours ahead of UTC, as the first real line's was**, stated
+in `server_info` and used when reading a `/timeshift/` path back. So a client
+that sends UTC lands two hours early and the panel's log says so, in the
+"(N h ago)" it prints beside every request. That is the fault the box had,
+made reproducible.
 
 ## Things that are true about a D-pad
 

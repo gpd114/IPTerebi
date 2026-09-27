@@ -33,6 +33,15 @@ import kotlin.math.abs
  */
 class GuideClock {
     private val exact = HashMap<String, Long>()
+
+    /**
+     * What the panel said about its own clock at sign-in. Weaker evidence than
+     * the full guide, because a panel could in principle write honest
+     * timestamps while its wall clock runs elsewhere — and stronger than
+     * anything else, because it is stated rather than inferred and it arrives
+     * on the first call, before a guide or a short answer exists.
+     */
+    private val stated = HashMap<String, Long>()
     private val windows = HashMap<String, LinkedHashMap<String, LongRange>>()
 
     /**
@@ -46,13 +55,29 @@ class GuideClock {
     }
 
     /**
+     * Takes [line]'s error from the panel's own `server_info` — see
+     * [panelClockShift], which works it out from the two fields there.
+     *
+     * This is what makes catch-up right on a line whose `get_short_epg`
+     * answers nothing: there is then no evidence to learn from, the shift
+     * stayed 0, and every recording was asked for in UTC from a panel two
+     * hours ahead of it.
+     */
+    @Synchronized
+    fun statedBy(line: String, shift: Long) {
+        stated[line] = shift
+    }
+
+    /**
      * [listings], one [channel]'s short answer on [line], as they should be
      * read at [now]: shifted when the panel's clock is known, or agreed, to be
      * out; as they came otherwise.
      */
     @Synchronized
     fun correct(line: String, channel: String, listings: List<EpgListing>, now: Instant): List<EpgListing> {
-        exact[line]?.let { shift -> return if (shift == 0L) listings else listings.map { it.shiftedBy(shift) } }
+        (exact[line] ?: stated[line])?.let { shift ->
+            return if (shift == 0L) listings else listings.map { it.shiftedBy(shift) }
+        }
         val timed = listings.filter { it.hasKnownTimes }
         if (timed.isEmpty() || timed.any { it.isOnAt(now) }) return listings
 
@@ -74,12 +99,14 @@ class GuideClock {
 
     /** The shift in use for [line], in seconds; 0 when none. For logs. */
     @Synchronized
-    fun shiftFor(line: String): Long = exact[line] ?: windows[line]?.values?.let(::agreed) ?: 0L
+    fun shiftFor(line: String): Long =
+        exact[line] ?: stated[line] ?: windows[line]?.values?.let(::agreed) ?: 0L
 
     /** Forgets [line], when it is signed out of. */
     @Synchronized
     fun forget(line: String) {
         exact.remove(line)
+        stated.remove(line)
         windows.remove(line)
     }
 }

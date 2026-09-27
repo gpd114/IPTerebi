@@ -187,6 +187,13 @@ public class FakePanel {
         "PPV | Events", "24/7 | Classic Sitcoms", "24/7 | Cartoons", "Radio", "4K UHD",
     };
 
+    /** How far this panel's wall clock runs ahead of UTC, as a real one did. */
+    static final long PANEL_AHEAD = 2 * 60 * 60;
+
+    static final java.time.format.DateTimeFormatter PANEL_CLOCK =
+        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+            .withZone(java.time.ZoneOffset.UTC);
+
     static String api(String action, Map<String, String> q, String base) {
         long now = Instant.now().getEpochSecond();
         switch (action) {
@@ -196,7 +203,15 @@ public class FakePanel {
                 return "{\"user_info\":{\"username\":\"demo\",\"password\":\"demo\",\"auth\":1," +
                     "\"status\":\"Active\",\"exp_date\":\"1893456000\",\"max_connections\":\"1\"," +
                     "\"active_cons\":0,\"allowed_output_formats\":[\"m3u8\",\"ts\"]}," +
-                    "\"server_info\":{\"url\":\"" + base.replaceFirst("^http://", "").replaceFirst(":.*", "") + "\"}}";
+                    "\"server_info\":{\"url\":\"" + base.replaceFirst("^http://", "").replaceFirst(":.*", "") + "\"," +
+                    // A clock two hours ahead of UTC, written the way a real
+                    // panel writes it: the wall clock as a string, the true
+                    // instant as a timestamp. The gap between them is what
+                    // catch-up must put in its URLs, and a line whose
+                    // get_short_epg answers nothing has no other way to know.
+                    "\"time_now\":\"" + PANEL_CLOCK.format(Instant.ofEpochSecond(now + PANEL_AHEAD)) + "\"," +
+                    "\"timestamp_now\":" + now + "," +
+                    "\"timezone\":\"Europe/Amsterdam\"}}";
             case "get_live_categories": {
                 // A blank id and a repeat, which must not reach the screen as keys.
                 StringBuilder categories = new StringBuilder("[{\"category_id\":\"1\",\"category_name\":\"News\"}," +
@@ -457,7 +472,12 @@ public class FakePanel {
             java.time.format.DateTimeFormatter f =
                 java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd:HH-mm");
             java.time.LocalDateTime t = java.time.LocalDateTime.parse(when, f);
-            return (System.currentTimeMillis() / 1000) - t.toEpochSecond(java.time.ZoneOffset.UTC);
+            // Read as this panel's own wall clock, which is PANEL_AHEAD of
+            // UTC and is what it told the client at sign-in. A client that
+            // sends UTC instead lands two hours early here, and the log says
+            // so rather than quietly serving the wrong television.
+            long asked = t.toEpochSecond(java.time.ZoneOffset.UTC) - PANEL_AHEAD;
+            return (System.currentTimeMillis() / 1000) - asked;
         } catch (Exception e) {
             return Long.MIN_VALUE;
         }
