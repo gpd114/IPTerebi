@@ -116,6 +116,13 @@ box, and put back to this on their word.
   still acted on the moment it arrives. Time is the one thing every remote
   has.
 
+  **It works on the box, on the real line, with the owner's own remote** —
+  27 September. Holding left walked back fourteen hours to a programme from
+  the evening before, and OK on it opened
+  `/timeshift/***/***/10/2026-09-26:16-10/497001.ts`, which came back at
+  1280x720 and played. That is the whole path the box could not reach at all
+  a day earlier.
+
   It also made the thing testable. `adb shell input keyevent --longpress`
   never registered against the repeat count, and against a timed key it lands
   as a hold — so the whole path can be driven on the `googletv34` emulator,
