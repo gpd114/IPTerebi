@@ -59,6 +59,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ipterebi.app.R
+import android.util.Log
+import com.ipterebi.app.BuildConfig
+import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.app.AppContainer
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.canCatchUp
@@ -218,9 +221,19 @@ internal fun TvChannelGuide(
 
     var note by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(note) { if (note != null) { delay(2_500); note = null } }
-
-    // OK is acted on when it is let go, so that holding it can mean something
-    // else: a first repeat while still held is a long press.
+    // OK, left and right are acted on when the key comes *up*, because that is
+    // the first moment a hold can be measured — and measuring it is the only
+    // thing that works on the owner's box. A hold used to be read from the key
+    // event's repeat count, which is what Android gives a held key and what the
+    // hold on OK has always used there. Its arrow keys send no repeat at all:
+    // every press of left arrives as one event with `repeatCount=0` however
+    // long it is held down, measured in the log on the box itself, so a hold on
+    // left could never be seen. How long the key was down is the one thing
+    // every remote has. A repeat, where one does arrive, is still acted on the
+    // moment it does, and the key-up then does nothing.
+    val holdMs = 400L
+    val downAt = remember { mutableStateMapOf<Key, Long>() }
+    val acted = remember { mutableStateMapOf<Key, Boolean>() }
     val okHeld = remember { BooleanArray(1) }
 
     val gridFocus = remember { FocusRequester() }
@@ -242,45 +255,108 @@ internal fun TvChannelGuide(
                     // From the state as it is now, not as last drawn: a held
                     // button sends keys faster than the grid redraws.
                     val channel = channels.getOrNull(row)
-                    if (e.key in Select) {
-                        if (channel == null) return@onKeyEvent true
-                        when (e.type) {
-                            KeyEventType.KeyDown -> {
-                                val repeat = e.nativeKeyEvent.repeatCount
-                                if (repeat == 0) {
-                                    okHeld[0] = true
-                                } else if (okHeld[0]) {
-                                    okHeld[0] = false
-                                    note = if (state.isFavourite(channel.streamId)) {
-                                        "${channel.name} taken off Favourites"
-                                    } else {
-                                        "${channel.name} added to Favourites"
-                                    }
-                                    onFavourite(channel)
+                    if (channel != null && (e.key in Select || e.key == Key.DirectionLeft || e.key == Key.DirectionRight)) {
+                        val at = e.nativeKeyEvent.eventTime
+
+                        fun favourite() {
+                            note = if (state.isFavourite(channel.streamId)) {
+                                "${channel.name} taken off Favourites"
+                            } else {
+                                "${channel.name} added to Favourites"
+                            }
+                            onFavourite(channel)
+                        }
+
+                        fun choose() {
+                            val slot = slotAt(programmesOf(channel), anchor)
+                            when {
+                                // Still to come, or on now: watch the channel.
+                                slot.stop > now -> onTune(channel, shown)
+                                canCatchUp(channel, slot.start, slot.stop, now) -> {
+                                    val from = catchUpFrom(channel, slot.start, slot.stop, now) ?: slot.start
+                                    onCatchUp(channel, from, catchUpMinutes(from, slot.stop))
+                                }
+                                // Finished, and nothing kept. Which of the two
+                                // reasons it is matters: one is the provider's
+                                // choice of channel, the other is time.
+                                !channel.hasCatchUp ->
+                                    note = "Your provider keeps no recording of " + channel.name
+                                else -> note = "That is older than the " + channel.tvArchiveDays + " days kept"
+                            }
+                        }
+
+                        fun sideways(held: Boolean) {
+                            val here = slotAt(programmesOf(channel), anchor)
+                            val earliest = floorToGuideStep(now - pastOf(channel))
+                            if (e.key == Key.DirectionRight) {
+                                // Held in the past: back to now in one go,
+                                // rather than a press per programme walked
+                                // back. Ahead of now a hold still steps, which
+                                // is how tonight gets browsed.
+                                if (held && here.stop <= now) {
+                                    anchor = now
+                                    windowStart = floorToGuideStep(now)
+                                    return
+                                }
+                                val next = nextSlot(programmesOf(channel), here)
+                                if (next.start < latest) {
+                                    anchor = next.start
+                                    windowStart = windowFor(windowStart, VISIBLE_SECONDS, next, earliest)
+                                }
+                                return
+                            }
+                            val previous = previousSlot(programmesOf(channel), here)
+                            val decision = guideLeft(here, previous, now, earliest, held)
+                            if (BuildConfig.DEBUG) {
+                                Log.d(
+                                    TAG_PLAY,
+                                    "guide left on " + channel.name + ": held=" + held +
+                                        " archive=" + channel.tvArchive + "/" + channel.tvArchiveDays + "d" +
+                                        " here=" + (here.start - now) / 60 + ".." + (here.stop - now) / 60 + " min" +
+                                        " earliest=" + (earliest - now) / 60 + " min -> " + decision,
+                                )
+                            }
+                            when (decision) {
+                                GuideLeft.StepBack -> {
+                                    anchor = previous.start
+                                    windowStart = windowFor(windowStart, VISIBLE_SECONDS, previous, earliest)
+                                }
+                                GuideLeft.OpenGroups -> groupsOpen = true
+                                // Say why nothing happened: a channel that will
+                                // not go back while the one under it does looks
+                                // like a fault otherwise.
+                                GuideLeft.Nothing -> note = if (channel.hasCatchUp) {
+                                    "That is as far back as " + channel.name + " is kept"
+                                } else {
+                                    "Your provider keeps no recording of " + channel.name
                                 }
                             }
-                            KeyEventType.KeyUp -> if (okHeld[0]) {
-                                okHeld[0] = false
-                                val slot = slotAt(programmesOf(channel), anchor)
-                                when {
-                                    // Still to come, or on now: watch it.
-                                    slot.stop > now -> onTune(channel, shown)
-                                    canCatchUp(channel, slot.start, slot.stop, now) -> {
-                                        val from = catchUpFrom(channel, slot.start, slot.stop, now) ?: slot.start
-                                        onCatchUp(channel, from, catchUpMinutes(from, slot.stop))
-                                    }
-                                    // Finished, and nothing kept. Say which of
-                                    // the two reasons it is, because they are
-                                    // different problems: one is the provider's
-                                    // choice of channel, the other is time.
-                                    !channel.hasCatchUp ->
-                                        note = "Your provider keeps no recording of " + channel.name
-                                    else -> note = "That is older than the " + channel.tvArchiveDays + " days kept"
-                                }
+                        }
+
+                        fun act(held: Boolean) {
+                            if (e.key in Select) {
+                                if (held) favourite() else choose()
+                            } else {
+                                sideways(held)
+                            }
+                        }
+
+                        when (e.type) {
+                            KeyEventType.KeyDown -> if (e.nativeKeyEvent.repeatCount == 0) {
+                                downAt[e.key] = at
+                                acted[e.key] = false
+                            } else if (acted[e.key] != true) {
+                                acted[e.key] = true
+                                act(held = true)
+                            }
+                            KeyEventType.KeyUp -> if (acted[e.key] != true) {
+                                act(held = at - (downAt[e.key] ?: at) >= holdMs)
                             }
                         }
                         return@onKeyEvent true
                     }
+                    // A press of OK with no channel under the cursor.
+                    if (e.key in Select) return@onKeyEvent true
                     if (e.type != KeyEventType.KeyDown) return@onKeyEvent e.key in Arrows
                     if (e.key == Key.Menu) {
                         groupsOpen = true
@@ -303,50 +379,6 @@ internal fun TvChannelGuide(
                             if (row < channels.lastIndex) {
                                 row++
                                 anchor = anchorOf(here, windowStart)
-                            }
-                            true
-                        }
-                        Key.DirectionRight -> {
-                            // Held while in the past: come back to now in one
-                            // go. Walking back an evening takes one hold; it
-                            // should not take a dozen presses to undo, and on
-                            // the way forward there is nothing else a hold in
-                            // the past could usefully mean. Ahead of now it
-                            // still steps, which is how tonight is browsed.
-                            if (here.stop <= now && e.nativeKeyEvent.repeatCount > 0) {
-                                anchor = now
-                                windowStart = floorToGuideStep(now)
-                                return@onKeyEvent true
-                            }
-                            val next = nextSlot(programmesOf(channel), here)
-                            if (next.start < latest) {
-                                anchor = next.start
-                                windowStart = windowFor(windowStart, VISIBLE_SECONDS, next, floorToGuideStep(now - pastOf(channel)))
-                            }
-                            true
-                        }
-                        Key.DirectionLeft -> {
-                            // A tap at what is on now opens the groups; a hold
-                            // goes back through what has been on. The rule is
-                            // `guideLeft` in core, where a hold is a boolean —
-                            // the TV emulator will not deliver a real one.
-                            val previous = previousSlot(programmesOf(channel), here)
-                            val earliest = floorToGuideStep(now - pastOf(channel))
-                            val held = e.nativeKeyEvent.repeatCount > 0
-                            when (guideLeft(here, previous, now, earliest, held)) {
-                                GuideLeft.StepBack -> {
-                                    anchor = previous.start
-                                    windowStart = windowFor(windowStart, VISIBLE_SECONDS, previous, earliest)
-                                }
-                                GuideLeft.OpenGroups -> groupsOpen = true
-                                // Say why nothing happened. This was silent,
-                                // and a channel that will not go back while
-                                // the one under it does looks like a fault.
-                                GuideLeft.Nothing -> note = if (channel.hasCatchUp) {
-                                    "That is as far back as " + channel.name + " is kept"
-                                } else {
-                                    "Your provider keeps no recording of " + channel.name
-                                }
                             }
                             true
                         }
