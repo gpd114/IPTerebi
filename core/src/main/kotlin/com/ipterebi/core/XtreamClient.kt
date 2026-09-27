@@ -44,12 +44,13 @@ class XtreamClient(
      * about it. Note that a rejected login is HTTP 200 with `auth: 0` in the
      * body — never a 401 — so the status code alone tells you nothing.
      */
-    suspend fun authenticate(account: XtreamAccount): UserInfo {
-        val info = decode(
+    suspend fun authenticate(account: XtreamAccount): LineStatus {
+        val answer = decode(
             body = get(account),
             deserializer = AuthResponse.serializer(),
             what = "the sign-in response",
-        ).userInfo
+        )
+        val info = answer.userInfo
 
         if (!info.isAuthenticated) {
             throw XtreamException(
@@ -67,7 +68,9 @@ class XtreamClient(
             "  line ok: status=${info.status}, connections=${info.activeConnections}/" +
                 "${info.maxConnections}, formats=${info.allowedOutputFormats}"
         )
-        return info
+        val shift = panelClockShift(answer.serverInfo.timeNow, answer.serverInfo.timestampNow)
+        if (shift != null) log("  panel clock: " + (-shift / 60) + " min from UTC")
+        return LineStatus(info, shift)
     }
 
     suspend fun liveCategories(account: XtreamAccount): List<XtreamCategory> = decode(

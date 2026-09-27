@@ -8,6 +8,7 @@ import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.UserInfo
+import com.ipterebi.core.lineKey
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.XtreamException
 import kotlinx.coroutines.CancellationException
@@ -90,8 +91,9 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(checking = true, error = null, info = null) }
             try {
-                val info = container.xtream.authenticate(account)
-                _state.update { it.copy(checking = false, info = info) }
+                val status = container.xtream.authenticate(account)
+                status.clockShift?.let { container.guide.clock.statedBy(account.lineKey, it) }
+                _state.update { it.copy(checking = false, info = status.info) }
             } catch (e: XtreamException) {
                 _state.update { it.copy(checking = false, error = e.message) }
             } catch (e: CancellationException) {
