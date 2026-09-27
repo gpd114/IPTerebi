@@ -757,6 +757,18 @@ Three things follow, and `core/CatchUp.kt` holds all three with tests:
 - **A programme half out of the window starts at the window's edge.** A
   three-hour film that began four days and an hour ago still has two hours
   kept; asking from its own start gets silence.
+- **What comes back may begin before what was asked for, by several minutes,
+  and that is the provider.** On the first real line a recording asked for at
+  its scheduled start played five to ten minutes of the previous programme
+  first. Checked in the log rather than assumed: the app asked for 90 minutes
+  from `2026-09-26:23-45`, the panel's name for the exact second the guide
+  gives that programme, and the cursor it came from lines up with it. Two
+  ordinary reasons, both the panel's: an archive is stored in chunks, so a
+  requested start is rounded down to a segment boundary, and a broadcast
+  drifts against its published schedule — junctions and trailers do not read
+  the guide. Nothing here can know either, and asking a minute or two later to
+  compensate would clip the start on a panel that is accurate. Left alone
+  deliberately.
 
 A catch-up plays as a *channel*, not as a film: a panel serves it as a stream
 with no length and nothing to seek in, so it takes the channel's retry policy,
