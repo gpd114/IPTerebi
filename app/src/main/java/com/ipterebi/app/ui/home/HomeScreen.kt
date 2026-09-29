@@ -332,7 +332,7 @@ private fun WatchedCard(item: WatchedItem, width: androidx.compose.ui.unit.Dp, r
                 AsyncImage(
                     model = item.poster,
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
                 )
             } else {

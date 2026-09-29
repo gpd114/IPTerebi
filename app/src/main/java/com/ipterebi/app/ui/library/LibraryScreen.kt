@@ -186,6 +186,14 @@ fun PosterTile(
 ) {
     // Rounded, with a faint rim so a dark cover still has an edge against the
     // page — Debritsu's PosterArt, which every cover there is drawn with.
+    //
+    // The artwork is *fitted*, not cropped. The tile is a fixed 2:3 and a
+    // provider uploads whatever it has: a square cover lost its top and
+    // bottom and a landscape one lost most of its width, which is what the
+    // owner saw. Nothing here can reshape a picture, so the tile keeps its
+    // shape and the cover keeps all of itself, with the tile colour behind
+    // whatever is left over. The fake panel has one of each shape now — with
+    // only the two 2:3 ones it had before, this could never have shown.
     val poster = Corners.card
     Column(
         modifier = Modifier
@@ -213,7 +221,7 @@ fun PosterTile(
                 AsyncImage(
                     model = image,
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

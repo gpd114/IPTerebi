@@ -270,11 +270,12 @@ public class FakePanel {
                     "{\"num\":\"2\",\"name\":\"Colour Bars (MKV)\",\"stream_id\":\"502\"," +
                     "\"stream_icon\":\"" + base + "/poster/502.jpg\",\"category_id\":10," +
                     "\"container_extension\":\"mkv\",\"rating\":0}," +
-                    "{\"num\":3,\"name\":\"Drops mid-film (MP4)\",\"stream_id\":503," +
-                    "\"stream_icon\":\"" + base + "/poster/501.jpg\",\"category_id\":\"10\"," +
+                    "{\"num\":3,\"name\":\"Drops mid-film (square poster)\",\"stream_id\":503," +
+                    // Not 2:3, which is the shape the poster tile assumes.
+                    "\"stream_icon\":\"" + base + "/poster/503.jpg\",\"category_id\":\"10\"," +
                     "\"container_extension\":\"mp4\"}," +
-                    "{\"num\":4,\"name\":\"Two audio tracks and subtitles (MKV)\",\"stream_id\":504," +
-                    "\"stream_icon\":\"" + base + "/poster/502.jpg\",\"category_id\":\"10\"," +
+                    "{\"num\":4,\"name\":\"Two audio tracks and subtitles (wide poster)\",\"stream_id\":504," +
+                    "\"stream_icon\":\"" + base + "/poster/504.jpg\",\"category_id\":\"10\"," +
                     "\"container_extension\":\"mkv\"}]";
             case "get_series_categories":
                 return "[{\"category_id\":\"20\",\"category_name\":\"Drama\"}]";
