@@ -38,6 +38,13 @@ echo "posters"
 ff -f lavfi -i "testsrc2=size=400x600:duration=1" -frames:v 1 poster501.jpg
 ff -f lavfi -i "smptebars=size=400x600:duration=1" -frames:v 1 poster502.jpg
 
+# Two that are not 2:3, because a provider uploads whatever it has and the
+# poster tile is a fixed 2:3. A square and a landscape one are what catch a
+# tile that crops to fill: with only the two above, every poster fitted its
+# frame exactly and the cropping could never show.
+ff -f lavfi -i "testsrc2=size=600x600:duration=1" -frames:v 1 poster503.jpg
+ff -f lavfi -i "smptebars=size=800x450:duration=1" -frames:v 1 poster504.jpg
+
 echo "done: $(pwd)"
 
 # Streams that carry a choice, which is what the audio-and-subtitles panel
