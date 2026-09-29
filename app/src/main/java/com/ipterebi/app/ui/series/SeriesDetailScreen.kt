@@ -173,7 +173,7 @@ private fun Header(detail: SeriesDetail) {
             AsyncImage(
                 model = detail.cover,
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
+                contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .width(96.dp)
                     .aspectRatio(2f / 3f)
@@ -238,7 +238,7 @@ private fun EpisodeRow(entry: EpisodeEntry, seriesName: String, onClick: () -> U
                 AsyncImage(
                     model = entry.details.image,
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
                 )
             }

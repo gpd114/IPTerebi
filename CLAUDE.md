@@ -436,6 +436,18 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   overnight. Stored lists match on `streamId` alone for that reason; matching a
   whole record would quietly empty someone's favourites the next time their
   provider tidied up.
+- **A poster is whatever shape the provider uploaded.** The tiles are a fixed
+  2:3, which is what a film cover usually is and what every poster the fake
+  panel served used to be — so the artwork was cropped to fill and nobody
+  noticed until a real line served a square one and a landscape one. A square
+  cover lost its top and bottom, a wide one lost most of its width. Artwork
+  is therefore *fitted* everywhere it is shown — the library grids, the Home
+  rows, a series' header and its episode stills — and the tile's own colour
+  carries whatever is left over. The cost is visible: a 16:9 still in a 2:3
+  tile is mostly background. The owner's call, and the right one — a cover
+  you cannot see the edges of is worse than a tile with space in it. The fake
+  panel now serves one square poster and one landscape one so this cannot
+  quietly come back.
 - **The API has no search.** Finding a channel outside the loaded category
   means holding every channel, which is the large request everything else
   avoids. So the channel list fetches it once, the first time something is
