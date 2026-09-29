@@ -643,14 +643,22 @@ survived until something was pressed.
   `NavigationRail`, one press of left from anywhere. The `NavHost` must stay the
   same call in the same place whichever bar is showing, or it is recreated and
   every screen's state goes with it.
-- **The category shelf costs a remote a press per row.** Categories wrap in a
-  `CategoryShelf` four rows tall that scrolls downwards — asked for, because a
-  single sideways row was tedious by touch on a real line's dozens of
-  categories. Down from a chip moves one row, so on a line with fifty
-  categories the list under the shelf is up to a dozen presses from the top
-  ones. Accepted: phone and tablet first. If it matters on a TV, give the chips
-  a `focusProperties { down = … }` to the list and keep left and right for the
-  shelf.
+- **A wrapped shelf eats a television.** Categories wrap in a `CategoryShelf`
+  four rows tall — asked for, because a single sideways row was tedious by
+  touch on a real line's dozens of categories. On a 1080p box, which is 540dp
+  tall, the top bar, the search field and those four rows left about a third
+  of the height for the posters: the first row of covers was cut off by the
+  bottom edge, and it *stayed* cut off when the remote moved into it, because
+  the shelf is pinned and only the grid scrolls. The owner reported it as the
+  posters not being fully visible, and looking for a cropping bug found a real
+  one — but not that one.
+
+  So the shelf is wrapped only where there is height for it: under
+  `WRAP_MIN_HEIGHT` (560dp) it is a single row that scrolls sideways, which is
+  a television and a phone held sideways. A phone upright is around 800dp and
+  a tablet more, so neither changes. On the box a full row of posters and
+  their titles now fits, with the next row showing beneath. Down from a chip
+  lands in the grid, because there is no second row of chips to catch it.
 - **A heading the width of the screen beats the small card under it.** On
   Home, Down from a row heading went to the *next heading* and never into the
   row. The cards were focusable all along and were candidates in the search;
