@@ -802,11 +802,24 @@ length. On a panel that streams a recording endlessly, as live television is
 streamed, they stay hidden and nothing else changes. The fake panel serves
 `/timeshift/` from a file with Range support for the same reason.
 
-The retry and reconnect still follow the *type*, not the stream, which is now
-inconsistent: a recording that drops is rejoined from its start rather than
-resumed where it was, and on a seekable body resuming is both possible and
-right. Not changed yet, deliberately — that path is the delicate one, and the
-ask was the skip.
+**Coming back follows the same answer.** A recording that drops, or that was
+left while the app went away, is re-prepared at the position it reached
+rather than rejoined at a "live edge" it does not have — rejoining a file at
+its edge means starting the programme again, which is what it used to do.
+A channel is still rejoined, because a position in live television is a
+position in a window that has moved on. Verified on the emulator for the
+coming-back case: away and back resumed at 00:47 rather than 00:00. Not
+verified for a mid-stream drop — the fake panel's ten-minute recording
+buffers whole in a few seconds, so killing the panel mid-play interrupts
+nothing.
+
+What still follows the *type* is `StreamRetryPolicy`, built with the player
+before anything is known about the stream: a catch-up gets the channel's
+policy, so ExoPlayer's own retry will not issue a Range request behind our
+back. That is the conservative way round. Undoing it needs the same measured
+answer the controls now use, and a panel that streams a recording endlessly
+would punish getting it wrong — the HTTP layer skipping every byte already
+watched, at the pace the panel sends them.
 
 **The guide is the way in**, so the guide had to change: it only ever scrolled
 back two hours, which was right when it answered "what is on" and useless for
