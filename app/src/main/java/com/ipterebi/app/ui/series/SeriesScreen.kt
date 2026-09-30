@@ -6,11 +6,10 @@ import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.ui.library.LibraryScreen
-import com.ipterebi.app.ui.library.LibrarySource
 import com.ipterebi.app.ui.library.LibraryViewModel
 import com.ipterebi.app.ui.library.PosterTile
-import com.ipterebi.core.ListedItem
-import com.ipterebi.core.SavedKind
+import com.ipterebi.app.ui.library.asSeries
+import com.ipterebi.app.ui.library.seriesSource
 import com.ipterebi.core.Series
 
 /**
@@ -26,27 +25,7 @@ fun SeriesScreen(
 ) {
     val viewModel: LibraryViewModel<Series> = viewModel(
         key = "series",
-        factory = LibraryViewModel.factory(
-            container,
-            LibrarySource(
-                categories = { account -> seriesCategories(account) },
-                items = { account, categoryId -> series(account, categoryId) },
-                nameOf = { it.name },
-                noun = "series",
-                nouns = "series",
-                publish = container.series::publish,
-                kind = SavedKind.SERIES,
-                // No extension: a series opens a screen, not a stream.
-                toListed = { series ->
-                    ListedItem(
-                        kind = SavedKind.SERIES,
-                        id = series.seriesId.toString(),
-                        name = series.name,
-                        poster = series.cover,
-                    )
-                },
-            ),
-        ),
+        factory = LibraryViewModel.factory(container, seriesSource(container)),
     )
 
     // Keyed on seriesId, which listableSeries() has already made present and unique.
@@ -58,15 +37,7 @@ fun SeriesScreen(
         placeholder = Icons.Filled.VideoLibrary,
         // From a list: the id and the name are all a series screen needs, and
         // it fetches the rest itself.
-        onOpenListed = { entry ->
-            onSeries(
-                Series(
-                    seriesId = entry.id.toIntOrNull() ?: 0,
-                    name = entry.name,
-                    cover = entry.poster,
-                )
-            )
-        },
+        onOpenListed = { entry -> onSeries(entry.asSeries()) },
     ) { series, hold ->
         PosterTile(
             title = series.name,
