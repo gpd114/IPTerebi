@@ -49,6 +49,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.ipterebi.core.WatchKind
+import com.ipterebi.core.SavedKind
+import com.ipterebi.core.Series
 import com.ipterebi.core.VodStream
 import com.ipterebi.core.EpisodeEntry
 import com.ipterebi.core.EpisodeDetails
@@ -256,6 +258,40 @@ fun AppNav(container: AppContainer) {
                                     onSeries = { nav.switchSection(Route.SERIES) },
                                     onPlayChannel = { channel ->
                                         nav.switchSection(Route.tvLive(channel.streamId))
+                                    },
+                                    // Out of one of the viewer's own lists. Same
+                                    // bargain as a resume: publish what was
+                                    // stored first, because nothing on a cold
+                                    // start has loaded the list it came from.
+                                    onOpenListed = { entry ->
+                                        val id = entry.id.toIntOrNull() ?: 0
+                                        when (entry.kind) {
+                                            SavedKind.FILM -> {
+                                                container.films.publish(
+                                                    listOf(
+                                                        VodStream(
+                                                            streamId = id,
+                                                            name = entry.name,
+                                                            icon = entry.poster,
+                                                            containerExtension = entry.extension,
+                                                        )
+                                                    )
+                                                )
+                                                nav.navigate(Route.playFilm(id, entry.extension))
+                                            }
+                                            SavedKind.SERIES -> {
+                                                container.series.publish(
+                                                    listOf(
+                                                        Series(
+                                                            seriesId = id,
+                                                            name = entry.name,
+                                                            cover = entry.poster,
+                                                        )
+                                                    )
+                                                )
+                                                nav.navigate(Route.seriesDetail(id))
+                                            }
+                                        }
                                     },
                                     onResume = { item ->
                                         when (item.kind) {

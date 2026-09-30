@@ -6,6 +6,10 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
+import com.ipterebi.core.ListedItem
+import com.ipterebi.core.OwnList
+import com.ipterebi.core.SavedKind
+import com.ipterebi.core.withAnyOf
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.XtreamCategory
 import com.ipterebi.core.XtreamClient
@@ -43,6 +47,14 @@ class LibrarySource<T : Any>(
     val nouns: String,
     /** Handed each loaded list, so a later screen can look an entry up by id. */
     val publish: (List<T>) -> Unit,
+    /** Which half of an own list this screen deals in. */
+    val kind: SavedKind,
+    /**
+     * What to keep when one of these is put in a list: enough to draw the
+     * card and open the thing again without the list it came from, which is
+     * usually long gone by then. Same bargain as `WatchedItem`.
+     */
+    val toListed: (T) -> ListedItem,
 )
 
 data class LibraryUiState<T>(
@@ -50,6 +62,12 @@ data class LibraryUiState<T>(
     /** Null means every category at once. */
     val selectedCategoryId: String? = null,
     val items: List<T> = emptyList(),
+    /** The viewer's own lists that hold anything of this kind: the shelf shows these. */
+    val lists: List<OwnList> = emptyList(),
+    /** Every list, including empty ones — what the "add to" sheet offers. */
+    val allLists: List<OwnList> = emptyList(),
+    /** The own list being shown, if one is: exclusive with [selectedCategoryId]. */
+    val selectedList: String? = null,
     /** [items] narrowed by [query]. Worked out here so the screen stays dumb. */
     val visible: List<T> = emptyList(),
     val query: String = "",
@@ -104,14 +122,64 @@ class LibraryViewModel<T : Any>(
         viewModelScope.launch {
             _state.map { it.items }.distinctUntilChanged().collect { source.publish(it) }
         }
+
+        // The viewer's own lists, kept up to date whatever changes them —
+        // adding from this screen, or from the other one, or a sign-out.
+        viewModelScope.launch {
+            container.credentials.state
+                .filterIsInstance<AccountState.SignedIn>()
+                .collect { signedIn ->
+                    container.lists.lists(signedIn.account).collect { all ->
+                        update { it.copy(lists = all.withAnyOf(source.kind), allLists = all) }
+                    }
+                }
+        }
     }
 
     fun onQueryChange(value: String) = update { it.copy(query = value) }
 
     fun selectCategory(categoryId: String?) {
-        update { it.copy(selectedCategoryId = categoryId, query = "") }
+        update { it.copy(selectedCategoryId = categoryId, selectedList = null, query = "") }
         startLoad { loadItems(categoryId) }
     }
+
+    /**
+     * Shows one of the viewer's own lists instead of a category.
+     *
+     * Nothing is fetched: a list holds everything needed to draw and open its
+     * entries, which is the whole point of storing the name and the poster
+     * beside the id. So this cancels any load in flight rather than starting
+     * one — tapping a list while a large category is still arriving should
+     * not leave that category's items to land on top of it.
+     */
+    fun selectList(name: String) {
+        loadJob?.cancel()
+        update {
+            it.copy(
+                selectedList = name,
+                selectedCategoryId = null,
+                query = "",
+                busy = false,
+                error = null,
+                offerFullLoad = false,
+            )
+        }
+    }
+
+    /** Puts something in a list, making the list if it is new. */
+    fun addToList(listName: String, item: T) {
+        val account = account ?: return
+        viewModelScope.launch { container.lists.add(account, listName, source.toListed(item)) }
+    }
+
+    /** Takes something out of a list, by what it is rather than by position. */
+    fun removeFromList(listName: String, id: String) {
+        val account = account ?: return
+        viewModelScope.launch { container.lists.remove(account, listName, source.kind, id) }
+    }
+
+    /** What to store for this, for a screen offering to add it. */
+    fun listedForm(item: T): ListedItem = source.toListed(item)
 
     fun retry() {
         startLoad {

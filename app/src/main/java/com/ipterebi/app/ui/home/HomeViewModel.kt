@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.core.LiveStream
+import com.ipterebi.core.OwnList
 import com.ipterebi.core.WatchKind
 import com.ipterebi.core.WatchedItem
 import com.ipterebi.core.XtreamAccount
@@ -30,6 +31,13 @@ data class HomeUiState(
     val recents: List<LiveStream> = emptyList(),
     val films: List<WatchedItem> = emptyList(),
     val episodes: List<WatchedItem> = emptyList(),
+    /**
+     * The viewer's own lists, in the order they were made. Empty ones are
+     * dropped: a row with nothing in it on the screen you see most is a row
+     * that has to explain itself, and a list you just made is one tap from
+     * being filled anyway.
+     */
+    val lists: List<OwnList> = emptyList(),
     /**
      * True until the stored lists have actually been read. Without it every
      * launch draws three "nothing here yet" panels for the moment before the
@@ -65,19 +73,20 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                         container.channelLists.favourites(account),
                         container.channelLists.recents(account),
                         container.watched.watching(account),
-                    ) { favourites, recents, watching ->
-                        Triple(account, favourites to recents, watching)
+                        container.lists.lists(account),
+                    ) { favourites, recents, watching, lists ->
+                        Home(account, favourites, recents, watching, lists)
                     }
                 }
-                .collect { (account, lists, watching) ->
-                    val (favourites, recents) = lists
+                .collect { home ->
                     _state.update {
                         it.copy(
-                            account = account,
-                            favourites = favourites,
-                            recents = recents,
-                            films = watching.ofKind(WatchKind.FILM),
-                            episodes = watching.ofKind(WatchKind.EPISODE),
+                            account = home.account,
+                            favourites = home.favourites,
+                            recents = home.recents,
+                            films = home.watching.ofKind(WatchKind.FILM),
+                            episodes = home.watching.ofKind(WatchKind.EPISODE),
+                            lists = home.lists.filter { list -> list.items.isNotEmpty() },
                             loading = false,
                         )
                     }
@@ -99,3 +108,15 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
  */
 private fun XtreamAccount.lineMatches(other: XtreamAccount): Boolean =
     base == other.base && username == other.username
+
+/**
+ * One frame of everything the home screen shows, so the four flows above
+ * combine into something with names rather than a nest of pairs.
+ */
+private class Home(
+    val account: XtreamAccount,
+    val favourites: List<LiveStream>,
+    val recents: List<LiveStream>,
+    val watching: List<WatchedItem>,
+    val lists: List<OwnList>,
+)
