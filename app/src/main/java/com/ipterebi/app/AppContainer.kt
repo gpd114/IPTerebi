@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.ipterebi.app.data.ChannelListStore
 import com.ipterebi.app.data.MediaRepository
+import com.ipterebi.app.data.ListStore
 import com.ipterebi.app.data.WatchStore
 import com.ipterebi.app.data.CredentialStore
 import com.ipterebi.app.data.EpisodeListing
@@ -55,6 +56,9 @@ class AppContainer(context: Context) {
 
     /** Where you got to in films and episodes you have not finished, per line. */
     val watched = WatchStore(context.applicationContext)
+
+    /** The viewer's own lists of films and series, per line. See ListStore. */
+    val lists = ListStore(context.applicationContext)
 
     /** Starred and recently watched channels, per line. */
     val channelLists = ChannelListStore(context.applicationContext)

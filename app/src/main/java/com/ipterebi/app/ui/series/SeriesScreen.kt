@@ -9,6 +9,8 @@ import com.ipterebi.app.ui.library.LibraryScreen
 import com.ipterebi.app.ui.library.LibrarySource
 import com.ipterebi.app.ui.library.LibraryViewModel
 import com.ipterebi.app.ui.library.PosterTile
+import com.ipterebi.core.ListedItem
+import com.ipterebi.core.SavedKind
 import com.ipterebi.core.Series
 
 /**
@@ -33,6 +35,16 @@ fun SeriesScreen(
                 noun = "series",
                 nouns = "series",
                 publish = container.series::publish,
+                kind = SavedKind.SERIES,
+                // No extension: a series opens a screen, not a stream.
+                toListed = { series ->
+                    ListedItem(
+                        kind = SavedKind.SERIES,
+                        id = series.seriesId.toString(),
+                        name = series.name,
+                        poster = series.cover,
+                    )
+                },
             ),
         ),
     )
@@ -43,13 +55,26 @@ fun SeriesScreen(
         viewModel = viewModel,
         key = { it.seriesId },
         onSettings = onSettings,
-    ) { series ->
+        placeholder = Icons.Filled.VideoLibrary,
+        // From a list: the id and the name are all a series screen needs, and
+        // it fetches the rest itself.
+        onOpenListed = { entry ->
+            onSeries(
+                Series(
+                    seriesId = entry.id.toIntOrNull() ?: 0,
+                    name = entry.name,
+                    cover = entry.poster,
+                )
+            )
+        },
+    ) { series, hold ->
         PosterTile(
             title = series.name,
             image = series.cover,
             placeholder = Icons.Filled.VideoLibrary,
             ratingOutOfTen = series.ratingOutOfTen,
             onClick = { onSeries(series) },
+            onLongPress = hold,
         )
     }
 }

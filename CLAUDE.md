@@ -464,6 +464,47 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   the UI loads one category at a time and the player is navigated to with a
   stream id alone — never the list, which would end up in a Bundle.
 
+## Your own lists
+
+Beside the provider's categories, a handful of lists the viewer names and
+fills: "Saturday", "For the kids", whatever they like. A real line's own
+filing is dozens of categories called `EN - 2020 & OLD`, which is the
+provider's idea of order rather than anyone else's.
+
+**Films and series only.** Channels already have Favourites, and two ideas
+for the same act — starring a channel, adding a film — would be one too many.
+`ListedItem` would hold a channel without changing if that turns out to be
+wanted.
+
+- **Holding a poster is how something goes in or comes out.** Not a button on
+  every tile: the grid is mostly picture, and a corner control on each would
+  be a hundred small targets nobody asked for. On a remote a hold is already
+  what adds a favourite on the channel list, so it means the same thing in
+  both places. Held in the panel's grid it offers every list and a field to
+  name a new one; held inside a list it offers to take the thing out again.
+- **The chips are the lists**, in the same shelf as the categories and pink
+  like Favourites, because they are a different kind of thing from the
+  provider's filing. A list holding nothing of this kind is not shown on this
+  screen — a films-only list does not clutter Series — but the "add to" sheet
+  offers every list, including empty ones.
+- **A list holds what it needs to draw and open its entries**, not just ids:
+  the name, the poster, and a film's container extension. The same bargain
+  `WatchStore` makes, for the same reason — the list a film came from is
+  usually gone by the time someone opens it again, so an entry that carried
+  only an id would be a blank card that could not be played. It is also what
+  lets a list open with the panel not yet spoken to.
+- **Per line, like everything keyed on a panel's ids** (`ListStore`, its own
+  DataStore). Film 4271 on one provider is not film 4271 on another, so a list
+  carried across lines would play something else entirely.
+
+The rules are `core/OwnLists.kt`, tested: what a name may be (trimmed, spaces
+collapsed, cut to 40, never blank), that the same name twice is one list
+whatever the case, that adding the same thing twice keeps the first — the
+second may come from a screen with no poster to hand — that entries stay in
+the order they were added because a curated list that reorders itself is one
+nobody can point at, that emptying a list is not deleting it, and that a film
+and a series may share an id without being the same thing.
+
 ## The home screen
 
 The app opens on Home, and the bottom bar has four tabs: Home, Live TV, Films,
