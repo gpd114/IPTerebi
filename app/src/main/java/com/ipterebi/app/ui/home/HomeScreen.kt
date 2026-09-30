@@ -50,6 +50,8 @@ import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.theme.tabular
 import com.ipterebi.core.LiveStream
+import com.ipterebi.core.ListedItem
+import com.ipterebi.core.SavedKind
 import com.ipterebi.core.WatchedItem
 import com.ipterebi.core.channelInitials
 import com.ipterebi.core.remainingLabel
@@ -73,6 +75,8 @@ fun HomeScreen(
     onSeries: () -> Unit,
     onPlayChannel: (LiveStream) -> Unit,
     onResume: (WatchedItem) -> Unit,
+    /** Something opened out of one of the viewer's own lists. */
+    onOpenListed: (ListedItem) -> Unit,
     viewModel: HomeViewModel = viewModel(factory = HomeViewModel.factory(container)),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -194,6 +198,28 @@ fun HomeScreen(
                     }
                 }
             }
+
+            // The viewer's own lists, after the rows the app decides on: what
+            // someone filed themselves should be here, but under what they
+            // were in the middle of. Empty lists are left out by the view
+            // model — a row that says "nothing in this list" on the screen you
+            // see most is a row explaining itself for no reason.
+            state.lists.forEach { own ->
+                item(key = "h:${own.name}") {
+                    RowHeading(title = own.name, tag = "LIST")
+                }
+                item(key = "r:${own.name}") {
+                    LazyRow(
+                        modifier = Modifier.focusGroup(),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        items(own.items, key = { it.kind.name + ":" + it.id }) { entry ->
+                            ListCard(entry) { onOpenListed(entry) }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -206,15 +232,24 @@ fun HomeScreen(
  * own — see the note where the requesters are made.
  */
 @Composable
-private fun RowHeading(title: String, tag: String, onOpen: () -> Unit, row: FocusRequester? = null) {
+private fun RowHeading(
+    title: String,
+    tag: String,
+    /**
+     * Null for one of the viewer's own lists: the row *is* the list, so there
+     * is nowhere further to go and no "All" to offer.
+     */
+    onOpen: (() -> Unit)? = null,
+    row: FocusRequester? = null,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
             .clip(Corners.control)
             .then(if (row != null) Modifier.focusProperties { down = row } else Modifier)
-            .focusFill(Corners.control)
-            .clickable(onClick = onOpen)
+            .then(if (onOpen != null) Modifier.focusFill(Corners.control) else Modifier)
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
             .padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -224,13 +259,15 @@ private fun RowHeading(title: String, tag: String, onOpen: () -> Unit, row: Focu
             Text(tag.uppercase(), style = MaterialTheme.typography.labelSmall, color = Night.accent)
         }
         Box(Modifier.weight(1f))
-        Text("All", style = MaterialTheme.typography.bodySmall, color = Night.inkSoft)
-        Icon(
-            Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
-            tint = Night.inkSoft,
-            modifier = Modifier.size(18.dp),
-        )
+        if (onOpen != null) {
+            Text("All", style = MaterialTheme.typography.bodySmall, color = Night.inkSoft)
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = Night.inkSoft,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }
 
@@ -373,6 +410,69 @@ private fun WatchedCard(item: WatchedItem, width: androidx.compose.ui.unit.Dp, r
             color = Night.inkSoft,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * One thing out of the viewer's own list.
+ *
+ * A poster and a name, with no progress bar: these were filed on purpose
+ * rather than left half-watched, and a bar at nought under every one would
+ * say something untrue. Fitted rather than cropped, as every poster in the
+ * app is.
+ */
+@Composable
+private fun ListCard(entry: ListedItem, onClick: () -> Unit) {
+    val width = 104.dp
+    Column(
+        modifier = Modifier
+            .width(width + 6.dp)
+            .clip(Corners.tag)
+            .focusFill(Corners.tag)
+            .clickable(onClick = onClick)
+            .padding(3.dp),
+    ) {
+        Box(
+            Modifier
+                .width(width)
+                .aspectRatio(2f / 3f)
+                .clip(Corners.tag)
+                .background(if (entry.poster.isBlank()) tileColour(entry.name) else Night.veil),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (entry.poster.isNotBlank()) {
+                AsyncImage(
+                    model = entry.poster,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                Text(
+                    entry.name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(8.dp),
+                )
+            }
+        }
+        Text(
+            entry.name,
+            style = MaterialTheme.typography.bodySmall,
+            color = Night.ink,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Text(
+            if (entry.kind == SavedKind.FILM) "Film" else "Series",
+            style = MaterialTheme.typography.labelSmall,
+            color = Night.inkSoft,
+            maxLines = 1,
         )
     }
 }

@@ -497,6 +497,14 @@ wanted.
   DataStore). Film 4271 on one provider is not film 4271 on another, so a list
   carried across lines would play something else entirely.
 
+**They are rows on Home too**, under the rows the app decides on: what
+someone filed themselves belongs there, but below what they were in the
+middle of. A list with nothing in it is left out — a row explaining its own
+emptiness on the screen you see most is a row not worth its height — and a
+list heading has no "All" beside it, because the row *is* the list and there
+is nowhere further to go. Nothing on those rows costs a request: an entry
+was stored with its poster and its name for exactly this.
+
 The rules are `core/OwnLists.kt`, tested: what a name may be (trimmed, spaces
 collapsed, cut to 40, never blank), that the same name twice is one list
 whatever the case, that adding the same thing twice keeps the first — the
