@@ -114,6 +114,7 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
             account?.let {
                 container.channelLists.clear(it)
                 container.watched.clear(it)
+                container.lists.clear(it)
                 container.guide.forget(it)
             }
             container.credentials.clear()
