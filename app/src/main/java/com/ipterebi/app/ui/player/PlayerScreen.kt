@@ -167,6 +167,16 @@ private fun PlayerContent(
     val zap by rememberUpdatedState(onZap)
     val onDemand = playable.isOnDemand
 
+    // Whether *this* stream can be skipped in, which is not the same as what
+    // kind of thing it is. A film always can, a live channel never can, and a
+    // catch-up depends entirely on the panel: the owner's serves a recording
+    // as a finite body — asked for 45 minutes, answered with a duration of 40
+    // and `seekable=true`, measured on the box — while another fork may stream
+    // it endlessly the way it streams live television. So the controls follow
+    // the stream once it is ready, rather than its type. The type is only the
+    // opening guess, for the moment before anything has loaded.
+    var seekable by remember(playable) { mutableStateOf(onDemand) }
+
     // Looked up from whichever list was on screen, because the id is all that
     // travels through navigation. Null after a process death, when that list is
     // gone — the overlay then shows no title rather than a wrong one.
@@ -546,6 +556,20 @@ private fun PlayerContent(
                 // the list it came from is gone, and storing an entry with no
                 // name would put an unreadable row in the recents shelf. Films
                 // are not recorded: the recents shelf is a list of channels.
+                // What the panel actually sent, now that there is something
+                // to ask. A recording that came back with a length can be
+                // skipped in; one streamed like live television cannot.
+                if (playbackState == Player.STATE_READY) {
+                    seekable = player.isCurrentMediaItemSeekable && player.duration > 0
+                    if (BuildConfig.DEBUG && playable is Playable.CatchUp) {
+                        Log.d(
+                            TAG_PLAY,
+                            "  recording: " + player.duration / 1000 + " s, " +
+                                (if (seekable) "seekable" else "not seekable"),
+                        )
+                    }
+                }
+
                 if (playbackState == Player.STATE_READY && !recorded && channel != null) {
                     recorded = true
                     scope.launch { container.channelLists.recordWatched(account, channel) }
@@ -832,17 +856,7 @@ private fun PlayerContent(
                     // A live stream has no duration and no seekable window, so
                     // skipping could only ever be inert. A film is the opposite:
                     // skipping is most of what its controls are for.
-                    setShowFastForwardButton(onDemand)
-                    setShowRewindButton(onDemand)
-                    // The same goes for the clock and the progress bar. For a
-                    // channel they read "00:16 · 00:00" over an empty bar — a
-                    // position with nothing to be a position in — which looks
-                    // like a fault. Media3 animates both but never sets their
-                    // visibility, so hiding them here stays hidden.
-                    if (!onDemand) {
-                        findViewById<View>(androidx.media3.ui.R.id.exo_time)?.visibility = View.GONE
-                        findViewById<View>(androidx.media3.ui.R.id.exo_progress)?.visibility = View.GONE
-                    }
+                    showSeekControls(seekable)
                     // Everything this screen draws over the picture follows the
                     // player's own controls in and out. A title and a guide sat
                     // permanently across the top of a film would be the first
@@ -947,6 +961,9 @@ private fun PlayerContent(
                 // in the panel has to change the picture while it plays, which
                 // is the only way to judge it.
                 view.resizeMode = Picture.fit.resizeMode
+                // And here too: a recording only says whether it can be sought
+                // in once it is ready, which is after the view was built.
+                view.showSeekControls(seekable)
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -1260,4 +1277,25 @@ private enum class Released {
     ByYou,
     /** The sleep timer went off. */
     BySleepTimer,
+}
+
+/**
+ * Shows or hides everything to do with moving about in a stream: the skip
+ * buttons, the clock and the progress bar.
+ *
+ * On a live channel they are worse than useless — the clock reads
+ * "00:16 · 00:00" over an empty bar, a position with nothing to be a position
+ * in, which looks like a fault — and on anything with a length they are most
+ * of what the controls are for. Media3 animates the clock and the bar but
+ * never sets their visibility itself, so what is set here stays set.
+ *
+ * Called from the view's factory *and* its update, because a recording only
+ * admits to having a length once it is ready, which is after the view exists.
+ */
+private fun PlayerView.showSeekControls(seekable: Boolean) {
+    setShowFastForwardButton(seekable)
+    setShowRewindButton(seekable)
+    val visibility = if (seekable) View.VISIBLE else View.GONE
+    findViewById<View>(androidx.media3.ui.R.id.exo_time)?.visibility = visibility
+    findViewById<View>(androidx.media3.ui.R.id.exo_progress)?.visibility = visibility
 }
