@@ -518,13 +518,17 @@ private fun PlayerContent(
                 return
             }
             if (BuildConfig.DEBUG) {
-                val at = if (onDemand) " at ${player.currentPosition / 1000} s" else ""
+                val at = if (seekable) " at " + player.currentPosition / 1000 + " s" else ""
                 Log.d(TAG_PLAY, "${playable.logName()} dropped$at; reconnecting in $wait ms")
             }
             reconnecting = true
             reconnectDelay.set(wait)
             player.stop()
-            if (!onDemand) player.seekToDefaultPosition()
+            // Back where it was on anything with a position: a recording is
+            // a file on this panel, and rejoining a file at its "live edge"
+            // means starting the programme again. A channel has no position
+            // worth keeping and is rejoined at the edge, as before.
+            if (!seekable) player.seekToDefaultPosition()
             player.prepare()
         }
 
@@ -717,33 +721,36 @@ private fun PlayerContent(
                     if (player.playWhenReady && player.playbackState != Player.STATE_IDLE) {
                         return@LifecycleEventObserver
                     }
-                    when (playable) {
+                    // Which of these it gets is the stream's shape, not its
+                    // kind. A recording this panel serves as a file has a
+                    // position worth keeping; one another panel streams like
+                    // live television does not, and neither does a channel.
+                    if (!seekable) {
                         // Rejoined at the live edge rather than resumed. stop()
                         // keeps the playback position, and for HLS that position
                         // has usually slid out of the live window while the app
                         // was away. Stopped first, because a channel paused from
                         // the lock screen is still prepared, minutes behind.
-                        is Playable.Channel, is Playable.CatchUp -> {
-                            // A fresh start: whatever went wrong while away —
-                            // reconnecting given up on, say — is not current.
-                            error = null
-                            reconnect.reset()
-                            player.stop()
-                            player.seekToDefaultPosition()
-                            player.prepare()
-                            player.play()
-                        }
+                        //
+                        // A fresh start: whatever went wrong while away —
+                        // reconnecting given up on, say — is not current.
+                        error = null
+                        reconnect.reset()
+                        player.stop()
+                        player.seekToDefaultPosition()
+                        player.prepare()
+                        player.play()
+                    } else {
                         // Reconnected at the position stop() kept, and left
                         // paused for the user to resume. One paused from the lock
                         // screen and not yet let go is still connected, and fine.
                         // A reconnect given up on while away is not current
                         // either, as for a channel.
-                        is Playable.Film, is Playable.Episode ->
-                            if (player.playbackState == Player.STATE_IDLE) {
-                                error = null
-                                reconnect.reset()
-                                player.prepare()
-                            }
+                        if (player.playbackState == Player.STATE_IDLE) {
+                            error = null
+                            reconnect.reset()
+                            player.prepare()
+                        }
                     }
                 }
 
@@ -1145,7 +1152,7 @@ private fun PlayerContent(
                         reconnectDelay.set(0)
                         // As Try again: a channel rejoins the broadcast, a film
                         // carries on from where it was handed over.
-                        if (!onDemand) player.seekToDefaultPosition()
+                        if (!seekable) player.seekToDefaultPosition()
                         player.prepare()
                         player.play()
                     },
