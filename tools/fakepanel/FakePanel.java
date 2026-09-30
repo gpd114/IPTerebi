@@ -101,7 +101,13 @@ public class FakePanel {
                     log("   (404: outside the archive window)");
                     status(ex, 404);
                 } else {
-                    streamLive(ex);
+                    // As a *file*, with a length and Range support, rather than
+                    // streamed endlessly the way a live channel is. That is what
+                    // the first real line does — a recording asked for as 45
+                    // minutes came back with a duration of 40 and
+                    // seekable=true, measured on the box — and it is what lets
+                    // the player offer a seek bar and a skip on a recording.
+                    serveFile(ex, "live.ts", "video/mp2t");
                 }
             } else if (path.startsWith("/live/")) {
                 String file = fileName(path);

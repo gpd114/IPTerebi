@@ -491,9 +491,14 @@ is at fault — a panel that does not list `m3u8` will not serve it.
   holding `12345.mkv`. Error wording is separate for the same reason —
   `describeFilmHttpError` never suggests changing the format.
 - **Live has no duration.** Media3 still draws a clock and a seek bar for it —
-  "00:16 · 00:00" over an empty bar, which reads as a fault — so for a channel
-  the player hides `exo_time` and `exo_progress`, along with the skip buttons,
-  which could only ever be inert. Films and episodes keep all of them.
+  "00:16 · 00:00" over an empty bar, which reads as a fault — so the player
+  hides `exo_time`, `exo_progress` and the skip buttons, which could only ever
+  be inert. **Which streams those are is asked of the stream, not of its
+  type**: `isCurrentMediaItemSeekable` and a duration, read when the player is
+  ready and applied in the view's update as well as its factory. A film is
+  always seekable and a channel never is, so neither changed — but a catch-up
+  depends on the panel, and this one serves a recording as a finite body, so
+  it gets the bar and the skip. See the catch-up section.
 - **EPG titles and descriptions are base64.** Documented, not a fork quirk — but
   forks that send plain text exist, and `News` is itself valid base64 that
   decodes to three bytes of noise, so "did it decode" does not answer the
@@ -782,11 +787,26 @@ Three things follow, and `core/CatchUp.kt` holds all three with tests:
   compensate would clip the start on a panel that is accurate. Left alone
   deliberately.
 
-A catch-up plays as a *channel*, not as a film: a panel serves it as a stream
-with no length and nothing to seek in, so it takes the channel's retry policy,
-the channel's reconnect — rejoin, never resume at a byte — and the channel's
-error wording, the connection limit included. `Playable.CatchUp` says so, and
-`isBroadcast` is what the player asks.
+A catch-up plays as a *channel* rather than as a film: it takes the channel's
+retry policy, the channel's reconnect — rejoin, never resume at a byte — and
+the channel's error wording, the connection limit included. `Playable.CatchUp`
+says so, and `isBroadcast` is what the player asks.
+
+**But it can be skipped in, because this panel serves a recording as a file.**
+That was written here as settled — "a stream with no length and nothing to
+seek in" — and it was a guess. Measured on the box: a recording asked for as
+45 minutes came back with `duration=2401700 ms, seekable=true, live=false`.
+So the controls follow the stream instead: the seek bar, the clock and the
+skip buttons appear when the player says the item is seekable and has a
+length. On a panel that streams a recording endlessly, as live television is
+streamed, they stay hidden and nothing else changes. The fake panel serves
+`/timeshift/` from a file with Range support for the same reason.
+
+The retry and reconnect still follow the *type*, not the stream, which is now
+inconsistent: a recording that drops is rejoined from its start rather than
+resumed where it was, and on a seekable body resuming is both possible and
+right. Not changed yet, deliberately — that path is the delicate one, and the
+ask was the skip.
 
 **The guide is the way in**, so the guide had to change: it only ever scrolled
 back two hours, which was right when it answered "what is on" and useless for
