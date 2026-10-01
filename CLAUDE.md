@@ -174,17 +174,38 @@ same. Only the drawing differs:
   mistake the wrapped category shelf made.
 - **Chips in one sideways row**, the viewer's lists first and in pink, then
   the provider's categories.
-- **Posters at 170dp**, four or five across, with the name under each.
+- **Posters at 118dp**, six across a 1080p screen, with the name under each.
+  They were 170dp, which comes out as four, and four was too big: one row
+  filled the screen under the description strip, so the grid showed four
+  films and no sign there were more. At six a row and the top of the next
+  one fit.
 - **The release that ends a hold must not do the next thing.** Holding OK on
   a poster opened the list panel and, where the viewer already had a list,
   put the thing in it and closed again — so the panel looked like it did
   nothing but add, and there was no way to reach "new list". tv-material
-  fires its long click while the key is still down; the release then lands on
-  whatever has focus by then, which is the panel's first row. With no lists
-  it looked fine, because a text field is not a button. The panel is deaf for
-  350 ms after it opens, which swallows that release and is short enough that
-  a deliberate press never notices. The guide hit the same thing with `okHeld`
-  and solved it there; this is the second instance, so expect a third.
+  fires its long click while the key is still down and then acts on the
+  centre key's *release* without caring whether it saw the press, so the
+  release lands on whatever has focus by then, which is the panel's first
+  row. With no lists it looked fine, because a text field is not a button.
+
+  **A timer cannot catch this, and the first attempt was one.** 350 ms of
+  deafness after the panel opens works only if the viewer lets go inside
+  350 ms; a hold of about a second on the box sailed past it. How long a key
+  is held is the viewer's choice and nothing here gets to decide it. What is
+  certain is the shape of the event — an up with no press before it — so the
+  panel now ignores centre keys until it sees a key down of its own.
+
+  **And "of its own" means a repeat count of zero.** The box's OK key
+  repeats, so a hold is a press, a stream of repeats and then a release, and
+  those repeats land on the panel once it is open. Arming on any key down
+  would arm on them and the release would choose the row underneath. This is
+  the same reading of `repeatCount` the guide does for its own holds.
+
+  The guide hit this first with `okHeld`; this is the second instance, so
+  expect a third. The panel logs every centre key it sees under
+  `IPTerebiPlay` in a debug build, because the emulator cannot reproduce a
+  real hold — `input keyevent --longpress` releases within milliseconds, so
+  focus has not moved yet and the release never reaches the panel at all.
 - **Hold OK puts something in a list**, and inside a list it takes it out —
   the same gesture as the phone's long press and the channel list's
   favourite. The panel it opens is over the grid, not a sheet up from the

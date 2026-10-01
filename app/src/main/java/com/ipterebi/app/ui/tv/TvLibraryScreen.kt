@@ -36,14 +36,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import android.util.Log
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import android.os.SystemClock
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.ipterebi.app.BuildConfig
+import com.ipterebi.app.TAG_PLAY
 import com.ipterebi.app.ui.DpadTextField
 import com.ipterebi.app.ui.fieldColours
 import com.ipterebi.app.ui.library.LibraryViewModel
@@ -370,9 +377,15 @@ private fun Chip(label: String, selected: Boolean, onClick: () -> Unit, mine: Bo
 }
 
 /**
- * Posters big enough to read the name under: four or five across a 1080p
- * screen rather than the phone's eight. That is the whole difference between
- * a grid you browse from a sofa and one you squint at.
+ * Posters big enough to read the name under, small enough to see a library:
+ * six across a 1080p screen rather than the phone's eight.
+ *
+ * It was four, which is what 170dp works out to on a 960dp-wide television
+ * once the rail is taken off, and the owner's verdict was that four is too
+ * big. They are right about what a poster is for: at that size one row fills
+ * the screen under the description strip, so the grid showed four films and
+ * no sense that there were more. At six a full row and the top of the next
+ * one fit, which is what says "keep going down".
  */
 @Composable
 private fun <I : Any> PosterGrid(
@@ -385,7 +398,7 @@ private fun <I : Any> PosterGrid(
     onHold: (I) -> Unit,
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 170.dp),
+        columns = GridCells.Adaptive(minSize = 118.dp),
         contentPadding = PaddingValues(start = 44.dp, end = 44.dp, top = 8.dp, bottom = 32.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -456,22 +469,52 @@ private fun ListPanel(
     BackHandler(onBack = onClose)
     val entry = remember { FocusRequester() }
 
-    // The press that opened this panel has not finished yet.
+    // The release that ends the hold has not arrived yet.
     //
-    // A hold is a long press, and tv-material fires its long click while the
-    // key is still down; the release then lands on whatever has focus by
-    // then, which is this panel's first row. With no lists that was harmless
-    // — the field is not a button — and with one it put the thing straight
-    // into that list and closed again, so the panel looked like it did
-    // nothing but add. The guide learned the same lesson about the release
-    // that ends a hold also opening the channel list; see `okHeld` there.
-    val openedAt = remember { SystemClock.uptimeMillis() }
-    fun settled() = SystemClock.uptimeMillis() - openedAt > SETTLE_MS
+    // tv-material fires its long click while the key is still down, and it
+    // acts on a centre key's release without caring whether it saw the press.
+    // So the release that ends the hold lands on this panel's first row and
+    // chooses it, and with a list already made that put the thing straight in
+    // and closed again. With no lists it looked fine, because a text field is
+    // not a button.
+    //
+    // A timer cannot catch it. How long a key is held is the viewer's choice,
+    // and a 350 ms guard here missed a hold of about a second on the owner's
+    // box: by the time they let go the panel had long since settled. What is
+    // certain is the shape of the event, so the panel ignores centre keys
+    // altogether until it sees a press of its own — a key down whose repeat
+    // count is zero — and from then on behaves normally.
+    //
+    // The repeat count is the part that matters on the box. Its OK key does
+    // repeat, so a hold is a down, a stream of repeats and then an up, and
+    // the repeats land on this panel once it is open. Arming on any key down
+    // would arm on those, and the release that followed would choose the row
+    // under them. Only a press that starts from nothing counts.
+    //
+    // The guide learned the same lesson about the release that ends a hold
+    // also opening the channel list; see `okHeld` there.
+    var armed by remember { mutableStateOf(false) }
     var newName by remember { mutableStateOf("") }
 
     Box(
         Modifier
             .fillMaxSize()
+            .onPreviewKeyEvent { event ->
+                if (event.key !in Select) return@onPreviewKeyEvent false
+                val fresh = event.type == KeyEventType.KeyDown &&
+                    event.nativeKeyEvent.repeatCount == 0
+                if (fresh) armed = true
+                val swallowed = !armed
+                if (BuildConfig.DEBUG) {
+                    Log.d(
+                        TAG_PLAY,
+                        "list panel key " + event.key + " " + event.type +
+                            " repeat=" + event.nativeKeyEvent.repeatCount +
+                            " armed=" + armed + " swallowed=" + swallowed,
+                    )
+                }
+                swallowed
+            }
             .background(Color(0xCC000000))
             .padding(horizontal = 120.dp, vertical = 64.dp),
         contentAlignment = Alignment.Center,
@@ -496,7 +539,7 @@ private fun ListPanel(
             }
             lists.forEachIndexed { index, (name, alreadyIn) ->
                 TvRow(
-                    onClick = { if (settled()) onChoose(name, alreadyIn) },
+                    onClick = { onChoose(name, alreadyIn) },
                     radius = 10.dp,
                     modifier = if (index == 0) Modifier.focusRequester(entry) else Modifier,
                 ) { focusedHere ->
@@ -529,7 +572,7 @@ private fun ListPanel(
                 }
                 TvButton(
                     text = "Make the list and add",
-                    onClick = { if (settled()) cleanListName(newName)?.let(onNew) },
+                    onClick = { cleanListName(newName)?.let(onNew) },
                 )
             }
         }
@@ -556,4 +599,4 @@ private val DetailHeight = 168.dp
  * enough that nobody deliberately pressing OK notices: a hold is 400 ms and
  * the release lands a frame or two after that.
  */
-private const val SETTLE_MS = 350L
+private val Select = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
