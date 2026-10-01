@@ -1024,6 +1024,9 @@ survived until something was pressed.
   press. It now starts editing on the key up and swallows the press that
   goes with it. This is the third time the same rule has been needed; see
   `okHeld` in the guide and the list panel's arming.
+  A phone's keyboard has not been seen to do it, which is why it went
+  unnoticed on main. Anything else that opens a window from a key should do
+  the same.
 - **Decide input mode when focus is decided, never at composition.** The mode
   flips on the input itself, before recomposition, so a captured value is one
   input stale exactly when it matters. Capturing it broke a tablet with a
@@ -1069,6 +1072,15 @@ survived until something was pressed.
   a tablet more, so neither changes. On the box a full row of posters and
   their titles now fits, with the next row showing beneath. Down from a chip
   lands in the grid, because there is no second row of chips to catch it.
+- **Right at the end of a row leaves the row.** There is no card past the
+  last one, and Compose does not stop there: it looks for the nearest
+  focusable anywhere to the right and takes it. On a television with one
+  favourite channel that was the settings cog in the opposite corner — one
+  press of Right and the remote was most of the screen away in the top bar,
+  measured as a jump from `[192,208][356,434]` to `[1798,10][1894,106]`, with
+  a second press doing nothing because there is no further right. Every
+  Home row cancels a focus exit to the right now. Only Right: Left is how a
+  remote gets back to the rail, and up and down are how the rows are walked.
 - **A heading the width of the screen beats the small card under it.** Down
   from a Home row heading went to the *next heading*, never into the row. The
   cards were focusable all along and were candidates in the search: they
