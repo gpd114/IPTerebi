@@ -206,6 +206,14 @@ same. Only the drawing differs:
   `IPTerebiPlay` in a debug build, because the emulator cannot reproduce a
   real hold — `input keyevent --longpress` releases within milliseconds, so
   focus has not moved yet and the release never reaches the panel at all.
+- **The panel keeps focus while it is up.** Down from its first row was
+  landing on a poster behind it, and from there nothing moved at all: the
+  grid is still composed underneath, and the poster below the row starts a
+  few pixels nearer than the name field does, which is all Compose's
+  distance scoring needs. The panel cancels its focus exit, so the search
+  stays inside it and down goes row, field, button. Deactivating the grid
+  instead does not work: `focusGroup()` is itself `canFocus = false`, and a
+  deactivated group is exactly one whose children are still reachable.
 - **Hold OK puts something in a list**, and inside a list it takes it out —
   the same gesture as the phone's long press and the channel list's
   favourite. The panel it opens is over the grid, not a sheet up from the
@@ -1006,6 +1014,16 @@ survived until something was pressed.
   up the list. `DpadTextField` fixes both with click-to-edit: under a remote the
   field is passed over, centre starts editing, and up or down always leave.
   Every text field in the app goes through it; a new one must too.
+- **A key that opens a window must act on the release, not the press.**
+  `DpadTextField` started editing on the key *down*, so the keyboard window
+  opened while OK was still held, and the release landed outside the
+  app's composition. On the box and on the Google TV emulator that threw the
+  whole screen away: the list panel went, then the screen, then the back
+  stack was down to Home, with no Back ever dispatched and no activity
+  restart — measured, not guessed, with lifecycle logs either side of the
+  press. It now starts editing on the key up and swallows the press that
+  goes with it. This is the third time the same rule has been needed; see
+  `okHeld` in the guide and the list panel's arming.
 - **Decide input mode when focus is decided, never at composition.** The mode
   flips on the input itself, before recomposition, so a captured value is one
   input stale exactly when it matters. Capturing it broke a tablet with a

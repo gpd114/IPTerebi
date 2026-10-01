@@ -123,12 +123,13 @@ fun DpadTextField(
             // focus target is inside it rather than above it.
             .onFocusChanged { wrapperFocused = it.isFocused }
             .onKeyEvent { event ->
-                if (remote() && !editing && event.type == KeyEventType.KeyDown && event.key in activateKeys) {
-                    editing = true
-                    true
-                } else {
-                    false
-                }
+                if (!remote() || editing || event.key !in activateKeys) return@onKeyEvent false
+                // Act on the release, and swallow the press that goes with
+                // it. Starting to edit on the key down opened the keyboard
+                // while the key was still held, and the release then landed
+                // on whatever the keyboard window left focused.
+                if (event.type == KeyEventType.KeyUp) editing = true
+                true
             }
             .focusProperties { canFocus = remote() && !editing }
             .focusable()

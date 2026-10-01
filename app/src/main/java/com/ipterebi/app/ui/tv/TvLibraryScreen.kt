@@ -32,9 +32,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import android.util.Log
 import androidx.compose.ui.input.key.Key
@@ -457,6 +459,7 @@ private fun <I : Any> PosterGrid(
  * [lists] is each list with whether this thing is already in it, so one row
  * can say both "put it here" and "take it out of here".
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun ListPanel(
     title: String,
@@ -522,6 +525,21 @@ private fun ListPanel(
         Column(
             Modifier
                 .fillMaxWidth()
+                // Focus stays in here while the panel is up.
+                //
+                // Down from the first row was landing on a poster behind the
+                // panel, and from there nothing moved: the grid is still
+                // composed underneath, the poster below the row starts a few
+                // pixels nearer than the name field does, and Compose scores
+                // by distance. Cancelling the exit restricts the search to
+                // this group, so down goes row, field, button, which is the
+                // order they are read in.
+                //
+                // Deactivating the grid instead does not work: focusGroup is
+                // itself `canFocus = false`, and a deactivated group is
+                // exactly one whose children are still reachable.
+                .focusProperties { exit = { FocusRequester.Cancel } }
+                .focusGroup()
                 .clip(Corners.panel)
                 .background(TvPanel)
                 .padding(32.dp),
