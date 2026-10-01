@@ -175,6 +175,16 @@ same. Only the drawing differs:
 - **Chips in one sideways row**, the viewer's lists first and in pink, then
   the provider's categories.
 - **Posters at 170dp**, four or five across, with the name under each.
+- **The release that ends a hold must not do the next thing.** Holding OK on
+  a poster opened the list panel and, where the viewer already had a list,
+  put the thing in it and closed again — so the panel looked like it did
+  nothing but add, and there was no way to reach "new list". tv-material
+  fires its long click while the key is still down; the release then lands on
+  whatever has focus by then, which is the panel's first row. With no lists
+  it looked fine, because a text field is not a button. The panel is deaf for
+  350 ms after it opens, which swallows that release and is short enough that
+  a deliberate press never notices. The guide hit the same thing with `okHeld`
+  and solved it there; this is the second instance, so expect a third.
 - **Hold OK puts something in a list**, and inside a list it takes it out —
   the same gesture as the phone's long press and the channel list's
   favourite. The panel it opens is over the grid, not a sheet up from the

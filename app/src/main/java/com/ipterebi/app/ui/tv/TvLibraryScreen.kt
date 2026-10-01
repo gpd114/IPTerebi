@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import android.os.SystemClock
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -440,6 +441,18 @@ private fun ListPanel(
 ) {
     BackHandler(onBack = onClose)
     val entry = remember { FocusRequester() }
+
+    // The press that opened this panel has not finished yet.
+    //
+    // A hold is a long press, and tv-material fires its long click while the
+    // key is still down; the release then lands on whatever has focus by
+    // then, which is this panel's first row. With no lists that was harmless
+    // — the field is not a button — and with one it put the thing straight
+    // into that list and closed again, so the panel looked like it did
+    // nothing but add. The guide learned the same lesson about the release
+    // that ends a hold also opening the channel list; see `okHeld` there.
+    val openedAt = remember { SystemClock.uptimeMillis() }
+    fun settled() = SystemClock.uptimeMillis() - openedAt > SETTLE_MS
     var newName by remember { mutableStateOf("") }
 
     Box(
@@ -469,7 +482,7 @@ private fun ListPanel(
             }
             lists.forEachIndexed { index, (name, alreadyIn) ->
                 TvRow(
-                    onClick = { onChoose(name, alreadyIn) },
+                    onClick = { if (settled()) onChoose(name, alreadyIn) },
                     radius = 10.dp,
                     modifier = if (index == 0) Modifier.focusRequester(entry) else Modifier,
                 ) { focusedHere ->
@@ -502,7 +515,7 @@ private fun ListPanel(
                 }
                 TvButton(
                     text = "Make the list and add",
-                    onClick = { cleanListName(newName)?.let(onNew) },
+                    onClick = { if (settled()) cleanListName(newName)?.let(onNew) },
                 )
             }
         }
@@ -521,3 +534,12 @@ private fun ListPanel(
  * edge, which is the same mistake the wrapped category shelf made.
  */
 private val DetailHeight = 168.dp
+
+/**
+ * How long after a panel opens its own buttons stay deaf.
+ *
+ * Long enough to swallow the release of the hold that opened it, short
+ * enough that nobody deliberately pressing OK notices: a hold is 400 ms and
+ * the release lands a frame or two after that.
+ */
+private const val SETTLE_MS = 350L
