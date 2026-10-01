@@ -28,8 +28,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -128,7 +130,7 @@ fun HomeScreen(
                         // The heading above hands Down to this requester, and
                         // the group passes it on to the first card. Both halves
                         // are needed; nothing shows any of it on a phone.
-                        modifier = Modifier.focusRequester(channelRow).focusGroup(),
+                        modifier = Modifier.focusRequester(channelRow).rightStaysInRow().focusGroup(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -158,7 +160,7 @@ fun HomeScreen(
                         // The heading above hands Down to this requester, and
                         // the group passes it on to the first card. Both halves
                         // are needed; nothing shows any of it on a phone.
-                        modifier = Modifier.focusRequester(filmRow).focusGroup(),
+                        modifier = Modifier.focusRequester(filmRow).rightStaysInRow().focusGroup(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -188,7 +190,7 @@ fun HomeScreen(
                         // The heading above hands Down to this requester, and
                         // the group passes it on to the first card. Both halves
                         // are needed; nothing shows any of it on a phone.
-                        modifier = Modifier.focusRequester(episodeRow).focusGroup(),
+                        modifier = Modifier.focusRequester(episodeRow).rightStaysInRow().focusGroup(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -210,7 +212,7 @@ fun HomeScreen(
                 }
                 item(key = "r:${own.name}") {
                     LazyRow(
-                        modifier = Modifier.focusGroup(),
+                        modifier = Modifier.rightStaysInRow().focusGroup(),
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -474,5 +476,26 @@ private fun ListCard(entry: ListedItem, onClick: () -> Unit) {
             color = Night.inkSoft,
             maxLines = 1,
         )
+    }
+}
+
+/**
+ * A row of cards keeps Right to itself.
+ *
+ * There is no card to the right of the last one, and Compose does not stop
+ * there: it looks for the nearest focusable anywhere to the right and takes
+ * it. With one favourite channel on a television that was the settings cog in
+ * the opposite corner — one press of Right and the remote was 1,600 pixels
+ * away in the top bar, with a second press doing nothing because there is no
+ * further right. It reads as the remote slipping, and it happens at the end of
+ * every row; a row of one just makes it the first press.
+ *
+ * Only Right is cancelled. Left is how a remote gets back to the rail, and up
+ * and down are how the rows are walked, so both still leave.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+private fun Modifier.rightStaysInRow(): Modifier = focusProperties {
+    exit = { direction ->
+        if (direction == FocusDirection.Right) FocusRequester.Cancel else FocusRequester.Default
     }
 }
