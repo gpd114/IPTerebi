@@ -701,6 +701,16 @@ survived until something was pressed.
   up the list. `DpadTextField` fixes both with click-to-edit: under a remote the
   field is passed over, centre starts editing, and up or down always leave.
   Every text field in the app goes through it; a new one must too.
+- **A key that opens a window must act on the release, not the press.**
+  `DpadTextField` started editing on the key *down*, so the keyboard window
+  opened while centre was still held and the release landed outside the
+  app's composition, on whatever the keyboard had left focused. It was found
+  on an Android TV box with a leanback keyboard, where it tore down the
+  screen the field was on and left the back stack at Home — no Back
+  dispatched and no activity restart, so it looked like neither. A phone's
+  keyboard has not been seen to do it, which is why this went unnoticed. The
+  field now starts editing on the key up and swallows the press that goes
+  with it. Anything else that opens a window from a key should do the same.
 - **Decide input mode when focus is decided, never at composition.** The mode
   flips on the input itself, before recomposition, so a captured value is one
   input stale exactly when it matters. Capturing it broke a tablet with a
