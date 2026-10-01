@@ -704,6 +704,11 @@ wanted.
 - **Per line, like everything keyed on a panel's ids** (`ListStore`, its own
   DataStore). Film 4271 on one provider is not film 4271 on another, so a list
   carried across lines would play something else entirely.
+  **And per app**: the phone and the box each keep their own, because a
+  DataStore is the app's and there is nowhere between them to sync to without
+  a server. The owner was asked and chose to leave it there. So a list made on
+  the sofa is not on the phone, and that is the design rather than a gap to
+  close.
 
 **They are rows on Home too**, under the rows the app decides on: what
 someone filed themselves belongs there, but below what they were in the
