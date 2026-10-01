@@ -78,6 +78,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.compose.foundation.focusGroup
+import com.ipterebi.app.playback.RecordingService
+import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.player.PlaybackPanel
 import com.ipterebi.app.ui.player.Picture
 import com.ipterebi.app.AppContainer
@@ -90,6 +92,10 @@ import com.ipterebi.app.ui.player.ProgrammeGuide
 import com.ipterebi.app.ui.player.StreamRetryPolicy
 import com.ipterebi.app.ui.player.rememberProgrammeGuide
 import com.ipterebi.core.LineWait
+import com.ipterebi.core.PAD_AFTER_SECONDS
+import com.ipterebi.core.Recording
+import com.ipterebi.core.Scheduling
+import com.ipterebi.core.recordingId
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.StreamReconnect
@@ -383,6 +389,55 @@ private fun TvLive(
         rememberProgrammeGuide(container, account, guideFor, state.find(guideFor)?.epgChannelId)
     } else {
         ProgrammeGuide()
+    }
+
+    // Keeping what is on, from the options panel.
+    //
+    // A recording takes the line, so this stops the picture — the service
+    // gives the panel a moment and then opens the channel itself. That is not
+    // a limitation of the service but of the line: one connection cannot both
+    // watch and record, and pretending otherwise would mean a recording that
+    // quietly loses to the player or the other way about.
+    //
+    // What is on comes from the banner's guide, which is already here. With
+    // no guide for this channel there is still something worth keeping, so it
+    // records an hour under the channel's name rather than refusing.
+    var recordNote by remember { mutableStateOf<String?>(null) }
+    val startRecording: () -> Unit = {
+        val channel = currentChannel
+        if (channel != null) {
+            val nowSeconds = System.currentTimeMillis() / 1000
+            val programme = guide.now
+            val stop = programme?.stopTimestamp?.takeIf { it > nowSeconds }
+                ?: (nowSeconds + FALLBACK_RECORD_SECONDS)
+            val recording = Recording(
+                id = recordingId(channel.streamId, programme?.startTimestamp ?: nowSeconds),
+                streamId = channel.streamId,
+                channelName = channel.name,
+                title = programme?.titleText?.ifBlank { null } ?: channel.name,
+                description = programme?.descriptionText.orEmpty(),
+                // Already under way, so it starts now rather than a minute ago;
+                // the end keeps its padding, which is where overruns live.
+                startSeconds = nowSeconds,
+                stopSeconds = stop + PAD_AFTER_SECONDS,
+                programmeStart = programme?.startTimestamp ?: nowSeconds,
+                programmeStop = programme?.stopTimestamp ?: stop,
+            )
+            container.scope.launch {
+                when (val outcome = container.recordings.book(account, recording)) {
+                    is Scheduling.Clash ->
+                        recordNote = "Already recording ${outcome.by.title}. One connection, one recording."
+                    is Scheduling.Booked -> {
+                        RecordingService.record(context, outcome.recording.id)
+                        recordNote = "Recording ${outcome.recording.title}"
+                    }
+                    is Scheduling.Merged -> {
+                        RecordingService.record(context, outcome.recording.id)
+                        recordNote = "Recording ${outcome.recording.title}"
+                    }
+                }
+            }
+        }
     }
 
     // Stop from the session, or Free the line in Settings: stopped until asked.
@@ -704,6 +759,33 @@ private fun TvLive(
         // otherwise break is that nothing focusable may *wait* over the video:
         // the first press of OK belongs to the channel list, not to a button
         // nobody asked to be there.
+        // What a record press did, said over the picture for a few seconds.
+        //
+        // Not focusable, and gone on its own: it is the answer to a press that
+        // has already happened, so nothing should have to be pressed to get
+        // rid of it, and nothing here may take the remote. Five seconds is
+        // long enough to read a clash from across a room.
+        recordNote?.let { note ->
+            LaunchedEffect(note) {
+                delay(5_000)
+                recordNote = null
+            }
+            Box(
+                Modifier.fillMaxSize().padding(top = 40.dp),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Text(
+                    note,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TvInk,
+                    modifier = Modifier
+                        .clip(Corners.panel)
+                        .background(TvPanel)
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                )
+            }
+        }
+
         if (optionsOpen) {
             val panelFocus = remember { FocusRequester() }
             Box(
@@ -718,6 +800,7 @@ private fun TvLive(
                     // This screen is channels and nothing else.
                     live = true,
                     onDismiss = { optionsOpen = false },
+                    onRecord = startRecording,
                     modifier = Modifier
                         .padding(end = 40.dp)
                         .focusRequester(panelFocus)
@@ -907,3 +990,12 @@ private const val ZAP_SETTLE_MS = 300L
 private const val NUMBER_WAIT_MS = 1_600L
 
 private const val BANNER_MS = 5_000L
+
+/**
+ * How long to record a channel the guide says nothing about.
+ *
+ * A missing guide is the normal case on plenty of lines, and "no programme
+ * information" is a poor reason to refuse to keep something. An hour is long
+ * enough to be useful and short enough not to fill a stick by accident.
+ */
+private const val FALLBACK_RECORD_SECONDS = 3_600L

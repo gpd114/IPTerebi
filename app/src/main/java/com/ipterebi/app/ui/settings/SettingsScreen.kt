@@ -174,6 +174,34 @@ fun SettingsScreen(
             }
 
             Panel {
+                SectionTitle("Recording")
+                // A volume, not a folder. Android TV has no file picker: the
+                // box resolves OPEN_DOCUMENT_TREE to nothing at all and the
+                // Google TV emulator to a stub that does nothing, both
+                // measured. What works everywhere with no permission is the
+                // app's own directory on each mounted volume, so the question
+                // put to the viewer is the only one they have — the stick, or
+                // the box.
+                if (state.recordingVolumes.isEmpty()) {
+                    Hint("No writable storage was found on this box.")
+                } else {
+                    ChoiceRow(
+                        options = state.recordingVolumes.map {
+                            it.path to "${it.label} · ${asGigabytes(it.freeBytes)} free"
+                        },
+                        isSelected = { it == state.recordingFolder },
+                        onSelect = viewModel::setRecordingFolder,
+                    )
+                }
+                Hint(
+                    "Where recordings are written. A USB stick, in practice: this box " +
+                        "has well under a gigabyte free, which is a few minutes of " +
+                        "television. A recording takes the line while it runs, so " +
+                        "nothing else can play at the same time.",
+                )
+            }
+
+            Panel {
                 SectionTitle("Check the line")
                 Hint(
                     "Asks the panel what it thinks of this account right now. Free the " +

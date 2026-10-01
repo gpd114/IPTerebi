@@ -6,6 +6,8 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
+import com.ipterebi.app.data.RecordingVolume
+import com.ipterebi.app.data.recordingVolumes
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.UserInfo
 import com.ipterebi.core.lineKey
@@ -27,6 +29,10 @@ data class SettingsUiState(
     val info: UserInfo? = null,
     val error: String? = null,
     val signedOut: Boolean = false,
+    /** The tree uri recordings are written into, or empty when none is chosen. */
+    val recordingFolder: String = "",
+    /** Everywhere a recording could go on this box, with the room on each. */
+    val recordingVolumes: List<RecordingVolume> = emptyList(),
 ) {
     val userAgentChanged: Boolean
         get() = account != null && userAgentDraft.trim() != account.userAgent
@@ -38,6 +44,11 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            // The folder a recording goes to, and how much room is on it. Per
+            // device rather than per line: a stick belongs to the box.
+            container.recordings.folder.collect { refreshFolder() }
+        }
         viewModelScope.launch {
             container.credentials.state
                 .filterIsInstance<AccountState.SignedIn>()
@@ -63,6 +74,21 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
      * ExoPlayer instance on the account, so this rebuilds it on the next open —
      * which is the whole point of having the toggle.
      */
+    /** Picked by volume, not by folder: a television has no file picker. */
+    fun setRecordingFolder(path: String) {
+        viewModelScope.launch { container.recordings.setFolder(path) }
+    }
+
+    fun forgetRecordingFolder() {
+        viewModelScope.launch { container.recordings.forgetFolder() }
+    }
+
+    private suspend fun refreshFolder() {
+        val volumes = recordingVolumes(container.appContext)
+        val chosen = container.recordings.folderNow()
+        _state.update { it.copy(recordingFolder = chosen, recordingVolumes = volumes) }
+    }
+
     fun setFormat(format: StreamFormat) {
         val account = _state.value.account ?: return
         if (account.format == format) return
@@ -133,4 +159,11 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
             initializer { SettingsViewModel(container) }
         }
     }
+}
+
+/** Free space, in the units a viewer deciding whether to record thinks in. */
+fun asGigabytes(bytes: Long): String {
+    val gb = bytes.toDouble() / (1024 * 1024 * 1024)
+    return if (gb >= 1) String.format(java.util.Locale.ROOT, "%.1f GB", gb)
+    else String.format(java.util.Locale.ROOT, "%d MB", bytes / (1024 * 1024))
 }

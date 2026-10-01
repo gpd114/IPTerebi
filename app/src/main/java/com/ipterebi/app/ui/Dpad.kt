@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.focus.FocusDirection
@@ -161,5 +162,40 @@ fun DpadTextField(
                     true
                 },
         )
+    }
+}
+
+/**
+ * Ignores centre keys until this thing has seen a press of its own.
+ *
+ * Put it on a panel that a *hold* opens. tv-material fires a long click while
+ * the key is still down and then acts on the centre key's release without
+ * caring whether it saw the press, so the release that ended the hold lands
+ * on whatever has focus by then — which is the panel that just appeared, on
+ * its first row. The panel opens and immediately presses something.
+ *
+ * It is the fourth time this has been needed, which is why it is a modifier
+ * rather than another copy: the guide's favourite hold (`okHeld`), the list
+ * panel, and the player's options panel, where it was invisible until a hold
+ * put something that mattered at the top — before that the first row was
+ * "Fit", and pressing it set the picture to what it already was.
+ *
+ * **A fresh press means a repeat count of zero.** A remote whose OK key
+ * repeats — the owner's box does — sends a press, a stream of repeats and
+ * then a release, and the repeats land here once the panel is up. Arming on
+ * any key down would arm on those and let the release through, which is the
+ * bug all over again.
+ *
+ * Nothing happens under touch, which sends no key events.
+ */
+@OptIn(ExperimentalComposeUiApi::class)
+fun Modifier.deafUntilPressed(): Modifier = composed {
+    var armed by remember { mutableStateOf(false) }
+    onPreviewKeyEvent { event ->
+        if (event.key !in activateKeys) return@onPreviewKeyEvent false
+        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+            armed = true
+        }
+        !armed
     }
 }

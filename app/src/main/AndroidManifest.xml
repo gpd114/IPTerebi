@@ -13,6 +13,9 @@
     -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Recording a channel to a file: a long download with the screen off,
+         which is what dataSync means. Not mediaPlayback: nothing is playing. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!--
       "Open in another player" asks whether any video player is installed
@@ -86,5 +89,15 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+
+        <!--
+          Writing a channel to a file. Not exported: nothing outside this app
+          has any business starting a recording, and unlike the media session
+          there is no system component that needs to find it.
+        -->
+        <service
+            android:name=".playback.RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
     </application>
 </manifest>

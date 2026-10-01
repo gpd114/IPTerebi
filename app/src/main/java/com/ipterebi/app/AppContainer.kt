@@ -5,6 +5,7 @@ import android.util.Log
 import com.ipterebi.app.data.ChannelListStore
 import com.ipterebi.app.data.MediaRepository
 import com.ipterebi.app.data.ListStore
+import com.ipterebi.app.data.RecordingStore
 import com.ipterebi.app.data.WatchStore
 import com.ipterebi.app.data.CredentialStore
 import com.ipterebi.app.data.EpisodeListing
@@ -27,10 +28,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 class AppContainer(context: Context) {
 
+    /** For the few things that need one after construction, such as a document tree. */
+    val appContext: Context = context.applicationContext
+
     val credentials = CredentialStore(context.applicationContext)
 
+    /**
+     * One HTTP client for the whole app: the panel API, and the recorder that
+     * writes a channel to a file. Sharing it shares the connection pool and
+     * the timeouts, and means a recording is opened exactly the way every
+     * other request to this panel is.
+     */
+    val http = defaultXtreamHttpClient()
+
     val xtream = XtreamClient(
-        http = defaultXtreamHttpClient(),
+        http = http,
         log = { line -> if (BuildConfig.DEBUG) Log.d(TAG_API, line) },
     )
 
@@ -59,6 +71,9 @@ class AppContainer(context: Context) {
 
     /** The viewer's own lists of films and series, per line. See ListStore. */
     val lists = ListStore(context.applicationContext)
+
+    /** What is to be recorded, what is recording, and where it is written. */
+    val recordings = RecordingStore(context.applicationContext)
 
     /** Starred and recently watched channels, per line. */
     val channelLists = ChannelListStore(context.applicationContext)
