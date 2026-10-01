@@ -52,10 +52,18 @@ internal val TvInkSoft = Color(0xFFA3A8B8)
 /** Where something is, rather than what is focused: the playing channel, the group being zapped. */
 internal val TvAccent = Color(0xFF9DB5FF)
 internal val TvCobalt = Color(0xFF2F5FE0)
+/** Ink on an [TvAccent] fill: the page, so the chosen thing reads as a block. */
+internal val TvOnAccent = Color(0xFF0B0C11)
 internal val TvPink = Color(0xFFFF8FA3)
 // Focus is the accent, the same block the phone screens fill with: the owner's
 // word on the white one it used to be was that it is ugly, and white was two
 // things at once anyway — the focus pill here and the ring over there.
+//
+// So cobalt answers one question and one only: where is the remote. What is
+// chosen — the section you are in, the group you are zapping — is the
+// accent instead, as a fill with [TvOnAccent] on it or as ink where there is
+// no fill. They used to share cobalt, and on the rail that put two identical
+// blue blocks on the screen at once with nothing to say which was which.
 internal val TvFocusFill = TvCobalt
 internal val TvFocusInk = Color.White
 

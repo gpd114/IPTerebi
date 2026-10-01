@@ -240,6 +240,22 @@ focus shows as a frame around the picture rather than not at all. One place is
 still a line: a text field cannot be filled behind its own well, so
 `DpadTextField` outlines in the same colour.
 
+**Chosen is not focus, and they must not be the same colour.** `Palette.chosen`
+is what is picked among peers — the section the rail is on, the chip you are
+browsing — with `onChosen` on it. On Light it is the same dark blue as
+`cobalt`, which is what it always was. On Dark it is the pale accent, because
+there `cobalt` is *also* `focus`: the rail drew the section you were in and the
+item the remote was on as two identical blue blocks, and the owner could not
+tell which was which. So on a television the section you are in is the pale
+blue with near-black on it, and the remote is the cobalt fill. The TV screens
+say the same thing in their own colours — `TvAccent` on `TvOnAccent` for
+chosen, `TvFocusFill` for focus, in `ui/tv/TvParts.kt`.
+
+One thing to watch when a component paints its own background: it covers the
+focus fill underneath. The library chips did, so the chip the remote was on
+looked like any other; they are transparent while focused now. Anything that
+fills itself and sits inside a `TvRow` needs the same.
+
 Flat throughout: no gradients, glows, rims or sheen, and each role one colour.
 Colours are roles in a `Palette` (`Light`, `Dark`), read through `Night.*`,
 which holds the current palette as state — switching recolours everything that

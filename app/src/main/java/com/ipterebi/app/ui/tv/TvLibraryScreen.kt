@@ -342,14 +342,28 @@ private fun Chip(label: String, selected: Boolean, onClick: () -> Unit, mine: Bo
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             color = when {
                 focusedHere -> TvFocusInk
-                selected -> TvInk
+                selected -> TvOnAccent
                 mine -> TvPink
                 else -> TvInkSoft
             },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .background(if (selected && !focusedHere) TvCobalt else CellFill)
+                // Chosen is the accent, focus is cobalt: see TvParts. A list of
+                // the viewer's own keeps its pink when it is the chosen one, so
+                // the two kinds of chip stay apart.
+                //
+                // Transparent while focused, because this background would
+                // otherwise paint over the focus fill the row puts behind it
+                // and the chip the remote is on would look like any other.
+                .background(
+                    when {
+                        focusedHere -> Color.Transparent
+                        !selected -> CellFill
+                        mine -> TvPink
+                        else -> TvAccent
+                    }
+                )
                 .padding(horizontal = 18.dp, vertical = 10.dp),
         )
     }

@@ -629,13 +629,13 @@ private fun RailItem(icon: Painter, label: String, selected: Boolean, onClick: (
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(if (selected && !focused) TvCobalt else Color.Transparent),
+                    .background(if (selected && !focused) TvAccent else Color.Transparent),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = if (focused) TvFocusInk else if (selected) Color.White else TvInkSoft,
+                    tint = if (focused) TvFocusInk else if (selected) TvOnAccent else TvInkSoft,
                     modifier = Modifier.size(24.dp),
                 )
             }
@@ -643,7 +643,7 @@ private fun RailItem(icon: Painter, label: String, selected: Boolean, onClick: (
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
-            color = if (focusedHere || selected) TvInk else TvInkSoft,
+            color = if (focusedHere) TvInk else if (selected) TvAccent else TvInkSoft,
             maxLines = 1,
             modifier = Modifier.padding(top = 4.dp),
         )

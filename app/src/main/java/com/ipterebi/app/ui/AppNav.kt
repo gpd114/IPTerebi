@@ -30,10 +30,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -208,19 +211,28 @@ fun AppNav(container: AppContainer) {
                             NavigationRail(containerColor = Color.Transparent) {
                                 Spacer(Modifier.weight(1f))
                                 Section.entries.forEach { item ->
+                                    // Where you are and where the remote is are two
+                                    // different questions asked of the same four items,
+                                    // so they cannot be the same colour: chosen is the
+                                    // accent, focus is the cobalt fill underneath.
+                                    // A focused item drops the indicator and takes the
+                                    // page ink, which is what reads on that fill.
+                                    var focused by remember { mutableStateOf(false) }
                                     NavigationRailItem(
                                         selected = item == section,
                                         onClick = { nav.switchSection(item.go) },
                                         icon = { Icon(painterResource(item.icon), contentDescription = null) },
                                         label = { Text(item.label) },
                                         colors = NavigationRailItemDefaults.colors(
-                                            selectedIconColor = Color.White,
-                                            selectedTextColor = Night.ink,
-                                            indicatorColor = Night.cobalt,
-                                            unselectedIconColor = Night.inkSoft,
-                                            unselectedTextColor = Night.inkSoft,
+                                            selectedIconColor = if (focused) Night.ink else Night.onChosen,
+                                            selectedTextColor = if (focused) Night.ink else Night.accent,
+                                            indicatorColor = if (focused) Color.Transparent else Night.chosen,
+                                            unselectedIconColor = if (focused) Night.ink else Night.inkSoft,
+                                            unselectedTextColor = if (focused) Night.ink else Night.inkSoft,
                                         ),
-                                        modifier = Modifier.focusFill(),
+                                        modifier = Modifier
+                                            .onFocusChanged { focused = it.isFocused }
+                                            .focusFill(),
                                     )
                                 }
                                 Spacer(Modifier.weight(1f))
@@ -502,7 +514,7 @@ fun AppNav(container: AppContainer) {
 
 /**
  * The sections along the bottom on a phone: a pill that floats above the
- * screen's edge, the one you are on filled cobalt with its name beside it.
+ * screen's edge, the one you are on filled with the accent, its name beside it.
  * Each tab is focusable and ringed, so a remote on a narrow screen can still
  * reach it — a wide one gets the rail instead, above.
  */
@@ -524,11 +536,20 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
     ) {
         Section.entries.forEach { item ->
             val selected = item == current
-            val tint = if (selected) Color.White else Night.inkSoft
+            var focused by remember { mutableStateOf(false) }
+            // As the rail above: the tab you are on is the accent, the one the
+            // remote is on is the focus fill. On Dark those used to be the same
+            // blue, so a remote on this bar could not say where it was.
+            val tint = when {
+                focused -> Night.ink
+                selected -> Night.onChosen
+                else -> Night.inkSoft
+            }
             Row(
                 modifier = Modifier
                     .clip(tab)
-                    .background(if (selected) Night.cobalt else Color.Transparent)
+                    .background(if (selected) Night.chosen else Color.Transparent)
+                    .onFocusChanged { focused = it.isFocused }
                     .focusFill(tab)
                     .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(item) })
                     .height(42.dp)

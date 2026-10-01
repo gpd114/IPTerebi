@@ -59,6 +59,18 @@ data class Palette(
     val cobalt: Color,
     /** The accent as text or a small mark on the page. */
     val accent: Color,
+    /**
+     * What is chosen among peers: the section the rail is on, the chip you are
+     * browsing, with [onChosen] on it.
+     *
+     * Not [cobalt], although on Light it is the same colour. On Dark [cobalt]
+     * is also [focus], so a chosen chip and the focused one were the same blue
+     * block and a remote could not say which was which. Chosen is therefore the
+     * one the theme does not spend on focus.
+     */
+    val chosen: Color,
+    /** Ink on [chosen]. */
+    val onChosen: Color,
     /** Primary text. */
     val ink: Color,
     /** Muted text. */
@@ -83,6 +95,7 @@ val Light = Palette(
     hairline = Color(0xFFE6EAF4), quiet = Color(0xFFE6EBF7), quietText = Color(0xFF34436A),
     glass = Color(0xFFE3E9F7), glassIcon = Color(0xFF1B3478), field = Color(0xFFFFFFFF),
     cobalt = Color(0xFF1B3478), accent = Color(0xFF1B3478),
+    chosen = Color(0xFF1B3478), onChosen = Color(0xFFFFFFFF),
     ink = Color(0xFF141A30), inkSoft = Color(0xFF6A7494),
     pink = Color(0xFFC2456B), badge = Color(0xB3142A66),
     focus = Color(0xFFC3D2F2),
@@ -103,6 +116,7 @@ val Dark = Palette(
     hairline = Color(0x14FFFFFF), quiet = Color(0xFF20263A), quietText = Color(0xFFDADDE6),
     glass = Color(0xFF20263A), glassIcon = Color(0xFFE6E9F2), field = Color(0xFF121419),
     cobalt = Color(0xFF2F5FE0), accent = Color(0xFF9DB5FF),
+    chosen = Color(0xFF9DB5FF), onChosen = Color(0xFF0B0C11),
     ink = Color(0xFFF1F3F8), inkSoft = Color(0xFFA3A8B8),
     pink = Color(0xFFFF8FA3), badge = Color(0xB31F3C8C),
     focus = Color(0xFF2F5FE0),
@@ -127,6 +141,8 @@ object Night {
     val field get() = palette.field
     val cobalt get() = palette.cobalt
     val accent get() = palette.accent
+    val chosen get() = palette.chosen
+    val onChosen get() = palette.onChosen
     val ink get() = palette.ink
     val inkSoft get() = palette.inkSoft
     val pink get() = palette.pink
