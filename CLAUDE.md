@@ -41,8 +41,8 @@ The home screen once signed in: the channel left on last time (the newest
 recent — recorded when a channel *plays*, not when it is chosen), full screen,
 playing. Up/down zap through the group it was chosen in; OK opens the
 channels with their guide (below); Left flips to the previous channel;
-Right shows the banner; digits jump by number; Back goes to Home. Home, Films,
-Series and Settings are the phone's screens.
+Right shows the banner; digits jump by number; Back goes to Home. Home and
+Settings are the phone's screens; Films and Series have their own below.
 
 - **One ExoPlayer for the screen.** A change of channel stops the stream at
   once and asks for the next 300 ms later; another press inside that cancels
@@ -145,6 +145,47 @@ box, and put back to this on their word.
   row of empty half-hours, not a `get_short_epg` request per row.
 - On the emulator, check its clock against the PC's first (`adb shell date`):
   one had drifted an hour and a half, and a right guide looked wrong.
+
+### Films and series, for a sofa (`ui/tv/TvLibraryScreen.kt`)
+
+The phone's library is a search box, a shelf of categories and a grid of
+112dp tiles. On a television that is the wrong shape twice over: a tile that
+size is a postage stamp across a room, and the name under it, clipped to two
+lines, says nothing on a real line — the titles there are
+`4K-OSN+ - The Last of Us (2023) (US)`, where everything that identifies the
+thing is at the end.
+
+So the TV build draws them differently and shares everything else. The
+`LibraryViewModel` is the same, `filmsSource` and `seriesSource` are the
+same, one category at a time is the same, the viewer's own lists are the
+same. Only the drawing differs:
+
+- **What the cursor is on gets the top of the screen**: its poster, its name
+  at headline size over two lines, its rating, and a series' plot. Films have
+  no plot in `get_vod_streams` and asking for one is a request per film, so
+  that line is empty for them rather than fetched.
+- **With nothing focused yet the panel says where you are** — the category or
+  list and how many are in it — rather than standing empty, which is what it
+  did on the first run.
+- **168dp of height**, not the guide's 213: that strip carries a programme,
+  its times and a player in the corner, this one a poster and a name. On a
+  540dp television the difference is a whole row of covers, and at the
+  guide's height the first row was clipped by the bottom edge — the same
+  mistake the wrapped category shelf made.
+- **Chips in one sideways row**, the viewer's lists first and in pink, then
+  the provider's categories.
+- **Posters at 170dp**, four or five across, with the name under each.
+- **Hold OK puts something in a list**, and inside a list it takes it out —
+  the same gesture as the phone's long press and the channel list's
+  favourite. The panel it opens is over the grid, not a sheet up from the
+  bottom: a sheet at the foot of a television is one a remote has to walk the
+  length of the screen to reach. It takes focus while it is up and Back
+  closes it, as the guide's groups panel does.
+
+Reaching it is the rail's usual pattern: the rail, right into the content,
+down into the posters. The view models are keyed `tv-films` and `tv-series`
+apart from the phone screens' — same class, same source, and a shared key
+would hand one screen the other's state on the one build where both exist.
 
 ## Layout
 

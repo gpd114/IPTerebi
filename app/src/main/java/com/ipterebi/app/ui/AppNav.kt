@@ -74,6 +74,8 @@ import com.ipterebi.app.ui.settings.SettingsScreen
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.tv.TvDestination
+import com.ipterebi.app.ui.tv.TvFilmsScreen
+import com.ipterebi.app.ui.tv.TvSeriesScreen
 import com.ipterebi.app.ui.tv.TvLiveScreen
 
 object Route {
@@ -368,21 +370,23 @@ fun AppNav(container: AppContainer) {
                                 )
                             }
 
+                            // The television's own libraries, not the phone's:
+                            // same data, same lists, drawn for a sofa. The
+                            // cog lives in the rail here, so neither takes an
+                            // onSettings.
                             composable(Route.FILMS) {
-                                FilmsScreen(
+                                TvFilmsScreen(
                                     container = container,
                                     onFilm = { film ->
                                         nav.navigate(Route.playFilm(film.streamId, film.playbackExtension))
                                     },
-                                    onSettings = { nav.navigate(Route.SETTINGS) },
                                 )
                             }
 
                             composable(Route.SERIES) {
-                                SeriesScreen(
+                                TvSeriesScreen(
                                     container = container,
                                     onSeries = { series -> nav.navigate(Route.seriesDetail(series.seriesId)) },
-                                    onSettings = { nav.navigate(Route.SETTINGS) },
                                 )
                             }
 

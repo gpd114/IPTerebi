@@ -80,7 +80,8 @@ internal val GuideTopHeight = 213.dp
 
 /** Behind the guide: the same near-black as the panels, but solid — it is a page, not an overlay. */
 internal val TvGround = Color(0xFF0B0C11)
-private val CellFill = Color(0xFF191B23)
+/** The flat fill behind a guide cell, a poster tile, a chip: the page lifted once. */
+internal val CellFill = Color(0xFF191B23)
 private val CellNowFill = Color(0xFF20263A)
 
 @Composable
