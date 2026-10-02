@@ -701,6 +701,20 @@ survived until something was pressed.
   up the list. `DpadTextField` fixes both with click-to-edit: under a remote the
   field is passed over, centre starts editing, and up or down always leave.
   Every text field in the app goes through it; a new one must too.
+- **A panel a hold opens must ignore the release that opened it.**
+  `Modifier.deafUntilPressed()` in `ui/Dpad.kt`. tv-material fires a long
+  click while the key is still down and then acts on the centre key's
+  release without caring whether it saw the press, so the release lands on
+  whatever has focus by then — the panel that just appeared, on its first
+  row. In the player's options panel that was invisible for as long as the
+  first row was "Fit", since pressing it set the picture to what it already
+  was; it bit the moment the TV build put something that mattered above it.
+
+  **A fresh press means a repeat count of zero.** A remote whose OK key
+  repeats — the owner's box does — sends a press, a stream of repeats and
+  then a release, and those repeats land on the panel once it is up. Arming
+  on any key down would arm on them and let the release through, which is
+  the bug again.
 - **A key that opens a window must act on the release, not the press.**
   `DpadTextField` started editing on the key *down*, so the keyboard window
   opened while centre was still held and the release landed outside the

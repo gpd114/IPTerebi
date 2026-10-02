@@ -41,6 +41,7 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import com.ipterebi.app.ui.focusFill
+import com.ipterebi.app.ui.deafUntilPressed
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.OverVideo
 import java.util.Locale
@@ -229,6 +230,15 @@ fun PlaybackPanel(
     /** Live has no end of its own, so a sleep timer means something different. */
     live: Boolean,
     onDismiss: () -> Unit,
+    /**
+     * Start keeping what is on, where that is offered — the TV build, on a
+     * channel. Null everywhere else, and the heading goes with it.
+     *
+     * It is here rather than on a button over the picture for the reason the
+     * whole panel is: nothing focusable may wait over the video, or the first
+     * press of OK goes to it instead of to the channel list.
+     */
+    onRecord: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var tracks by remember { mutableStateOf(player.currentTracks) }
@@ -257,6 +267,9 @@ fun PlaybackPanel(
 
     Column(
         modifier
+            // A hold opens this, and the release that ends the hold would
+            // otherwise press whatever is at the top of it. See Dpad.kt.
+            .deafUntilPressed()
             .widthIn(max = 320.dp)
             // A share of the screen rather than a fixed height: in landscape,
             // which is how anything is watched, 460dp is taller than the phone
@@ -269,6 +282,18 @@ fun PlaybackPanel(
             .padding(vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
+        if (onRecord != null) {
+            Heading("Recording")
+            Line(label = "Record what is on", selected = false) {
+                onRecord()
+                onDismiss()
+            }
+            Hint(
+                "Takes your line for the rest of the programme, so the picture stops. " +
+                    "One connection cannot both watch and record.",
+            )
+        }
+
         Heading("Picture")
         PictureFit.entries.forEach { option ->
             Line(
