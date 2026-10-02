@@ -7,6 +7,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.core.LiveStream
+import com.ipterebi.core.hiddenIds
+import com.ipterebi.core.withoutHidden
 import com.ipterebi.core.OwnList
 import com.ipterebi.core.WatchKind
 import com.ipterebi.core.WatchedItem
@@ -74,8 +76,23 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                         container.channelLists.recents(account),
                         container.watched.watching(account),
                         container.lists.lists(account),
-                    ) { favourites, recents, watching, lists ->
-                        Home(account, favourites, recents, watching, lists)
+                        container.channelLists.hidden(account),
+                    ) { values ->
+                        @Suppress("UNCHECKED_CAST")
+                        Home(
+                            account = account,
+                            // Hidden here as well as on the channel list: these
+                            // rows are drawn from the stored copies, so a
+                            // channel hidden after it was starred would
+                            // otherwise still greet you on the screen you see
+                            // most.
+                            favourites = (values[0] as List<LiveStream>)
+                                .withoutHidden((values[4] as List<LiveStream>).hiddenIds()),
+                            recents = (values[1] as List<LiveStream>)
+                                .withoutHidden((values[4] as List<LiveStream>).hiddenIds()),
+                            watching = values[2] as List<WatchedItem>,
+                            lists = values[3] as List<OwnList>,
+                        )
                     }
                 }
                 .collect { home ->
