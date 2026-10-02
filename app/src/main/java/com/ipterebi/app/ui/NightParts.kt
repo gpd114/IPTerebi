@@ -241,7 +241,12 @@ fun SectionTopBar(
             modifier = Modifier.weight(1f),
         )
         actions()
-        SquareIconButton(Icons.Filled.Settings, "Settings", onSettings)
+        // Only where there is no rail to hold it. On a television the rail
+        // carries Settings at its foot, and a second way in at the far corner
+        // of the screen is a trip a remote should not have to make.
+        if (!railShowing()) {
+            SquareIconButton(Icons.Filled.Settings, "Settings", onSettings)
+        }
     }
 }
 

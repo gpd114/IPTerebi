@@ -72,6 +72,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -190,6 +191,9 @@ private fun PlayerContent(
             is Playable.Channel, is Playable.CatchUp -> channel?.name
             is Playable.Film -> container.films.find(playable.id)?.name
             is Playable.Episode -> container.episodes.find(playable.id)?.title
+            // Its own name, from the row that opened it: no list to look it
+            // up in, because this one never came from the panel.
+            is Playable.Recorded -> playable.name
         }
     }
     // For the notification and the lock screen. Often blank and often a dead
@@ -199,6 +203,7 @@ private fun PlayerContent(
             is Playable.Channel, is Playable.CatchUp -> channel?.icon
             is Playable.Film -> container.films.find(playable.id)?.icon
             is Playable.Episode -> null
+            is Playable.Recorded -> null
         }?.takeIf { it.isNotBlank() }
     }
 
@@ -237,6 +242,9 @@ private fun PlayerContent(
                 account,
                 VodStream(streamId = playable.id, containerExtension = playable.extension),
             )
+            // A file on this box. No account, no panel, no credentials in a
+            // path — the one playable that is nobody else's business.
+            is Playable.Recorded -> android.net.Uri.fromFile(java.io.File(playable.path)).toString()
             // Qualified: core's Episode, not Playable.Episode, which shares the name.
             is Playable.Episode -> container.xtream.episodeStreamUrl(
                 account,
@@ -271,13 +279,25 @@ private fun PlayerContent(
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(20_000)
 
-        val sources = DefaultMediaSourceFactory(DelayedOpenFactory(httpFactory, reconnectDelay)).apply {
+        // A recording is read off the disk, and the HTTP data source cannot
+        // do that: handed a file:// uri it casts the connection to
+        // HttpURLConnection and throws, which reads as "Source error" and
+        // says nothing about the real reason. DefaultDataSource handles
+        // file, content and http, so it is the one to give a local file.
+        val upstream = if (playable is Playable.Recorded) {
+            DefaultDataSource.Factory(context)
+        } else {
+            DelayedOpenFactory(httpFactory, reconnectDelay)
+        }
+        val sources = DefaultMediaSourceFactory(upstream).apply {
             when (playable) {
                 // HLS is left to ExoPlayer: its segments are separate requests
                 // with nothing to range over, and it has never met a real line.
                 is Playable.Channel, is Playable.CatchUp ->
                     if (account.format == StreamFormat.TS) setLoadErrorHandlingPolicy(StreamRetryPolicy(live = true))
-                is Playable.Film, is Playable.Episode ->
+                // A recording is a file like any other, and the one on local
+                // storage that cannot fail for a reason the panel knows about.
+                is Playable.Film, is Playable.Episode, is Playable.Recorded ->
                     setLoadErrorHandlingPolicy(StreamRetryPolicy(live = false))
             }
         }
@@ -325,7 +345,7 @@ private fun PlayerContent(
                                 // real extension, mp4 and mkv need different
                                 // extractors, and sniffing the container is
                                 // exactly what the progressive extractors do.
-                                is Playable.Film, is Playable.Episode -> null
+                                is Playable.Film, is Playable.Episode, is Playable.Recorded -> null
                             }
                         )
                         // What the notification and the lock screen show.
@@ -340,6 +360,7 @@ private fun PlayerContent(
                                         is Playable.CatchUp -> "Catch-up"
                                         is Playable.Film -> "Film"
                                         is Playable.Episode -> "Series"
+                                        is Playable.Recorded -> "Recording"
                                     }
                                 )
                                 .setArtworkUri(artwork?.toUri())
@@ -393,6 +414,10 @@ private fun PlayerContent(
                 watchedAt = System.currentTimeMillis(),
             )
             is Playable.Channel, is Playable.CatchUp -> return@save
+            // Not kept: Home's part-watched row is built from the panel's
+            // ids, and a file on this box has none. The recording is in its
+            // own list either way, which is where someone would look for it.
+            is Playable.Recorded -> return@save
         }
         if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} noting ${position / 1000} s of ${length / 1000} s")
         container.scope.launch { container.watched.record(account, item) }
@@ -412,12 +437,14 @@ private fun PlayerContent(
         val kind = when (playable) {
             is Playable.Film -> WatchKind.FILM
             is Playable.Episode -> WatchKind.EPISODE
-            is Playable.Channel, is Playable.CatchUp -> return@LaunchedEffect
+            is Playable.Channel, is Playable.CatchUp, is Playable.Recorded ->
+                return@LaunchedEffect
         }
         val id = when (playable) {
             is Playable.Film -> playable.id.toString()
             is Playable.Episode -> playable.id
-            is Playable.Channel, is Playable.CatchUp -> return@LaunchedEffect
+            is Playable.Channel, is Playable.CatchUp, is Playable.Recorded ->
+                return@LaunchedEffect
         }
         container.watched.resumeAt(account, kind, id).takeIf { it > 0 }?.let { at ->
             if (BuildConfig.DEBUG) Log.d(TAG_PLAY, "${playable.logName()} resuming at ${at / 1000} s")
@@ -464,6 +491,7 @@ private fun PlayerContent(
                         "open film ${playable.id} as .${playable.extension}, ua=${account.userAgent}"
                     is Playable.Episode ->
                         "open episode ${playable.id} as .${playable.extension}, ua=${account.userAgent}"
+                    is Playable.Recorded -> "open recording from this box"
                 },
             )
             // The real URL carries the credentials in its path, so only its
@@ -487,6 +515,8 @@ private fun PlayerContent(
                         "  ${account.base}/movie/***/***/${playable.id}.${playable.extension}"
                     is Playable.Episode ->
                         "  ${account.base}/series/***/***/${playable.id}.${playable.extension}"
+                    // No credentials to hide: this one never left the box.
+                    is Playable.Recorded -> "  " + playable.path
                 },
             )
         }
@@ -608,6 +638,11 @@ private fun PlayerContent(
                         is Playable.Channel, is Playable.CatchUp -> describeStreamHttpError(cause.responseCode)
                         is Playable.Film -> describeFilmHttpError(cause.responseCode)
                         is Playable.Episode -> describeEpisodeHttpError(cause.responseCode)
+                        // A file on this box answers no HTTP code at all, so
+                        // this is unreachable rather than unlikely — but the
+                        // compiler wants it and a sentence is better than a
+                        // crash if it ever is reached.
+                        is Playable.Recorded -> "That recording could not be read."
                     }
 
                     is HttpDataSource.HttpDataSourceException ->
@@ -799,6 +834,8 @@ private fun PlayerContent(
                     is Playable.Channel, is Playable.CatchUp -> account.format.extension
                     is Playable.Film -> playable.extension
                     is Playable.Episode -> playable.extension
+                    // Written as transport stream, whatever the channel was.
+                    is Playable.Recorded -> "ts"
                 }
             ),
             title = title,
@@ -1033,6 +1070,7 @@ private fun PlayerContent(
                         is Playable.Channel, is Playable.CatchUp -> "Back to channels"
                         is Playable.Film -> "Back to films"
                         is Playable.Episode -> "Back to episodes"
+                        is Playable.Recorded -> "Back to recordings"
                     },
                     tint = Color.White,
                 )
@@ -1245,6 +1283,9 @@ private fun Playable.logName(): String = when (this) {
     is Playable.CatchUp -> "catch-up on channel $channelId"
     is Playable.Film -> "film $id"
     is Playable.Episode -> "episode $id"
+    // The name, not the path: a path across a log is noise, and this one is
+    // long enough to wrap.
+    is Playable.Recorded -> "recording \"$name\""
 }
 
 /**
@@ -1259,7 +1300,7 @@ private fun playbackStateName(state: Int, playable: Playable): String = when (st
     Player.STATE_READY -> "ready"
     Player.STATE_ENDED -> when (playable) {
         is Playable.Channel, is Playable.CatchUp -> "ended (source closed the connection)"
-        is Playable.Film, is Playable.Episode -> "ended"
+        is Playable.Film, is Playable.Episode, is Playable.Recorded -> "ended"
     }
     else -> "state $state"
 }

@@ -71,10 +71,9 @@ focused programme described at the top, and the tuned channel still playing
 top right — the *same* player, resized into a corner the screen leaves
 unpainted, so it never opens a second stream. Up/down move between channels,
 right looks ahead; **left from the programme on now slides the groups out**,
-with the rail beyond them — Home, Live TV, Films, Series, in that order
-because that is the order every other screen's rail is in, and Settings set
-apart at the foot because the other screens keep it as the cog in a top bar
-and this screen has none — and moving
+with the rail beyond them — Home, Live TV, Films, Series, Recordings, in that
+order because that is the order every other screen's rail is in, and Settings
+set apart at the foot — and moving
 through the groups changes the rows at once — OK or right goes back in. OK
 watches the focused channel full screen; holding OK toggles it in
 Favourites (acted on at key-up, so a first repeat can mean "held"); Back
@@ -1002,6 +1001,86 @@ that sends UTC lands two hours early and the panel's log says so, in the
 "(N h ago)" it prints beside every request. That is the fault the box had,
 made reproducible.
 
+## Recording
+
+The last TV phase. The viewer keeps their own copy of a programme: the app
+opens the channel and writes the bytes to a file. Not to be confused with
+catch-up, which plays back the *provider's* recording — see above.
+
+The rules are `core/Recordings.kt`, tested, and three measured facts shape
+all of them.
+
+- **One connection is one recorder.** There is no second tuner, so two
+  recordings that overlap at all cannot both happen whatever channels they
+  are on, and a recording in progress owns the line: the service stops
+  playback through `ActivePlayback`, waits for the panel to notice, and then
+  opens the channel itself. That is why "record what you are watching" stops
+  the picture — bytes cannot be teed out of ExoPlayer, so the honest
+  behaviour is the one the screen describes before you press it. Two
+  overlapping recordings on the *same* channel are the exception and merge,
+  which is also what stops an evening of one channel clashing with itself.
+- **A broadcast does not keep to its published time**, as catch-up already
+  measured. So a recording starts a minute early and ends three late, and the
+  padding is part of the window rather than something a screen adds. The id
+  is built from the programme's own start, so widening the padding later does
+  not orphan what is already booked.
+- **A USB stick is usually FAT32**, which refuses `\ / : * ? " < > |` in a
+  name — provider channels are called `UK: BBC ONE HD` — and cannot hold a
+  file of 4 GB, which at this bitrate is a little over an hour. Names are
+  cleaned by replacement rather than deletion, or two channels collide on one
+  file.
+
+**Android TV has no file picker, and that decided where recordings go.** The
+box resolves `OPEN_DOCUMENT_TREE` to nothing at all, so launching it throws;
+the Google TV emulator resolves it to a framework stub that does nothing.
+Both measured before anything was built. So the Storage Access Framework is
+out and the viewer picks a *volume* rather than a folder:
+`getExternalFilesDirs` gives the app a directory on each mounted volume, with
+no permission and no picker, and Settings lists them with the free space on
+each — which also answers "is the stick in?" without anyone reading a path.
+It matters because **the box has 737 MB free**, which is twelve to
+twenty-four minutes; there is a test in core saying an hour does not fit and
+neither does a quarter of an hour.
+
+**Two ways in.** Hold OK while a channel plays and choose Record, for what is
+on now. Or, in the guide, OK on a cell that has not been on yet — that cell
+was the one place in the grid where OK did nothing anyone wanted, so the
+gesture was free, and a remote with no spare keys needs the free ones. OK
+again takes it off, and the footer says which it will do.
+
+**One alarm at a time**, for the next recording due, re-armed when the list
+changes, when a recording ends, when the app starts and after a reboot. A
+reboot loses every alarm Android holds, so `BOOT_COMPLETED` is not a nicety.
+It is exact and `USE_EXACT_ALARM` is declared rather than asked for: an
+inexact alarm may be held back to batch it, and the usual way to get
+permission is a Settings screen a television may not have — the file picker
+having already taught that lesson.
+
+`Recordings` in the rail lists what is booked, what is recording and what is
+kept, with the reason beside anything that failed: "the stick is not in" is
+worth more than silence. OK watches a finished one, cancels a booked one or
+stops one in progress; holding OK deletes it, file and all, because a stick
+holding recordings the app no longer lists is a stick that fills up for
+reasons nobody can see.
+
+A recording plays as a file, not as the channel it came from — `Playable.
+Recorded`, seekable, with an end. Two things that cost time: the player's
+media source is built on the HTTP data source, which is handed a `file://`
+uri and throws `FileURLConnection cannot be cast to HttpURLConnection`,
+reported as "Source error" and saying nothing about the real reason, so a
+recording gets `DefaultDataSource` instead; and `ActivePlayback.stop()` goes
+through the ExoPlayer the screen owns, which Media3 insists is the main
+thread, while the whole service runs on IO.
+
+Proved end to end on the `googletv34` emulator against the fake panel: the
+volume chosen, hold OK and Record, the picture stops with "Your line is free
+for another device", 24,888,380 bytes arrive starting `0x47`; a cell booked
+from the guide, the log saying "waking in 1 min", the alarm firing, the
+service starting and the alarm re-arming itself; and a finished recording
+played back at 640x360. The refusal path too — recording the fake panel's
+"Line busy for 15 s" channel fails with the connection-limit sentence rather
+than an empty file.
+
 ## Things that are true about a D-pad
 
 Every one of these was found by driving the app on an emulator with key events,
@@ -1014,6 +1093,21 @@ survived until something was pressed.
   up the list. `DpadTextField` fixes both with click-to-edit: under a remote the
   field is passed over, centre starts editing, and up or down always leave.
   Every text field in the app goes through it; a new one must too.
+- **A panel a hold opens must ignore the release that opened it.** It has
+  been needed four times now — the guide's favourite (`okHeld`), the list
+  panel, the player's options panel, and anything else a hold will ever
+  open — so it is `Modifier.deafUntilPressed()` in `ui/Dpad.kt` rather than
+  a fourth copy. tv-material fires a long click while the key is still down
+  and then acts on the centre key's release without caring whether it saw
+  the press, so the release lands on whatever has focus by then, which is
+  the panel that just appeared. In the options panel it was invisible until
+  a hold put something that mattered at the top: the first row used to be
+  "Fit", and pressing it set the picture to what it already was. Adding
+  Record above it turned a harmless bug into one that recorded.
+
+  **A fresh press means a repeat count of zero**, because the box's OK key
+  repeats and those repeats land on the panel once it is up. Arming on any
+  key down would arm on them.
 - **A key that opens a window must act on the release, not the press.**
   `DpadTextField` started editing on the key *down*, so the keyboard window
   opened while OK was still held, and the release landed outside the

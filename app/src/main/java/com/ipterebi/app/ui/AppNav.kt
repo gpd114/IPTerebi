@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -78,6 +79,7 @@ import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.tv.TvDestination
 import com.ipterebi.app.ui.tv.TvFilmsScreen
+import com.ipterebi.app.ui.tv.TvRecordingsScreen
 import com.ipterebi.app.ui.tv.TvSeriesScreen
 import com.ipterebi.app.ui.tv.TvLiveScreen
 
@@ -94,6 +96,19 @@ object Route {
     const val SERIES = "series"
     const val SERIES_DETAIL = "series/{id}"
     const val SETTINGS = "settings"
+
+    /** What has been kept, and what is waiting to be. TV only. */
+    const val RECORDINGS = "recordings"
+
+    /**
+     * Playing a recording back: a file on the box, not anything the panel
+     * knows about, so the path travels in the route rather than an id the
+     * player would have to look up before it could draw anything.
+     */
+    const val RECORDED = "recorded/{path}/{name}"
+
+    fun recorded(path: String, name: String) =
+        "recorded/" + Uri.encode(path) + "/" + Uri.encode(name)
     const val GUIDE = "guide"
     const val PLAY_CHANNEL = "player/channel/{id}"
     const val PLAY_CATCHUP = "player/catchup/{id}/{start}/{minutes}"
@@ -146,6 +161,7 @@ private enum class Section(
     LIVE(Route.TV_LIVE, "Live TV", R.drawable.ic_nav_live, go = Route.tvLive()),
     FILMS(Route.FILMS, "Films", R.drawable.ic_nav_films),
     SERIES(Route.SERIES, "Series", R.drawable.ic_nav_series),
+    RECORDINGS(Route.RECORDINGS, "Recordings", R.drawable.ic_nav_recordings),
 }
 
 @Composable
@@ -181,7 +197,7 @@ fun AppNav(container: AppContainer) {
                 // away. A rail is one press of left from anywhere. 600dp is
                 // Material's own line between compact and medium, so a tablet,
                 // or a phone turned sideways, gets the rail too.
-                val wide = LocalConfiguration.current.screenWidthDp >= 600
+                val wide = railShowing()
 
                 Scaffold(
                     // The bar is shown on the section screens only. The screens
@@ -236,6 +252,36 @@ fun AppNav(container: AppContainer) {
                                     )
                                 }
                                 Spacer(Modifier.weight(1f))
+
+                                // Settings at the foot, set apart from the
+                                // sections: it is not a place you browse, it is
+                                // the one you go to and come back from. It used
+                                // to be a cog in each screen's top right and the
+                                // owner asked for it here instead — on a remote
+                                // the rail is one press of left from anywhere,
+                                // while the top right is a trip across the
+                                // screen and back. The cog is still there on a
+                                // narrow screen, which has no rail to put it in.
+                                var cogFocused by remember { mutableStateOf(false) }
+                                NavigationRailItem(
+                                    selected = route == Route.SETTINGS,
+                                    onClick = { nav.navigate(Route.SETTINGS) },
+                                    icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                                    label = { Text("Settings") },
+                                    colors = NavigationRailItemDefaults.colors(
+                                        selectedIconColor = if (cogFocused) Night.ink else Night.onChosen,
+                                        selectedTextColor = if (cogFocused) Night.ink else Night.accent,
+                                        indicatorColor =
+                                            if (cogFocused) Color.Transparent else Night.chosen,
+                                        unselectedIconColor =
+                                            if (cogFocused) Night.ink else Night.inkSoft,
+                                        unselectedTextColor =
+                                            if (cogFocused) Night.ink else Night.inkSoft,
+                                    ),
+                                    modifier = Modifier
+                                        .onFocusChanged { cogFocused = it.isFocused }
+                                        .focusFill(),
+                                )
                             }
                         }
                         // Always the same call in the same place, whichever bar is
@@ -429,6 +475,40 @@ fun AppNav(container: AppContainer) {
                                 )
                             }
 
+                            // What has been kept, and what is waiting to be.
+                            // TV only: the phone has no way to start one yet,
+                            // and the storage it would need is a stick in a box.
+                            composable(Route.RECORDINGS) {
+                                val signedIn = current as? AccountState.SignedIn
+                                if (signedIn != null) {
+                                    TvRecordingsScreen(
+                                        container = container,
+                                        account = signedIn.account,
+                                        onPlay = { recording ->
+                                            nav.navigate(
+                                                Route.recorded(recording.document, recording.title),
+                                            )
+                                        },
+                                    )
+                                }
+                            }
+
+                            composable(
+                                Route.RECORDED,
+                                arguments = listOf(
+                                    navArgument("path") { type = NavType.StringType },
+                                    navArgument("name") { type = NavType.StringType },
+                                ),
+                            ) { entry ->
+                                val path = entry.arguments?.getString("path").orEmpty()
+                                val name = entry.arguments?.getString("name").orEmpty()
+                                PlayerScreen(
+                                    container = container,
+                                    playable = Playable.Recorded(path, name),
+                                    onBack = { nav.popBackStack() },
+                                )
+                            }
+
                             composable(Route.SETTINGS) {
                                 SettingsScreen(
                                     container = container,
@@ -586,3 +666,15 @@ private fun NavController.switchSection(route: String) {
         restoreState = true
     }
 }
+
+/**
+ * Whether the sections are down the left edge rather than along the bottom.
+ *
+ * 600dp is Material's own line between compact and medium, so a tablet or a
+ * phone turned sideways gets the rail as a television does. It is asked in two
+ * places — the navigation itself, and the top bar, which leaves its settings
+ * cog out where the rail already carries one — so it is one function rather
+ * than the same number written twice.
+ */
+@Composable
+fun railShowing(): Boolean = LocalConfiguration.current.screenWidthDp >= 600

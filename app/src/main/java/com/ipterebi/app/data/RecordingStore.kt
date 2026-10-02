@@ -131,6 +131,21 @@ class RecordingStore(private val context: Context) {
         }
     }
 
+    /**
+     * Drops one recording and the file it wrote.
+     *
+     * The file goes with the entry rather than being left behind: a stick
+     * with recordings on it that the app no longer lists is a stick that
+     * fills up for reasons nobody can see.
+     */
+    suspend fun forget(account: XtreamAccount, id: String) {
+        val going = current(account).firstOrNull { it.id == id }
+        if (going != null && going.document.isNotBlank()) {
+            runCatching { java.io.File(going.document).delete() }
+        }
+        remove(account, id)
+    }
+
     /** Forgets every recording for one line, when that line is signed out of. */
     suspend fun clear(account: XtreamAccount) {
         context.recordingStore.edit { it.remove(key(account)) }

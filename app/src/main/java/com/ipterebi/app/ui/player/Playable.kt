@@ -37,11 +37,22 @@ sealed interface Playable {
     data class Episode(val id: String, val extension: String) : Playable
 
     /**
+     * A recording this box made: a file on its own storage, nothing the panel
+     * knows about.
+     *
+     * It behaves like a film rather than like the channel it came from. The
+     * channel is live and has no length; this is a finished file with both,
+     * so it seeks, it resumes where it was left, and a drop is a disk problem
+     * rather than a connection one.
+     */
+    data class Recorded(val path: String, val name: String) : Playable
+
+    /**
      * A file rather than a broadcast: seekable, with a position worth keeping
      * and an end. Films and episodes behave identically in the player; a
      * catch-up does not, for the reason given above.
      */
-    val isOnDemand: Boolean get() = this is Film || this is Episode
+    val isOnDemand: Boolean get() = this is Film || this is Episode || this is Recorded
 
     /**
      * Live television or a recording of it — the same thing to the player.
