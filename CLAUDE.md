@@ -744,6 +744,29 @@ survived until something was pressed.
 - **On an error Media3 raises its controls, and they take focus** — OK went to
   the settings gear, not Try again. The controls are switched off while an
   error is up, and back on with the retry.
+- **The rail was centred, which strands it on a tall screen.** It had a
+  weighted spacer above and below, so its items sat in the middle of the
+  column. On a 540dp-tall television that reads as deliberate, because four
+  items nearly fill it. On an 800x1280dp tablet in portrait it put Home,
+  Live TV, Films and Series two thirds of the way down the left edge, a long
+  way from the content and from where a thumb rests — measured as a rail
+  column of `[0,137][160,2440]` holding its items between y 1028 and 1548.
+  The top spacer is now there only below `SHORT_SCREEN_HEIGHT`, which is the
+  same 560dp line the category shelf uses to decide whether to wrap, and for
+  the same reason: a short screen is a television or a phone sideways, and
+  wants the opposite of what a tall one wants.
+
+  **This is the first time the app has been looked at on a tablet at all**,
+  despite "phone and tablet first" being the first thing this file says. It
+  was found by setting an emulator to `wm size 1600x2560` and
+  `wm density 320`, which is cheaper than a tablet AVD and gives the same
+  800x1280dp. Worth doing again after anything that touches layout.
+
+  One thing that looked like a second bug and was not: the poster grid
+  appeared to leave a fifth of the width empty. It does not — the node
+  bounds show five columns at a 286px pitch across the full 1440px content
+  area, and the fake panel's films category simply holds four films. Dump
+  the bounds before believing a screenshot.
 - **A bottom bar is unreachable on a TV.** It sits past the end of the list, so
   800 channels puts it 800 presses away. At 600dp and wider the sections are a
   `NavigationRail`, one press of left from anywhere. The `NavHost` must stay the
