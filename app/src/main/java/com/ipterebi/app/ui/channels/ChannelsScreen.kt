@@ -1,7 +1,9 @@
 package com.ipterebi.app.ui.channels
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -96,6 +99,9 @@ fun ChannelsScreen(
             minute = System.currentTimeMillis() / 60_000
         }
     }
+
+    /** The channel a long press is asking about, if any. */
+    var hiding by remember { mutableStateOf<LiveStream?>(null) }
 
     Scaffold(
         topBar = {
@@ -189,9 +195,44 @@ fun ChannelsScreen(
                                 starred = state.isFavourite(channel.streamId),
                                 onClick = { onChannel(channel.streamId) },
                                 onStar = { viewModel.toggleFavourite(channel) },
+                                onHide = { hiding = channel },
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // Asked rather than done. A long press is easy to make by accident on a
+    // list being scrolled, and a channel that silently disappears is a fault
+    // report rather than a feature — so the sheet says what will happen and
+    // where to undo it.
+    hiding?.let { channel ->
+        ModalBottomSheet(onDismissRequest = { hiding = null }, containerColor = Night.veil) {
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 28.dp)) {
+                Text(
+                    text = "Hide ${channel.name}?",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    text = "It will stop appearing in lists, in search and in the guide. " +
+                        "Settings has a list of hidden channels to bring it back from.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Night.inkSoft,
+                )
+                Spacer(Modifier.size(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    PrimaryButton(
+                        onClick = {
+                            viewModel.toggleHidden(channel)
+                            hiding = null
+                        },
+                    ) {
+                        Text("Hide")
+                    }
+                    SecondaryButton(text = "Cancel", onClick = { hiding = null })
                 }
             }
         }
@@ -275,12 +316,19 @@ private fun ResumeBar(channel: LiveStream, onClick: () -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun ChannelRow(
     channel: LiveStream,
     category: String?,
     starred: Boolean,
     onClick: () -> Unit,
     onStar: () -> Unit,
+    /**
+     * Hide this channel. A long press, as adding a film to a list is: the
+     * row is already full of small targets — the star, the catch-up mark, the
+     * number — and a fourth would be one too many on a phone.
+     */
+    onHide: () -> Unit,
     /** What is on now, when the full guide knows. */
     onNow: XmltvProgramme? = null,
     nowSeconds: Long = 0,
@@ -290,7 +338,7 @@ private fun ChannelRow(
             .fillMaxWidth()
             .nightCard()
             .focusFill(Corners.card)
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onHide)
             .padding(start = 9.dp, end = 2.dp, top = 9.dp, bottom = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

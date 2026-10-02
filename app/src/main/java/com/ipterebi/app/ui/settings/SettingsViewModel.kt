@@ -8,6 +8,7 @@ import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.app.data.RecordingVolume
 import com.ipterebi.app.data.recordingVolumes
+import com.ipterebi.core.LiveStream
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.UserInfo
 import com.ipterebi.core.lineKey
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -33,11 +35,14 @@ data class SettingsUiState(
     val recordingFolder: String = "",
     /** Everywhere a recording could go on this box, with the room on each. */
     val recordingVolumes: List<RecordingVolume> = emptyList(),
+    /** Channels hidden from every list, newest first, so they can be brought back. */
+    val hiddenChannels: List<LiveStream> = emptyList(),
 ) {
     val userAgentChanged: Boolean
         get() = account != null && userAgentDraft.trim() != account.userAgent
 }
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SettingsViewModel(private val container: AppContainer) : ViewModel() {
 
     private val _state = MutableStateFlow(SettingsUiState())
@@ -48,6 +53,12 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
             // The folder a recording goes to, and how much room is on it. Per
             // device rather than per line: a stick belongs to the box.
             container.recordings.folder.collect { refreshFolder() }
+        }
+        viewModelScope.launch {
+            container.credentials.state
+                .filterIsInstance<AccountState.SignedIn>()
+                .flatMapLatest { container.channelLists.hidden(it.account) }
+                .collect { hidden -> _state.update { it.copy(hiddenChannels = hidden) } }
         }
         viewModelScope.launch {
             container.credentials.state
@@ -128,6 +139,12 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
                 _state.update { it.copy(checking = false, error = e.message ?: "The check failed.") }
             }
         }
+    }
+
+    /** Brings a hidden channel back into every list it was taken out of. */
+    fun showChannel(channel: LiveStream) {
+        val account = _state.value.account ?: return
+        viewModelScope.launch { container.channelLists.toggleHidden(account, channel) }
     }
 
     fun signOut() {

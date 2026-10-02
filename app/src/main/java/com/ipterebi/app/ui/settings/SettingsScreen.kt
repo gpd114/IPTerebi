@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -171,6 +172,36 @@ fun SettingsScreen(
                     "How the app identifies itself. If the channel list loads but every " +
                         "stream is refused, the panel is blocking the client — try another.",
                 )
+            }
+
+            // Hiding has to be undoable from somewhere, or it is a trap: a
+            // channel taken out of every list cannot be found again to bring
+            // back. This is that somewhere, and it is why the hidden list
+            // stores whole channels rather than ids — there would otherwise be
+            // no name to draw here.
+            if (state.hiddenChannels.isNotEmpty()) Panel {
+                SectionTitle("Hidden channels")
+                Hint(
+                    "These are out of every list, out of search and out of the guide. " +
+                        "Long-press a channel on Live TV to hide one.",
+                )
+                Spacer(Modifier.size(4.dp))
+                state.hiddenChannels.forEach { channel ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = channel.name,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Night.ink,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        SecondaryButton(
+                            text = "Show",
+                            onClick = { viewModel.showChannel(channel) },
+                        )
+                    }
+                }
             }
 
             Panel {

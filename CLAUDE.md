@@ -754,6 +754,41 @@ the order they were added because a curated list that reorders itself is one
 nobody can point at, that emptying a list is not deleting it, and that a film
 and a series may share an id without being the same thing.
 
+## Hiding channels
+
+The other half of making a provider's list usable. Favourites says what to
+keep close; hiding says what to stop showing at all, and it is the half that
+shrinks a line of 21,077 channels filed into categories called
+`EN - 2020 & OLD`.
+
+Long-press a channel on Live TV. It asks first, because a long press is easy
+to make by accident on a list being scrolled and a channel that silently
+disappears is a fault report rather than a feature — and the sheet says where
+to undo it, which is Settings.
+
+**Hidden means hidden everywhere**, not just on the list screen: the filter is
+applied to `visibleChannels` in `ChannelsViewModel`, which is what the list,
+the search results, the published repository, the TV guide and the player's
+zap keys all read, and again to the Home rows, which are drawn from the stored
+copies rather than from that list. A channel still turning up in search is one
+that has not been hidden, whatever the list says.
+
+**Stored as whole records, not ids, and that was a mistake first.** The
+original design kept ids alone, reasoning that a hidden channel is never drawn
+so there is nothing to remember but which one it is. That is wrong in a way
+that would have shipped: hiding has to be undoable, the screen that undoes it
+has to draw a name, and by then the channel is out of every list the name
+could have been read from. So it carries its name, the same bargain
+favourites and `WatchStore` make. Filtering still matches on `streamId` alone,
+so a provider renaming a channel overnight does not un-hide it.
+
+The rules are `core/HiddenChannels.kt`, tested: that filtering an empty set
+returns the same list rather than copying a line's worth of channels, that
+hiding twice is showing again, that the newest hidden is first because it is
+the likeliest mistake, that a renamed channel stays hidden, and that ids the
+provider has dropped stop being kept — a set that grew for ever might one day
+hide something new that was given an old id.
+
 ## The home screen
 
 The app opens on Home, and the bottom bar has four tabs: Home, Live TV, Films,

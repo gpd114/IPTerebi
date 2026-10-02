@@ -12,7 +12,9 @@ import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.lineKey
 import com.ipterebi.core.playableChannels
+import com.ipterebi.core.stillOnLine
 import com.ipterebi.core.withFavouriteToggled
+import com.ipterebi.core.withHiddenToggled
 import com.ipterebi.core.withRecent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -42,11 +44,39 @@ class ChannelListStore(private val context: Context) {
     private fun recentsKey(account: XtreamAccount) =
         stringPreferencesKey("recents:${account.lineKey}")
 
+    private fun hiddenKey(account: XtreamAccount) =
+        stringPreferencesKey("hidden:${account.lineKey}")
+
     fun favourites(account: XtreamAccount): Flow<List<LiveStream>> =
         context.channelListStore.data.map { it[favouritesKey(account)].decodeChannels() }
 
     fun recents(account: XtreamAccount): Flow<List<LiveStream>> =
         context.channelListStore.data.map { it[recentsKey(account)].decodeChannels() }
+
+    /**
+     * Channels the viewer has hidden, as ids.
+     *
+     * Ids rather than records, unlike the two lists above: a favourite is
+     * drawn from its stored copy before the panel answers, so it has to carry
+     * its name and logo, while a hidden channel is never drawn at all.
+     */
+    fun hidden(account: XtreamAccount): Flow<List<LiveStream>> =
+        context.channelListStore.data.map { it[hiddenKey(account)].decodeChannels() }
+
+    suspend fun toggleHidden(account: XtreamAccount, channel: LiveStream) {
+        context.channelListStore.edit { prefs ->
+            val key = hiddenKey(account)
+            prefs[key] = prefs[key].decodeChannels().withHiddenToggled(channel).encode()
+        }    }
+
+    /** Lets go of ids no channel on the line answers to any more. */
+    suspend fun forgetMissingHidden(account: XtreamAccount, allChannels: List<LiveStream>) {
+        context.channelListStore.edit { prefs ->
+            val key = hiddenKey(account)
+            val now = prefs[key].decodeChannels()
+            val kept = now.stillOnLine(allChannels)
+            if (kept.size != now.size) prefs[key] = kept.encode()
+        }    }
 
     suspend fun toggleFavourite(account: XtreamAccount, channel: LiveStream) {
         context.channelListStore.edit { prefs ->
@@ -68,6 +98,7 @@ class ChannelListStore(private val context: Context) {
         context.channelListStore.edit { prefs ->
             prefs.remove(favouritesKey(account))
             prefs.remove(recentsKey(account))
+            prefs.remove(hiddenKey(account))
         }
     }
 }
@@ -94,3 +125,4 @@ private fun String?.decodeChannels(): List<LiveStream> {
         emptyList()
     }
 }
+
