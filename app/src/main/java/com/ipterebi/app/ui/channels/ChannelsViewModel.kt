@@ -13,6 +13,8 @@ import com.ipterebi.core.XtreamCategory
 import com.ipterebi.core.XtreamException
 import com.ipterebi.core.XmltvProgramme
 import com.ipterebi.core.holds
+import com.ipterebi.core.hiddenIds
+import com.ipterebi.core.withoutHidden
 import com.ipterebi.core.searchByName
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -74,6 +76,13 @@ data class ChannelsUiState(
     val indexing: Boolean = false,
     /** Why search is only covering [listed], when the full list could not be had. */
     val searchNote: String? = null,
+    /**
+     * Channels the viewer has hidden. Taken out of everything this state
+     * offers rather than of the list screen alone — a channel still turning
+     * up in search, in the guide or under the zap keys is one that has not
+     * been hidden, whatever the list says.
+     */
+    val hidden: List<LiveStream> = emptyList(),
 ) {
     /** The list the chosen shelf is showing, when nothing is being searched. */
     val listed: List<LiveStream>
@@ -103,7 +112,7 @@ data class ChannelsUiState(
      * that would read as "nothing matches".
      */
     val visibleChannels: List<LiveStream>
-        get() = if (searching) results ?: listed else listed
+        get() = (if (searching) results ?: listed else listed).withoutHidden(hidden.hiddenIds())
 
     /** The channel to offer as "carry on watching". Null before anything has been played. */
     val lastWatched: LiveStream? get() = recents.firstOrNull()
@@ -190,6 +199,10 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             signedIn.flatMapLatest { container.channelLists.recents(it.account) }
                 .collect { recents -> _state.update { it.copy(recents = recents) } }
+        }
+        viewModelScope.launch {
+            signedIn.flatMapLatest { container.channelLists.hidden(it.account) }
+                .collect { hidden -> _state.update { it.copy(hidden = hidden) } }
         }
 
         // The repository is "the channel list currently on screen", which the
@@ -278,6 +291,18 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
     fun toggleFavourite(channel: LiveStream) {
         val account = account ?: return
         viewModelScope.launch { container.channelLists.toggleFavourite(account, channel) }
+    }
+
+    /**
+     * Hides a channel, or brings it back.
+     *
+     * Nothing else is needed to make it disappear: every list this screen
+     * offers is filtered by the stored set, and the guide and the zap keys
+     * read the same published list.
+     */
+    fun toggleHidden(channel: LiveStream) {
+        val account = account ?: return
+        viewModelScope.launch { container.channelLists.toggleHidden(account, channel) }
     }
 
     fun retry() {
