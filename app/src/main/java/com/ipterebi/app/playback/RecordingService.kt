@@ -115,6 +115,9 @@ class RecordingService : Service() {
                     Outcome.Failed(e.message ?: "The recording stopped unexpectedly.")
                 }
             container.recordings.put(account, outcome.applyTo(recording))
+            // The next one, now this is out of the way. Without this a box
+            // left alone records the first thing booked and nothing after it.
+            RecordingAlarms.arm(this@RecordingService)
             runningId = ""
             stopSelf()
         }

@@ -16,6 +16,14 @@
     <!-- Recording a channel to a file: a long download with the screen off,
          which is what dataSync means. Not mediaPlayback: nothing is playing. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Waking for a scheduled recording. Exact, because an inexact alarm may
+         be held back to batch it and a programme that starts without its
+         first minutes is most of the way to useless. USE_EXACT_ALARM is
+         granted at install: the alternative is sending the viewer to a
+         Settings screen a television may not have, which is the mistake the
+         file picker already taught. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!--
       "Open in another player" asks whether any video player is installed
@@ -95,6 +103,20 @@
           has any business starting a recording, and unlike the media session
           there is no system component that needs to find it.
         -->
+        <!--
+          The alarm going off, and the box having come back on. A reboot loses
+          every alarm Android was holding, so without BOOT_COMPLETED a box
+          unplugged in the afternoon records nothing that evening.
+        -->
+        <receiver
+            android:name=".playback.RecordingAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.ipterebi.app.RECORDING_DUE" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name=".playback.RecordingService"
             android:exported="false"

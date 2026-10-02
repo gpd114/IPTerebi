@@ -78,6 +78,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.compose.foundation.focusGroup
+import com.ipterebi.app.playback.RecordingAlarms
 import com.ipterebi.app.playback.RecordingService
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.player.PlaybackPanel
@@ -93,6 +94,7 @@ import com.ipterebi.app.ui.player.StreamRetryPolicy
 import com.ipterebi.app.ui.player.rememberProgrammeGuide
 import com.ipterebi.core.LineWait
 import com.ipterebi.core.PAD_AFTER_SECONDS
+import com.ipterebi.core.recordingWindow
 import com.ipterebi.core.Recording
 import com.ipterebi.core.Scheduling
 import com.ipterebi.core.recordingId
@@ -440,6 +442,45 @@ private fun TvLive(
         }
     }
 
+    // Booking a programme that has not been on yet, from the guide.
+    //
+    // OK on a future cell books it and OK again takes it back off, because
+    // there is no second key to undo with and a schedule nobody can unmake is
+    // worse than one that is awkward to make. The clash rules are core's; all
+    // that happens here is the answer being turned into a sentence.
+    val booked by container.recordings.recordings(account)
+        .collectAsStateWithLifecycle(emptyList())
+    val bookRecording: (LiveStream, Long, Long, String) -> Unit = { channel, start, stop, title ->
+        val id = recordingId(channel.streamId, start)
+        val already = booked.firstOrNull { it.id == id && !it.finished }
+        container.scope.launch {
+            if (already != null) {
+                container.recordings.remove(account, id)
+                recordNote = "Not recording ${already.title}"
+            } else {
+                val window = recordingWindow(start, stop)
+                val recording = Recording(
+                    id = id,
+                    streamId = channel.streamId,
+                    channelName = channel.name,
+                    title = title,
+                    startSeconds = window.first,
+                    stopSeconds = window.last,
+                    programmeStart = start,
+                    programmeStop = stop,
+                )
+                when (val outcome = container.recordings.book(account, recording)) {
+                    is Scheduling.Clash ->
+                        recordNote = "Clashes with ${outcome.by.title}. One connection, one recording."
+                    is Scheduling.Booked -> recordNote = "Will record ${outcome.recording.title}"
+                    is Scheduling.Merged ->
+                        recordNote = "Added to the recording of ${outcome.recording.title}"
+                }
+            }
+            RecordingAlarms.arm(context)
+        }
+    }
+
     // Stop from the session, or Free the line in Settings: stopped until asked.
     DisposableEffect(player) {
         val unregister = ActivePlayback.register {
@@ -759,33 +800,6 @@ private fun TvLive(
         // otherwise break is that nothing focusable may *wait* over the video:
         // the first press of OK belongs to the channel list, not to a button
         // nobody asked to be there.
-        // What a record press did, said over the picture for a few seconds.
-        //
-        // Not focusable, and gone on its own: it is the answer to a press that
-        // has already happened, so nothing should have to be pressed to get
-        // rid of it, and nothing here may take the remote. Five seconds is
-        // long enough to read a clash from across a room.
-        recordNote?.let { note ->
-            LaunchedEffect(note) {
-                delay(5_000)
-                recordNote = null
-            }
-            Box(
-                Modifier.fillMaxSize().padding(top = 40.dp),
-                contentAlignment = Alignment.TopCenter,
-            ) {
-                Text(
-                    note,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = TvInk,
-                    modifier = Modifier
-                        .clip(Corners.panel)
-                        .background(TvPanel)
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                )
-            }
-        }
-
         if (optionsOpen) {
             val panelFocus = remember { FocusRequester() }
             Box(
@@ -824,6 +838,12 @@ private fun TvLive(
                     if (channel.streamId == tunedId && (error != null || released)) attempt++
                 },
                 onFavourite = model::toggleFavourite,
+                onRecord = { channel, start, stop, title ->
+                    bookRecording(channel, start, stop, title)
+                },
+                isRecording = { streamId, start ->
+                    booked.any { it.id == recordingId(streamId, start) && !it.finished }
+                },
                 onCatchUp = { channel, start, minutes ->
                     listOpen = false
                     onCatchUp(channel, start, minutes)
@@ -833,6 +853,33 @@ private fun TvLive(
                 onRetry = model::retry,
             )
         }
+        // What a record press did, said over the picture for a few seconds.
+        //
+        // Not focusable, and gone on its own: it is the answer to a press that
+        // has already happened, so nothing should have to be pressed to get
+        // rid of it, and nothing here may take the remote. Five seconds is
+        // long enough to read a clash from across a room.
+        recordNote?.let { note ->
+            LaunchedEffect(note) {
+                delay(5_000)
+                recordNote = null
+            }
+            Box(
+                Modifier.fillMaxSize().padding(top = 40.dp),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Text(
+                    note,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = TvInk,
+                    modifier = Modifier
+                        .clip(Corners.panel)
+                        .background(TvPanel)
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                )
+            }
+        }
+
     }
 }
 

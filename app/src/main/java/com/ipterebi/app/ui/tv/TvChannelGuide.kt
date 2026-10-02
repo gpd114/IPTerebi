@@ -139,6 +139,14 @@ internal fun TvChannelGuide(
     onFavourite: (LiveStream) -> Unit,
     /** Play a recording of a programme that has finished. */
     onCatchUp: (LiveStream, Long, Int) -> Unit,
+    /**
+     * Keep a programme that has not been on yet: the channel, when it runs,
+     * and what it is called. Booking and clashes are the caller's; this only
+     * knows that OK on something still to come means record it.
+     */
+    onRecord: (LiveStream, Long, Long, String) -> Unit,
+    /** Whether a programme is already booked, so OK can take it back off. */
+    isRecording: (Int, Long) -> Boolean,
     onOpen: (TvDestination) -> Unit,
     onClose: () -> Unit,
     onRetry: () -> Unit,
@@ -194,6 +202,14 @@ internal fun TvChannelGuide(
             canCatchUp(focusedChannel, finished.start, finished.stop, now) ->
             "OK  Watch from the start      Hold ▶  Back to now"
         finished != null -> "Nothing kept from then      Hold ▶  Back to now"
+        // Still to come: OK keeps it, and says so, because a cell in the
+        // future is the one place OK does something other than watch.
+        currentSlot != null && focusedChannel != null && currentSlot.start > now ->
+            if (isRecording(focusedChannel.streamId, currentSlot.start)) {
+                "OK  Do not record after all"
+            } else {
+                "OK  Record this"
+            }
         focusedChannel?.hasCatchUp == true ->
             "◀  Groups      Hold ◀  Earlier      OK  Watch      Hold OK  Favourite"
         else -> "◀  Groups      OK  Watch      Hold OK  Favourite"
@@ -270,7 +286,19 @@ internal fun TvChannelGuide(
                         fun choose() {
                             val slot = slotAt(programmesOf(channel), anchor)
                             when {
-                                // Still to come, or on now: watch the channel.
+                                // Still to come: keep it. Watching a channel
+                                // for a programme that has not started is the
+                                // one thing OK could do here that nobody wants,
+                                // and a future programme is otherwise the only
+                                // cell in the grid that answers to nothing.
+                                slot.start > now ->
+                                    onRecord(
+                                        channel,
+                                        slot.start,
+                                        slot.stop,
+                                        slot.programme?.title?.ifBlank { null } ?: channel.name,
+                                    )
+                                // On now: watch it.
                                 slot.stop > now -> onTune(channel, shown)
                                 canCatchUp(channel, slot.start, slot.stop, now) -> {
                                     val from = catchUpFrom(channel, slot.start, slot.stop, now) ?: slot.start
