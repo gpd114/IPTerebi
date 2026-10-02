@@ -66,7 +66,7 @@ class ShelfChip(
  * overview and gives back two thirds of the screen. Down from a chip then
  * lands in the grid rather than on more chips.
  *
- * Short means under [WRAP_MIN_HEIGHT]: a television, and a phone held
+ * Short means under [SHORT_SCREEN_HEIGHT]: a television, and a phone held
  * sideways, which has the same problem for the same reason. A phone upright
  * is around 800dp and a tablet more, so neither changes.
  */
@@ -75,7 +75,7 @@ class ShelfChip(
 fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
     if (chips.isEmpty()) return
 
-    val wrapped = LocalConfiguration.current.screenHeightDp >= WRAP_MIN_HEIGHT
+    val wrapped = LocalConfiguration.current.screenHeightDp >= SHORT_SCREEN_HEIGHT
     val scroll = rememberScrollState()
     Box(modifier.padding(horizontal = 16.dp)) {
         if (wrapped) {
@@ -162,8 +162,17 @@ private fun Chip(chip: ShelfChip) {
     }
 }
 
-/** Under this many dp of screen height the shelf is one sideways row. */
-private const val WRAP_MIN_HEIGHT = 560
+/**
+ * A screen short enough that there is no height to spend: a television, and a
+ * phone held sideways. A phone upright is around 800dp and a tablet more, so
+ * neither counts as short.
+ *
+ * Two things read it. The shelf wraps onto four rows only above it, and the
+ * navigation rail centres its items only below it — both because a short
+ * screen and a tall one want opposite things, and both drawing the line in
+ * the same place because it is the same line.
+ */
+const val SHORT_SCREEN_HEIGHT = 560
 
 /** How tall a category shelf may grow before it scrolls. */
 private const val SHELF_ROWS = 4
