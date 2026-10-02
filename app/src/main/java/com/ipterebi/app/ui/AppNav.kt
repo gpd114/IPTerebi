@@ -186,8 +186,20 @@ fun AppNav(container: AppContainer) {
                     // empty space above the bar.
                     Row(Modifier.padding(padding).consumeWindowInsets(padding)) {
                         if (section != null && wide) {
+                            // Centred on a short screen, from the top on a tall
+                            // one. A television is 540dp high and the items
+                            // nearly fill it, so centring reads as deliberate;
+                            // a tablet in portrait is 1280dp and centring
+                            // stranded Home, Live TV, Films and Series two
+                            // thirds of the way down the left edge, a long way
+                            // from the content they belong to and from where a
+                            // thumb rests. Measured on a 800x1280dp tablet: the
+                            // rail column was [0,137][160,2440] with its items
+                            // between y 1028 and 1548.
+                            val short =
+                                LocalConfiguration.current.screenHeightDp < SHORT_SCREEN_HEIGHT
                             NavigationRail(containerColor = Color.Transparent) {
-                                Spacer(Modifier.weight(1f))
+                                if (short) Spacer(Modifier.weight(1f))
                                 Section.entries.forEach { item ->
                                     NavigationRailItem(
                                         selected = item == section,
