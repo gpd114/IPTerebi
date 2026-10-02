@@ -1072,6 +1072,19 @@ recording gets `DefaultDataSource` instead; and `ActivePlayback.stop()` goes
 through the ExoPlayer the screen owns, which Media3 insists is the main
 thread, while the whole service runs on IO.
 
+**A known gap, left deliberately: the recorder does not reconnect.** When the
+panel closes the connection the read returns -1 and the recording is marked
+Done with whatever it had — a short file and a row claiming success. That is
+wrong for the same reason it is wrong in the player: a clean hang-up from a
+live panel is never really the end, which is why playback has a back-off and
+rejoins. The recorder should do the same, appending to the same file until
+the programme's end time, and only finish when the clock says so. It has not
+been hit on the fake panel, whose streams are finite by design. The owner
+does not record and chose to wait for a user to report it rather than spend
+time on it now, which is a reasonable call — but if anyone ever says a
+recording stopped early, this is the first place to look, and
+`RecordingService`'s `if (read < 0) break` is the line.
+
 Proved end to end on the `googletv34` emulator against the fake panel: the
 volume chosen, hold OK and Record, the picture stops with "Your line is free
 for another device", 24,888,380 bytes arrive starting `0x47`; a cell booked
