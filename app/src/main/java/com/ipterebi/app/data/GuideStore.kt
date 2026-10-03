@@ -237,6 +237,35 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
             }
         }
 
+    /**
+     * Everything on [line] that *starts* between [from] and [to].
+     *
+     * Not the same question as [inWindow], and the difference is the whole
+     * cost: two programmes are the same event only when their starts are
+     * close, so a band around one start is all the rule can use. Asking by
+     * overlap instead drags in every three-hour film and nightly marathon
+     * crossing that band — 3,163 rows against 168 on a real line, measured
+     * around one programme — and the grouping then throws almost all of them
+     * away. Indexed no better than [inWindow], but the band is minutes wide.
+     */
+    fun startingNear(line: String, from: Long, to: Long, limit: Int = 8_000): List<XmltvProgramme> =
+        readableDatabase.rawQuery(
+            "SELECT p.channel, p.start, p.stop, p.title, p.description FROM programme p " +
+                "JOIN guide g ON p.line = g.line AND p.gen = g.gen " +
+                "WHERE p.line = ? AND p.start >= ? AND p.start <= ? ORDER BY p.start LIMIT ?",
+            arrayOf(line, from.toString(), to.toString(), limit.toString()),
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    add(
+                        XmltvProgramme(
+                            c.getString(0), c.getLong(1), c.getLong(2), c.getString(3), c.getString(4),
+                        ),
+                    )
+                }
+            }
+        }
+
     /** Forgets [line]'s guide, when it is signed out of. */
     fun clear(line: String) {
         val db = writableDatabase

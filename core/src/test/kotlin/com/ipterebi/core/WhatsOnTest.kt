@@ -226,6 +226,100 @@ class WhatsOnTest {
         assertEquals(emptyList(), match.showings().single().streams(emptyList()))
     }
 
+    @Test
+    fun `a real line's worth of programmes groups without grinding`() {
+        // The bug this pins cost an evening of testing and was invisible on
+        // the fake panel. Grouping compared each programme against every
+        // event so far and normalised both titles inside the comparison, so
+        // a window around one programme on a real line — 3,163 rows across
+        // 160 start times — turned into a quarter of a million comparisons
+        // and half a million NFD normalisations. The box sat silent: no
+        // error, no card, nothing in the log after "looking for".
+        //
+        // Twenty channels could never show it, so the shape of a real line is
+        // the test. The bound is deliberately loose — this is a guard against
+        // quadratic work, not a benchmark.
+        val programmes = buildList {
+            for (slot in 0 until 200) {
+                val start = slot * 30L * 60
+                for (channel in 0 until 20) {
+                    add(
+                        prog(
+                            channel = "ch$channel.uk",
+                            startMinute = start / 60,
+                            stopMinute = start / 60 + 30,
+                            // One long distinct word, so nothing groups and
+                            // the grouping does its most work. Titles that
+                            // differ only by a number do *not* count as
+                            // distinct here — see the test below.
+                            title = "Programme${slot}Feed$channel",
+                            description = "Some words about it, long enough to cost something to fold.",
+                        ),
+                    )
+                }
+            }
+        }
+        assertEquals(4000, programmes.size)
+
+        val began = System.nanoTime()
+        val found = programmes.showings()
+        val tookMillis = (System.nanoTime() - began) / 1_000_000
+
+        // Every title here is distinct, so nothing groups: 4,000 events.
+        assertEquals(4000, found.size)
+        assertTrue(tookMillis < 4_000, "grouping 4,000 programmes took ${tookMillis}ms")
+    }
+
+    @Test
+    fun `two titles differing only by a number are taken for one event`() {
+        // Found by writing the test above, not by design: words of one or two
+        // letters are skipped so that a title made only of them cannot glue
+        // to everything, and a digit is one of those. So "Match Day 3" and
+        // "Match Day 4" at the same moment read as the same event.
+        //
+        // Recorded rather than fixed, because the same rule is what merges
+        // the variants that matter — "Nations League" into "UEFA Nations
+        // League: Croatia v England" — and on a real line the damage is a
+        // channel offered that is showing the next fixture rather than this
+        // one. If a provider turns up where this misleads, the fix is to
+        // keep short tokens when they are all that differs.
+        val two = listOf(
+            prog("a.uk", 900, 960, "Match Day 3"),
+            prog("b.uk", 900, 960, "Match Day 4"),
+        )
+        assertEquals(1, two.showings().size)
+
+        // Words long enough to tell apart do tell them apart.
+        val apart = listOf(
+            prog("a.uk", 900, 960, "Live: EFL League One"),
+            prog("b.uk", 900, 960, "Live: EFL League Two"),
+        )
+        assertEquals(2, apart.showings().size)
+    }
+
+    @Test
+    fun `and it still groups them when they share a title`() {
+        // The other half of the same shape: one title per slot across twenty
+        // channels, which is what a syndicated programme looks like.
+        val programmes = buildList {
+            for (slot in 0 until 200) {
+                for (channel in 0 until 20) {
+                    add(
+                        prog(
+                            channel = "ch$channel.uk",
+                            startMinute = slot * 30L,
+                            stopMinute = slot * 30L + 30,
+                            title = "Slot $slot",
+                        ),
+                    )
+                }
+            }
+        }
+        val found = programmes.showings()
+        assertEquals(200, found.size)
+        assertTrue(found.all { it.feeds == 20 })
+    }
+
     // The index, which is what a screen actually searches.
 
     @Test

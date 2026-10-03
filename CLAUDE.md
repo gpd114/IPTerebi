@@ -638,6 +638,42 @@ whole channel list that maps guide ids to things that can be pressed, so the
 channel search and this share one several-megabyte request instead of making
 it each.
 
+
+**It ground to a halt on a real line, and only a real line could show it.**
+Shipped, then measured on the owner's box against their own provider: the
+lookup never returned. No error, no card, no crash — the log said it had
+started and then nothing, for as long as anyone cared to wait. Two faults,
+both now numbers rather than opinions:
+
+- **The window was the playing programme's whole span.** Strictly Come Dancing
+  runs two and a half hours, and asking for everything overlapping it returned
+  **3,163 rows across 160 start times**; a band of a quarter of an hour either
+  side of its start holds **168**. Two programmes can only be one event when
+  their starts are close, so the rule discarded nearly all of it anyway. Hence
+  `GuideStore.startingNear`, which asks by `start` rather than by overlap — a
+  different question from `inWindow`, which is why both exist.
+- **The grouping was quadratic with a normaliser inside the comparison.** Each
+  programme was compared against every event gathered so far, folding both
+  titles with `normaliseForSearch` every time: a quarter of a million
+  comparisons and half a million NFD normalisations for one window. It now
+  folds each title once and walks events in start order, dropping those too
+  far behind to match again. Same answers, **9 ms** where it had never come
+  back.
+
+This is the `NameIndex` lesson — re-folding thousands of strings is the slow
+part — met again one layer down. It was applied to the matching when this was
+written and missed in the grouping, which is worth remembering: the index only
+helps the half it covers. `WhatsOnTest` now builds a real line's shape, 4,000
+programmes across 200 slots, as a guard against it returning quietly.
+
+Writing that test turned up a quirk worth knowing: words of one or two letters
+are skipped when titles are compared, so **two titles differing only by a
+number read as one event** — "Match Day 3" and "Match Day 4" group. Left that
+way deliberately, because the same rule is what merges "Nations League" into
+"UEFA Nations League: Croatia v England", and the worst case is a channel
+offered that is showing the next fixture rather than this one. There is a test
+saying so, so it is a decision and not an accident.
+
 **Two things limit it, both the provider's.** It only knows what the guide
 says, and how far the guide reaches moves: the same line published 41 hours
 ahead one day and **17 the next**, so this answers "on now and tonight"
