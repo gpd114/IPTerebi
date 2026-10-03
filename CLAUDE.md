@@ -789,6 +789,34 @@ the likeliest mistake, that a renamed channel stays hidden, and that ids the
 provider has dropped stop being kept — a set that grew for ever might one day
 hide something new that was given an old id.
 
+## Putting favourites in order
+
+Starring appends, so a favourites list arrives in the order it was built.
+The order is most of its value — the point is that the four channels actually
+watched are the first four — so it can be changed: the Favourites shelf
+carries a **Reorder** button, and while it is on each row swaps its star for
+a pair of arrows.
+
+**A mode with arrows rather than a drag, and that is a decision rather than a
+shortcut.** There was no room for a drag handle — the row already carries a
+star, a number and a catch-up mark, and the note on `ChannelRow` says a
+fourth target is one too many on a phone — and no spare gesture to start a
+drag with, because a long press is how a channel is hidden. Arrows also work
+under a remote, which the TV build inherits from here and could not have
+driven a drag with at all. The honest cost is that dragging is what a phone
+user expects; `withFavouriteMoved` takes a from and a to, so a drag could be
+added later without changing anything underneath.
+
+The rule is `withFavouriteMoved` in `core/ChannelLists.kt`, tested: that a
+move keeps every channel and duplicates none, and that an index off either
+end leaves the list alone rather than throwing — a drag or a fast double tap
+can ask for one, and a reorder that crashes is far worse than one that
+declines.
+
+Reordering writes the whole list back through `setFavourites`, so the stored
+order is the order, and everything reading it follows: the shelf, and the
+Live TV row on Home.
+
 ## The home screen
 
 The app opens on Home, and the bottom bar has four tabs: Home, Live TV, Films,

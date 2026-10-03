@@ -14,6 +14,7 @@ import com.ipterebi.core.XtreamException
 import com.ipterebi.core.XmltvProgramme
 import com.ipterebi.core.holds
 import com.ipterebi.core.hiddenIds
+import com.ipterebi.core.withFavouriteMoved
 import com.ipterebi.core.withoutHidden
 import com.ipterebi.core.searchByName
 import kotlinx.coroutines.CancellationException
@@ -83,6 +84,15 @@ data class ChannelsUiState(
      * been hidden, whatever the list says.
      */
     val hidden: List<LiveStream> = emptyList(),
+    /**
+     * Whether the favourites list is being put in order.
+     *
+     * A mode rather than a gesture. The row already carries a star, a number
+     * and a catch-up mark, and a long press is how a channel is hidden, so
+     * there was neither room for a drag handle nor a spare gesture to start
+     * a drag with.
+     */
+    val reordering: Boolean = false,
 ) {
     /** The list the chosen shelf is showing, when nothing is being searched. */
     val listed: List<LiveStream>
@@ -303,6 +313,23 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
     fun toggleHidden(channel: LiveStream) {
         val account = account ?: return
         viewModelScope.launch { container.channelLists.toggleHidden(account, channel) }
+    }
+
+    fun setReordering(on: Boolean) = _state.update { it.copy(reordering = on) }
+
+    /**
+     * Moves a favourite, by position in the favourites list.
+     *
+     * Positions rather than ids because that is what the buttons know, and
+     * the list they move within is the stored one — not the filtered one on
+     * screen, which may be shorter. Hidden channels cannot be in it: hiding
+     * one takes it out of the favourites row as well.
+     */
+    fun moveFavourite(from: Int, to: Int) {
+        val account = account ?: return
+        val moved = _state.value.favourites.withFavouriteMoved(from, to)
+        if (moved === _state.value.favourites) return
+        viewModelScope.launch { container.channelLists.setFavourites(account, moved) }
     }
 
     fun retry() {
