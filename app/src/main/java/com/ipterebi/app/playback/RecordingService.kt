@@ -21,6 +21,7 @@ import com.ipterebi.core.FAT32_MAX_BYTES
 import com.ipterebi.core.Recording
 import com.ipterebi.core.RecordingState
 import com.ipterebi.core.SPACE_HEADROOM_BYTES
+import com.ipterebi.core.StreamReconnect
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.describeStreamHttpError
 import com.ipterebi.core.recordingFileName
@@ -28,6 +29,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -205,74 +207,188 @@ class RecordingService : Service() {
             .header("User-Agent", account.userAgent)
             .build()
 
-        val response = runCatching { container.http.newCall(request).execute() }
-            .getOrElse { e ->
-                return Outcome.Failed("The panel could not be reached: ", 0, file.absolutePath)
-            }
-
-        response.use { reply ->
-            if (!reply.isSuccessful) {
-                file.delete()
-                return Outcome.Failed(describeStreamHttpError(reply.code))
-            }
-            val body = reply.body ?: return Outcome.Failed("The panel sent nothing.", 0, file.absolutePath)
-
-            val written = runCatching { file.outputStream() }.getOrElse { e ->
-                return Outcome.Failed("The file could not be opened: ", 0, file.absolutePath)
-            }
-
-            return written.use { out ->
-                copy(container, account, recording, body.byteStream().buffered(), out, file.absolutePath)
-            }
+        val written = runCatching { file.outputStream().buffered() }.getOrElse { e ->
+            return Outcome.Failed("The file could not be opened: ${e.message}", 0, file.absolutePath)
         }
+
+        // One file, however many connections it takes to fill it.
+        //
+        // A panel closing the connection is not the end of the programme. That
+        // is the oldest lesson in this app — a channel restarting hangs up
+        // cleanly and ExoPlayer calls it ENDED, which for live is never true —
+        // and the recorder used to fall for it exactly as the player once did:
+        // the read returned -1, the recording was marked Done, and a row
+        // claimed success over a file that stopped twenty minutes in.
+        //
+        // So the clock decides when a recording is over, never the socket. The
+        // same back-off the player uses (1, 2, 4, 8, 15 s, then give up) asks
+        // the panel again, and the bytes keep going into the same file. The
+        // delays matter as much as the retrying: a line that allows one stream
+        // counts the connection it just lost for a few seconds, so an instant
+        // reconnect is refused.
+        val reconnect = StreamReconnect()
+        var total = 0L
+        var attempt = 0
+
+        return written.use { out ->
+            while (true) {
+                currentCoroutineContext().ensureActive()
+                attempt++
+
+                val asked = runCatching { container.http.newCall(request).execute() }
+                val response = asked.getOrNull()
+                val body = response?.takeIf { it.isSuccessful }?.body
+
+                if (body == null) {
+                    val code = response?.code
+                    response?.close()
+                    // Refused before a single byte: that is the panel saying no
+                    // — the wrong format, a dead channel, the connection limit
+                    // — and the reason is worth showing at once. Refused after
+                    // bytes have arrived is just a failed attempt at getting
+                    // back in, which is what the back-off is for.
+                    if (total == 0L && attempt == 1) {
+                        file.delete()
+                        return@use Outcome.Failed(
+                            code?.let(::describeStreamHttpError)
+                                ?: "The panel could not be reached: " +
+                                asked.exceptionOrNull()?.message.orEmpty(),
+                        )
+                    }
+                    val wait = reconnect.onDropped(System.currentTimeMillis())
+                        ?: return@use giveUp(recording, total, file.absolutePath)
+                    if (over(recording)) return@use done(total, file.absolutePath)
+                    kotlinx.coroutines.delay(wait)
+                    continue
+                }
+
+                val chunk = response.use {
+                    stream(container, account, recording, body.byteStream(), out, file.absolutePath, total, reconnect)
+                }
+                total = chunk.total
+
+                when (chunk) {
+                    is Chunk.Finished -> return@use Outcome.Done(total, file.absolutePath)
+                    is Chunk.Stopped -> return@use Outcome.Failed(chunk.why, total, file.absolutePath)
+                    is Chunk.Dropped -> {
+                        val wait = reconnect.onDropped(System.currentTimeMillis())
+                            ?: return@use giveUp(recording, total, file.absolutePath)
+                        // The programme can end while a back-off is being
+                        // waited out, and then there is nothing left to ask
+                        // for: one more connection would be opened only to
+                        // be closed by the clock.
+                        if (over(recording)) return@use done(total, file.absolutePath)
+                        if (BuildConfig.DEBUG) {
+                            Log.d(
+                                TAG_PLAY,
+                                "recording ${recording.id} dropped at ${total / (1024 * 1024)} MB; " +
+                                    "asking again in $wait ms",
+                            )
+                        }
+                        kotlinx.coroutines.delay(wait)
+                    }
+                }
+            }
+            @Suppress("UNREACHABLE_CODE")
+            done(total, file.absolutePath)
+        }
+    }
+
+    /** Whether the clock has passed the end of what was asked for. */
+    private fun over(recording: Recording): Boolean =
+        System.currentTimeMillis() / 1000 >= recording.stopSeconds
+
+    /**
+     * The end of the programme, reached.
+     *
+     * Nothing at all is a failure rather than a success, however the loop
+     * got here: a row saying Done over an empty file is the thing this whole
+     * change exists to stop.
+     */
+    private fun done(total: Long, document: String): Outcome =
+        if (total > 0) Outcome.Done(total, document)
+        else Outcome.Failed("Nothing arrived from the panel.", 0, document)
+
+    /**
+     * Out of attempts, with the programme still running.
+     *
+     * Kept rather than deleted, and said plainly. A short recording of the
+     * right programme is worth something; a row that claims it worked is
+     * worth less than nothing.
+     */
+    private fun giveUp(recording: Recording, total: Long, document: String): Outcome {
+        val left = (recording.stopSeconds - System.currentTimeMillis() / 1000) / 60
+        return Outcome.Failed(
+            "The stream kept dropping and would not come back, with about $left minutes " +
+                "still to record. What was recorded up to then is kept.",
+            total,
+            document,
+        )
+    }
+
+    /** Why one connection's worth of copying stopped. */
+    private sealed interface Chunk {
+        val total: Long
+
+        /** The recording's end time arrived, which is the only real finish. */
+        data class Finished(override val total: Long) : Chunk
+
+        /** The stream ended or failed while the clock says there is more. */
+        data class Dropped(override val total: Long) : Chunk
+
+        /** Something retrying cannot fix: a full disk, a file at its limit. */
+        data class Stopped(override val total: Long, val why: String) : Chunk
     }
 
     /**
      * The loop. Reads until the recording's end, the volume fills, the file
-     * grows past what FAT32 holds, or the viewer stops it.
+     * grows past what FAT32 holds, or the connection goes.
      *
      * The store is updated every few seconds rather than every buffer: a row
      * that shows the size growing is worth having, and a DataStore write per
      * 64 KB is not.
      */
-    private suspend fun copy(
+    private suspend fun stream(
         container: AppContainer,
         account: XtreamAccount,
         recording: Recording,
         input: java.io.InputStream,
         out: OutputStream,
         document: String,
-    ): Outcome = withContext(Dispatchers.IO) {
+        alreadyWritten: Long,
+        reconnect: StreamReconnect,
+    ): Chunk = withContext(Dispatchers.IO) {
         val buffer = ByteArray(64 * 1024)
-        var total = 0L
+        var total = alreadyWritten
         var lastTold = System.currentTimeMillis()
         var lastNotified = 0L
 
         while (true) {
             ensureActive()
             val now = System.currentTimeMillis() / 1000
-            if (now >= recording.stopSeconds) break
+            if (now >= recording.stopSeconds) return@withContext Chunk.Finished(total)
 
-            val read = runCatching { input.read(buffer) }.getOrElse { e ->
-                return@withContext Outcome.Failed(
-                    "The stream stopped: ${e.message}",
-                    total,
-                    document,
-                )
+            val read = runCatching { input.read(buffer) }.getOrElse {
+                return@withContext Chunk.Dropped(total)
             }
-            if (read < 0) break
+            // The end of the body, which for live television means the panel
+            // hung up rather than that the programme is over.
+            if (read < 0) return@withContext Chunk.Dropped(total)
 
             runCatching { out.write(buffer, 0, read) }.getOrElse { e ->
-                return@withContext Outcome.Failed("Writing failed: ${e.message}", total, document)
+                return@withContext Chunk.Stopped(total, "Writing failed: ${e.message}")
             }
             total += read
+            // Bytes arriving is this stream playing, which is what lets the
+            // back-off forgive its attempts once it has run steadily. Without
+            // it, a recording that drops once an hour would run out of tries.
+            reconnect.onPlaying(System.currentTimeMillis())
 
             if (total >= FAT32_MAX_BYTES) {
-                return@withContext Outcome.Failed(
+                return@withContext Chunk.Stopped(
+                    total,
                     "The recording reached four gigabytes, which is as much as one file can " +
                         "hold on this stick. What was recorded up to then is kept.",
-                    total,
-                    document,
                 )
             }
 
@@ -280,10 +396,9 @@ class RecordingService : Service() {
             if (millis - lastTold > TELL_EVERY_MS) {
                 lastTold = millis
                 if (freeBytes(document) < SPACE_HEADROOM_BYTES) {
-                    return@withContext Outcome.Failed(
-                        "The disk is full. What was recorded up to then is kept.",
+                    return@withContext Chunk.Stopped(
                         total,
-                        document,
+                        "The disk is full. What was recorded up to then is kept.",
                     )
                 }
                 container.recordings.put(
@@ -300,7 +415,8 @@ class RecordingService : Service() {
                 notify(recording, total)
             }
         }
-        Outcome.Done(total, document)
+        @Suppress("UNREACHABLE_CODE")
+        Chunk.Finished(total)
     }
 
     /**

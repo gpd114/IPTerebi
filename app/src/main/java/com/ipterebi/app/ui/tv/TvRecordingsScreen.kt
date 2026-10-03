@@ -126,17 +126,20 @@ fun TvRecordingsScreen(
                     recording = recording,
                     zone = zone,
                     onChoose = {
-                        when (recording.state) {
-                            // Already kept: watch it.
-                            RecordingState.DONE -> onPlay(recording)
+                        when {
+                            // Anything with minutes on the stick is watched,
+                            // Failed included: a recording that ran out of
+                            // reconnects keeps what it got, says so on the row,
+                            // and OK on it used to throw that away.
+                            recording.watchable -> onPlay(recording)
                             // Still to come: take it off, and move the alarm
                             // on to whatever is next.
-                            RecordingState.SCHEDULED -> container.scope.launch {
+                            recording.state == RecordingState.SCHEDULED -> container.scope.launch {
                                 container.recordings.remove(account, recording.id)
                                 RecordingAlarms.arm(context)
                             }
                             // Going on now: stop it, and keep what there is.
-                            RecordingState.RECORDING -> RecordingService.stop(context)
+                            recording.state == RecordingState.RECORDING -> RecordingService.stop(context)
                             // Nothing to watch and nothing to stop.
                             else -> container.scope.launch {
                                 container.recordings.forget(account, recording.id)

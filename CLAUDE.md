@@ -1135,18 +1135,46 @@ recording gets `DefaultDataSource` instead; and `ActivePlayback.stop()` goes
 through the ExoPlayer the screen owns, which Media3 insists is the main
 thread, while the whole service runs on IO.
 
-**A known gap, left deliberately: the recorder does not reconnect.** When the
-panel closes the connection the read returns -1 and the recording is marked
-Done with whatever it had — a short file and a row claiming success. That is
-wrong for the same reason it is wrong in the player: a clean hang-up from a
-live panel is never really the end, which is why playback has a back-off and
-rejoins. The recorder should do the same, appending to the same file until
-the programme's end time, and only finish when the clock says so. It has not
-been hit on the fake panel, whose streams are finite by design. The owner
-does not record and chose to wait for a user to report it rather than spend
-time on it now, which is a reasonable call — but if anyone ever says a
-recording stopped early, this is the first place to look, and
-`RecordingService`'s `if (read < 0) break` is the line.
+**The clock decides when a recording is over, never the socket.** This was a
+known gap and is not one now. A panel closing the connection made the read
+return -1, and the recorder took that for the end: the file was closed and
+the row said Done over whatever few minutes had arrived. It is the oldest
+mistake in this app, made twice — a clean hang-up from a live panel is never
+the end, which is the whole reason playback has a back-off and rejoins.
+
+So the file is opened once and `record()` loops over connections, the same
+`StreamReconnect` the player uses driving the back-off (1, 2, 4, 8, 15 s,
+then give up), with the bytes from each going into the same file. The delays
+matter as much as the retrying: a line that allows one stream counts the
+connection it just lost for a few seconds, so an instant reconnect is
+refused. One connection's worth of copying ends in a `Chunk` saying which of
+three things happened — the end time arrived, the stream went, or something
+retrying cannot fix — because only the first of those is a finish.
+
+Refused **before a single byte** is still reported at once, because that is
+the panel saying no — wrong format, dead channel, the connection limit — and
+the reason is worth showing. Refused *after* bytes have arrived is only a
+failed attempt at getting back in, which is what the back-off is for.
+
+**Out of attempts keeps the file and says so.** A row claiming success over
+a short file is worth less than nothing, so it is Failed, with how many
+minutes were still to go and the promise that what was recorded is kept —
+and that promise forced a second change: OK on such a row used to *forget*
+it. `Recording.watchable` in `core/` is the rule now, tested: bytes and a
+file behind them, in a state that is over (Done or Failed). Anything still
+going is not watchable, because opening it would be the app competing with
+itself for the one connection.
+
+Driven on the `googletv34` emulator against the fake panel's **Drops every
+20 s** channel, which hangs up after 20 s and answers 456 to a reconnect
+inside 2.5 s. The log is the proof: `dropped at 0 MB; asking again in
+1000 ms`, then 4000, then 8000, then 15000 — the 2000 ms step going on the
+456 that the 1 s attempt earned — one file of 4,148,000 bytes from four
+connections where the old code would have kept one 20-second connection and
+called it Done, and the row then played that part-recording back at 640x360.
+It gives up on about the fifth drop, which is the player's policy and
+correct: `STEADY_MS` forgives attempts after 30 s of steady bytes, so only a
+channel dropping faster than that ever runs out.
 
 Proved end to end on the `googletv34` emulator against the fake panel: the
 volume chosen, hold OK and Record, the picture stops with "Your line is free
