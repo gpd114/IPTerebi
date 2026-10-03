@@ -21,9 +21,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import com.ipterebi.core.TeamMatch
+import com.ipterebi.core.teamMatch
+import com.ipterebi.core.streams
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
@@ -46,6 +52,11 @@ data class HomeUiState(
      * disk answers, which reads as an app that has forgotten everything.
      */
     val loading: Boolean = true,
+    /** The team's name, blank when none is set. */
+    val team: String = "",
+    /** Their match, on now or next, with the channels carrying it. */
+    val teamMatch: TeamMatch? = null,
+    val teamChannels: List<LiveStream> = emptyList(),
 )
 
 /**
@@ -64,7 +75,63 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     @OptIn(ExperimentalCoroutinesApi::class)
     private val signedIn = container.credentials.state.filterIsInstance<AccountState.SignedIn>()
 
+    /**
+     * Where the team is on, found once per launch and whenever the name
+     * changes.
+     *
+     * This is the one thing on Home that can cost a request, and it is the
+     * exception rather than a change of mind. Mapping the guide's channel
+     * ids to things that can be pressed needs the channel list, which is
+     * several megabytes on a real line — the reason there is no "recently
+     * added films" row. The difference is that nothing happens unless a team
+     * has actually been named: setting one is asking for precisely this, in
+     * advance, so that the moment a feed dies there is a list already
+     * waiting. Everyone who has not set one pays nothing, and the rest of
+     * the screen still draws before the panel answers.
+     */
+    private fun findTeam(account: XtreamAccount, team: String) {
+        viewModelScope.launch {
+            if (team.isBlank()) {
+                _state.update { it.copy(team = team, teamMatch = null, teamChannels = emptyList()) }
+                return@launch
+            }
+            val found = runCatching {
+                val now = System.currentTimeMillis() / 1000
+                val guide = container.guide.whatsOn(account, now, now + TEAM_WINDOW_SECONDS)
+                val match = withContext(Dispatchers.Default) {
+                    teamMatch(guide.search(team), now)
+                } ?: return@runCatching null
+                val line = container.lineChannels.all(account)
+                    .withoutHidden(container.channelLists.hidden(account).first().hiddenIds())
+                match to match.showing.streams(line)
+            }.getOrNull()
+            _state.update {
+                it.copy(
+                    team = team,
+                    teamMatch = found?.first,
+                    teamChannels = found?.second.orEmpty(),
+                )
+            }
+        }
+    }
+
     init {
+        // The name is one short string in plain preferences, so this is a
+        // cheap flow to sit on: changing it in Settings refreshes the row on
+        // the way back without a reload of anything else.
+        viewModelScope.launch {
+            // The guide version is in here because the row has to look
+            // again when the guide arrives. On a first run Home is built
+            // before the full guide has downloaded, so the first answer is
+            // always "nothing for them" — and without this it stayed that
+            // way until something else happened to rebuild the screen.
+            combine(
+                signedIn.map { it.account },
+                container.team.team,
+                container.guide.version,
+            ) { account, team, _ -> account to team }
+                .collect { (account, team) -> findTeam(account, team) }
+        }
         @OptIn(ExperimentalCoroutinesApi::class)
         viewModelScope.launch {
             signedIn
@@ -137,3 +204,14 @@ private class Home(
     val watching: List<WatchedItem>,
     val lists: List<OwnList>,
 )
+
+/**
+ * How far ahead the team row looks.
+ *
+ * Four days, rather than the one a search uses. A row that says "nothing
+ * this week" the moment a match finishes is a row nobody trusts, and the
+ * next fixture is the useful thing between matches. The guide reaches only
+ * as far as the provider publishes — 17 hours on one measurement and 41 on
+ * another — so this is a ceiling and often not reached.
+ */
+private const val TEAM_WINDOW_SECONDS = 4L * 24 * 3600
