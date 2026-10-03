@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.EpgListing
 import com.ipterebi.core.GuideClock
+import com.ipterebi.core.SAME_EVENT_SLACK_SECONDS
 import com.ipterebi.core.Showing
 import com.ipterebi.core.WhatsOnIndex
 import com.ipterebi.core.showingOf
@@ -225,10 +226,20 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
             val line = account.lineKey
             val playing = store.programmes(line, epgChannelId, after = at, limit = 1)
                 .firstOrNull()?.takeIf { it.start <= at } ?: return@withContext null
-            // Only what overlaps the programme itself. A wider window would
-            // pull in the evening either side of it for 1,366 channels and
-            // group none of it.
-            showingOf(playing, store.inWindow(line, playing.start, playing.stop))
+            // Only what could possibly be the same event: a programme whose
+            // start is within the slack the rule allows. Asking for the
+            // playing programme's whole span looks equivalent and is not
+            // — Strictly Come Dancing runs two and a half hours, and that
+            // window held 3,163 rows on a real line against 168 within a
+            // quarter of an hour of its start. The rule would have thrown
+            // all but those away anyway; the box just had to grind through
+            // them first, and did not finish.
+            val near = store.startingNear(
+                line,
+                playing.start - SAME_EVENT_SLACK_SECONDS,
+                playing.start + SAME_EVENT_SLACK_SECONDS,
+            )
+            showingOf(playing, near)
         }
     }
 

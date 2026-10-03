@@ -24,7 +24,7 @@ package com.ipterebi.core
  * *different games* on different affiliates, so exact titles also glue
  * unrelated matches into one.
  *
- * So an event is a time and a *compatible* title; see `sameEvent` below.
+ * So an event is a time and a *compatible* title; see `Event.takes` below.
  *
  * **Noise is ranked down, not filtered out.** Searching "England" also finds
  * darts, two cricket ODIs, "7 News Today in New England" and "Out of
@@ -142,24 +142,87 @@ private fun List<String>.matchedBy(text: String): Boolean =
  * counts go by start time, so what is on soonest is nearer the top.
  */
 fun List<XmltvProgramme>.showings(): List<Showing> {
-    val events = mutableListOf<MutableList<XmltvProgramme>>()
-    for (programme in sortedBy { it.start }) {
-        val joined = events.firstOrNull { event -> sameEvent(event.first(), programme) }
-        if (joined != null) joined.add(programme) else events.add(mutableListOf(programme))
+    // Folded once per programme, never inside the comparison.
+    //
+    // The first version normalised both titles on every comparison and
+    // compared each programme against every event so far. On the fake
+    // panel's twenty channels that is instant; on a real line it never
+    // finished. A window around one programme held **3,163 rows across 160
+    // start times**, which is a quarter of a million comparisons and half a
+    // million NFD normalisations, and the box simply sat there — no error, no
+    // card, nothing in the log after "looking for". This is the same lesson
+    // [NameIndex] already carries for channel names, learnt again one layer
+    // down.
+    val folded = sortedBy { it.start }.map { Folded(it, normaliseForSearch(it.title)) }
+
+    val events = mutableListOf<Event>()
+    // Everything before this has a start too far back to match again, because
+    // the programmes are in start order. Without it the scan is quadratic.
+    var live = 0
+    for (one in folded) {
+        while (live < events.size && one.programme.start - events[live].start > SAME_EVENT_SLACK_SECONDS) {
+            live++
+        }
+        var joined: Event? = null
+        for (index in live until events.size) {
+            if (events[index].takes(one)) {
+                joined = events[index]
+                break
+            }
+        }
+        if (joined != null) joined.members.add(one.programme)
+        else events.add(Event(one))
     }
+
     return events
         .map { event ->
             Showing(
                 // The longest title is the most specific one. Not the
                 // commonest: five channels said "Nations League" and two gave
                 // the fixture, so a majority would pick the vague one.
-                title = event.maxByOrNull { it.title.length }?.title.orEmpty(),
-                start = event.first().start,
-                stop = event.maxOf { it.stop },
-                channels = event.map { it.channel.lowercase() }.distinct(),
+                title = event.members.maxByOrNull { it.title.length }?.title.orEmpty(),
+                start = event.start,
+                stop = event.members.maxOf { it.stop },
+                channels = event.members.map { it.channel.lowercase() }.distinct(),
             )
         }
         .sortedWith(compareByDescending<Showing> { it.feeds }.thenBy { it.start })
+}
+
+/** A programme with its title folded, so the folding happens once. */
+private class Folded(val programme: XmltvProgramme, val title: String) {
+    /** Words worth matching on; see [Event.takes]. */
+    val words: List<String> = title.split(' ').filter { it.length > 2 }
+}
+
+/** Programmes gathered as one event, keyed on the first one seen. */
+private class Event(first: Folded) {
+    val members = mutableListOf(first.programme)
+    private val head = first
+    val start: Long get() = head.programme.start
+
+    /**
+     * Whether [other] is this same event on another channel.
+     *
+     * Time alone would make everything starting at 15:15 one event. A title
+     * alone splits a fixture titled three ways. So: the starts are close, the
+     * windows overlap, and the shorter title's real words all appear in the
+     * longer one — "Nations League" inside "UEFA Nations League: Croatia v
+     * England". Words of one or two letters are skipped, because a title made
+     * only of them would otherwise glue to anything; where a title has no
+     * longer word, the two have to read the same.
+     */
+    fun takes(other: Folded): Boolean {
+        val a = head.programme
+        val b = other.programme
+        if (kotlin.math.abs(a.start - b.start) > SAME_EVENT_SLACK_SECONDS) return false
+        if (a.start >= b.stop || b.start >= a.stop) return false
+        if (head.words.isEmpty() || other.words.isEmpty()) return head.title == other.title
+        val (shorter, longer) =
+            if (head.words.size <= other.words.size) head.words to other.words
+            else other.words to head.words
+        return shorter.all { longer.contains(it) }
+    }
 }
 
 /**
@@ -214,26 +277,3 @@ fun Showing.streams(channels: List<LiveStream>): List<LiveStream> {
     return this.channels.flatMap { byChannel[it].orEmpty() }
 }
 
-/**
- * Whether two programmes are the same event on two channels.
- *
- * Time alone would make everything starting at 15:15 one event. A title
- * alone splits a fixture titled three ways. So: the starts are close, the
- * windows overlap, and the shorter title's real words all appear in the
- * longer one — "Nations League" inside "UEFA Nations League: Croatia v
- * England". Words of one or two letters are skipped, because a title made
- * only of them would otherwise glue to anything; where a title has no longer
- * word, the two have to read the same.
- */
-private fun sameEvent(a: XmltvProgramme, b: XmltvProgramme): Boolean {
-    if (kotlin.math.abs(a.start - b.start) > SAME_EVENT_SLACK_SECONDS) return false
-    if (a.start >= b.stop || b.start >= a.stop) return false
-    val one = normaliseForSearch(a.title)
-    val two = normaliseForSearch(b.title)
-    val oneWords = one.split(' ').filter { it.length > 2 }
-    val twoWords = two.split(' ').filter { it.length > 2 }
-    if (oneWords.isEmpty() || twoWords.isEmpty()) return one == two
-    val (shorter, longer) =
-        if (oneWords.size <= twoWords.size) oneWords to twoWords else twoWords to oneWords
-    return shorter.all { longer.contains(it) }
-}
