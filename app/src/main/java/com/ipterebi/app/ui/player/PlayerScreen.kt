@@ -104,6 +104,12 @@ import com.ipterebi.core.VodStream
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.describeEpisodeHttpError
 import com.ipterebi.core.describeFilmHttpError
+import com.ipterebi.app.ui.SecondaryButton
+import com.ipterebi.core.LiveStream
+import com.ipterebi.core.hiddenIds
+import com.ipterebi.core.streams
+import com.ipterebi.core.withoutHidden
+import kotlinx.coroutines.flow.first
 import com.ipterebi.core.describeStreamHttpError
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
@@ -142,6 +148,9 @@ fun PlayerScreen(container: AppContainer, playable: Playable, onBack: () -> Unit
                 onBack = onBack,
                 // Channels only: films and episodes have nothing to switch to.
                 onZap = if (playable is Playable.Channel) zapThroughList else null,
+                onTune = if (playable is Playable.Channel) {
+                    { id -> channelId = id }
+                } else null,
             )
 
         else -> Box(
@@ -162,6 +171,8 @@ private fun PlayerContent(
     onBack: () -> Unit,
     /** Moves to the next (+1) or previous (-1) channel. Null for films and episodes. */
     onZap: ((Int) -> Unit)? = null,
+    /** Switches to a named channel, for the other feeds carrying a programme. */
+    onTune: ((Int) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // The view's touch listener is created once, so it reads the latest of this.
@@ -253,6 +264,37 @@ private fun PlayerContent(
         }
     }
     var error by remember(url) { mutableStateOf<String?>(null) }
+
+    // The other feeds carrying what this channel has on, for when this one
+    // dies. Entirely a local query — the guide is on the device and the whole
+    // line is cached — which is the point: the panel refusing things is
+    // usually why there is an error card at all, so working around it must
+    // not need the panel's help.
+    //
+    // Looked up only once an error is up. On a healthy stream it would be a
+    // guide scan per channel change that nothing ever reads.
+    var otherFeeds by remember(url) { mutableStateOf<List<LiveStream>>(emptyList()) }
+    var otherFeedsTitle by remember(url) { mutableStateOf("") }
+    LaunchedEffect(error, playable) {
+        if (error == null || onTune == null) return@LaunchedEffect
+        val id = (playable as? Playable.Channel)?.id ?: return@LaunchedEffect
+        val found = runCatching {
+            val line = container.lineChannels.all(account)
+            val visible = line.withoutHidden(container.channelLists.hidden(account).first().hiddenIds())
+            val here = visible.firstOrNull { it.streamId == id } ?: return@runCatching null
+            val showing = container.guide.elsewhere(
+                account,
+                here.epgChannelId,
+                System.currentTimeMillis() / 1000,
+            ) ?: return@runCatching null
+            // Everything carrying it except the stream that just failed —
+            // which may well leave another stream on this same guide channel,
+            // the provider's own backup feed, and that is often the best one.
+            showing to showing.streams(visible).filterNot { it.streamId == id }
+        }.getOrNull()
+        otherFeedsTitle = found?.first?.title.orEmpty()
+        otherFeeds = found?.second?.take(MAX_OTHER_FEEDS).orEmpty()
+    }
 
     // Anything that drops after playing is reconnected; see StreamReconnect for
     // when and how often. The delay is read by the loading thread, hence atomic.
@@ -1236,6 +1278,39 @@ private fun PlayerContent(
                         .padding(top = 18.dp)
                         .focusRequester(retryFocus),
                 ) { Text("Try again", style = MaterialTheme.typography.labelLarge) }
+
+                // The whole reason this feature exists: one connection means
+                // the way out of a dead feed is another channel showing the
+                // same thing, and on a line of twenty thousand channels
+                // nobody is going to find it by browsing.
+                if (otherFeeds.isNotEmpty() && onTune != null) {
+                    Text(
+                        text = otherFeedsTitle.ifBlank { "Also showing on" }
+                            .let { "$it — also on ${otherFeeds.size}" },
+                        color = OverVideo.inkSoft,
+                        style = MaterialTheme.typography.labelLarge,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 20.dp, bottom = 6.dp),
+                    )
+                    otherFeeds.forEach { feed ->
+                        SecondaryButton(
+                            text = feed.name,
+                            // Switching happens here, by changing which
+                            // channel this player is on — never by navigating,
+                            // which would animate a second player in over the
+                            // top and hold two connections against a line that
+                            // allows one.
+                            onClick = {
+                                error = null
+                                reconnect.reset()
+                                reconnectDelay.set(0)
+                                onTune(feed.streamId)
+                            },
+                            modifier = Modifier.padding(top = 6.dp),
+                            colour = OverVideo.accent,
+                        )
+                    }
+                }
             }
             // Focus to the button when the error appears, so on a remote OK
             // means "try again".
@@ -1251,6 +1326,16 @@ private fun PlayerContent(
  * let go. Long enough for an earbud out and back in; short of the minute after
  * which Android starts winding down a backgrounded app's services.
  */
+/**
+ * How many other feeds the error card offers.
+ *
+ * A real line can carry one match on dozens of channels — 127 US affiliates
+ * shared one slot on the line this was measured against — and a card listing
+ * them all would be a scroll over the video rather than a way out of a dead
+ * stream. The first few, in the provider’s own order, is a decision.
+ */
+private const val MAX_OTHER_FEEDS = 5
+
 private const val PAUSED_AWAY_GRACE_MS = 30_000L
 
 /**

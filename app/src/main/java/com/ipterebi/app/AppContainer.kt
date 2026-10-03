@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.ipterebi.app.data.ChannelListStore
 import com.ipterebi.app.data.MediaRepository
+import com.ipterebi.app.data.LineChannels
 import com.ipterebi.app.data.ListStore
 import com.ipterebi.app.data.RecordingStore
 import com.ipterebi.app.data.WatchStore
@@ -76,6 +77,9 @@ class AppContainer(context: Context) {
     val recordings = RecordingStore(context.applicationContext)
 
     /** Starred and recently watched channels, per line. */
+    /** Every channel on the line, for searching what is on and for finding other feeds. */
+    val lineChannels = LineChannels(xtream)
+
     val channelLists = ChannelListStore(context.applicationContext)
 
     /** What is on: the full guide kept on the device, and short answers put right. */
