@@ -691,6 +691,60 @@ and carries `bigmatch.a`, which `Big match (backup feed)` shares, with
 `BigMatch.B` spelling it with capitals and titling the slot generically, and
 `Something else entirely` on at the same moment to catch a rule that groups
 by time alone.
+## Your team
+
+The thing this was asked for, in the owner's words: *"find out which
+channels my team is playing and have them listed so I can easily switch
+between them if connection goes bad."* A name typed once in Settings, and
+after that a row at the top of Home saying where they are on — the match,
+when it is, and every channel carrying it, each one a card that tunes it.
+
+**A list, not a search, and the difference is the whole point.** The moment
+the list is wanted is the moment a feed has just died, mid-match, with a
+remote in hand. That is the worst imaginable time to be typing a team name
+letter by letter on a D-pad keyboard. The name does not change from week to
+week, so all of the work can be done in advance, and is. A search box was
+built first and taken back out; it is in the history if it is ever wanted.
+
+- **`core/YourTeam.kt`**, tested: which match to show — on now beats what is
+  coming, because that is the one a dying feed is interrupting; failing that
+  the soonest to come, so the row says something useful for the six days a
+  week the team is not playing. Among several at once the widest-carried
+  wins, which is the same ranking the rest of this uses and for the same
+  reason: a fixture is on many channels and a programme merely naming the
+  team is not. And what a name may be: trimmed, spaces collapsed, cut to 40.
+  Blank is how the row is turned off, so there is no second switch to fall
+  out of step with the name.
+- **The name is not keyed on the line**, unlike favourites, hidden channels
+  and the viewer's own lists. Those hold a provider's stream ids, which mean
+  nothing on another panel; a team's name means the same everywhere, so it
+  survives changing provider — the one time someone is least likely to want
+  to set it up again. `TeamStore`, plain preferences.
+- **It is the one thing on Home that can cost a request**, and that is a
+  deliberate exception rather than a change of mind. Turning the guide's
+  channel ids into things that can be pressed needs the channel list, which
+  is megabytes on a real line — the reason there is no "recently added
+  films" row. The difference is that nothing happens unless a team has been
+  named: setting one is asking for exactly this, in advance. Everyone else
+  pays nothing.
+- **It looks again when the guide arrives.** Found by testing: on a first
+  run Home is built before the full guide has downloaded, so the first
+  answer is always "nothing for them" — and without `Guide.version` in the
+  combine it stayed that way until something else rebuilt the screen.
+- **Four days ahead**, not the one a window around a programme uses. A row
+  that says "nothing" the moment a match ends is a row nobody trusts. The
+  guide reaches only as far as the provider publishes, so this is a ceiling
+  and usually not reached.
+
+Type the name the way the guide writes it. "Man Utd" and "Manchester
+United" are not the same thing to a provider, and nothing here second-
+guesses that on the viewer's behalf.
+
+Proved on the `googletv34` emulator against the fake panel: the name set in
+Settings, and Home then showing **Croatia / ON NOW / "UEFA Nations League:
+Croatia v England" / 23:21–01:21 · on 4 channels**, with the four feeds
+listed — including the backup sharing the failed channel's own guide id, and
+not the unrelated programme on at the same moment.
 ## The home screen
 
 The app opens on Home, and the bottom bar has four tabs: Home, Live TV, Films,
