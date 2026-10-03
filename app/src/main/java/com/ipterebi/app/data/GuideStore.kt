@@ -205,6 +205,38 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
             }
         }
 
+    /**
+     * Everything on [line] that overlaps [from]..[to], on every channel.
+     *
+     * For finding a programme rather than reading one channel's evening, so
+     * there is no channel in the query — which is also why it is the one
+     * read here that cannot use `programme_by_channel`. It is a scan, and
+     * affordable because of what the window holds: a real line measured
+     * 12,584 programmes still to come and 1.8 MB of text in them, out of
+     * 100,192 in the whole download. [limit] is a floor under a pathological
+     * guide rather than a figure anything relies on.
+     *
+     * The caller folds the text once into a `WhatsOnIndex` and searches that,
+     * instead of asking the database per keystroke.
+     */
+    fun inWindow(line: String, from: Long, to: Long, limit: Int = 40_000): List<XmltvProgramme> =
+        readableDatabase.rawQuery(
+            "SELECT p.channel, p.start, p.stop, p.title, p.description FROM programme p " +
+                "JOIN guide g ON p.line = g.line AND p.gen = g.gen " +
+                "WHERE p.line = ? AND p.stop > ? AND p.start < ? ORDER BY p.start LIMIT ?",
+            arrayOf(line, from.toString(), to.toString(), limit.toString()),
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    add(
+                        XmltvProgramme(
+                            c.getString(0), c.getLong(1), c.getLong(2), c.getString(3), c.getString(4),
+                        ),
+                    )
+                }
+            }
+        }
+
     /** Forgets [line]'s guide, when it is signed out of. */
     fun clear(line: String) {
         val db = writableDatabase

@@ -576,6 +576,85 @@ Reordering writes the whole list back through `setFavourites`, so the stored
 order is the order, and everything reading it follows: the shelf, and the
 Live TV row on Home.
 
+## Finding a match across the channels carrying it
+
+A line usually allows one stream, so when a feed buffers or dies the only
+move left is another channel showing the same thing. Finding that by browsing
+a line of 21,077 channels filed into categories called `EN - 2020 & OLD` is
+hopeless. The guide already on the device knows the answer, so it answers:
+
+- **Searching finds what is *on*, not only what a channel is *called*.** A
+  team name matches no channel name — nothing is called Croatia — so the
+  search box now reports both: events above, channels matched by name below.
+- **A failing stream offers the other feeds.** The error card lists them and
+  switching happens inside the player screen, by changing which channel it is
+  on, never by navigating — which would animate a second player in over the
+  top and hold two connections against a line that allows one.
+
+The rules are `core/WhatsOn.kt`, tested, and every one of them was settled by
+measuring one real line's `xmltv.php` — 100,192 programmes across 1,366
+channels, read off the box — rather than guessed. Each measurement killed a
+simpler design:
+
+- **The description matters as much as the title.** Croatia v England was on
+  seven feeds and five of them titled it only "Nations League", with the teams
+  in the description. Searching titles alone found two of the seven.
+- **Grouping by identical title is wrong**, which was the first design. The
+  same fixture arrived titled three ways — "UEFA Nations League: Croatia v
+  England", "Nations League", "Kick Off - Croatia v England" — so exact titles
+  split one event into three. And in the other direction `Live: College
+  Football` was on **127 channels**, a generic slot name covering *different*
+  games on different affiliates, so exact titles also glue unrelated matches
+  into one. An event is therefore a close start, an overlap, and the shorter
+  title's real words appearing in the longer one.
+- **The longest title wins, not the commonest.** Five channels said "Nations
+  League" and two gave the fixture, so a majority picks the vague one.
+- **Noise is ranked down, not filtered out.** Searching "England" also finds
+  darts, two cricket ODIs, "7 News Today in New England" and "Out of England".
+  No word-boundary rule helps — England is a whole word in "New England" — and
+  this app is not going to carry a football database. What separates them is
+  how many channels carry it: the match is on seven, the news programme on
+  one. So events are ordered by that and the viewer picks from a short list,
+  rather than the app pretending to know. Measured against the real guide, the
+  actual match ranks first with the other 33 England-mentioning channels below
+  it.
+- **`epg_channel_id` arrives in inconsistent case.** One line sent both
+  `SkySport3.nz` and `skysport3.nz`, and `SkySportsCricket.uk` beside
+  `skysportscricket.uk`. Folded, or the same channel is offered twice.
+- **The channel being watched is kept in the event, and only its failed
+  *stream* is dropped.** A provider carries ITV1 as the HD cut, the FHD cut
+  and a backup under one guide id, so when a feed dies the best thing to
+  switch to is very often another stream on the *same* guide channel. Taking
+  the guide channel out would hide exactly those. Hence `showingOf`, which
+  keeps it, beside `alsoShowing`, which does not.
+
+**It is all local, and that is the point.** `GuideStore.inWindow` reads the
+window from the database on the device and `WhatsOnIndex` folds the text once
+— 12,584 programmes and 1.8 MB on a real line, far too much to re-fold per
+keystroke, which is the lesson `NameIndex` already learnt for channel names.
+The panel refusing things is usually why there is an error card at all, so
+working around it must not need the panel's help. `LineChannels` holds the
+whole channel list that maps guide ids to things that can be pressed, so the
+channel search and this share one several-megabyte request instead of making
+it each.
+
+**Two things limit it, both the provider's.** It only knows what the guide
+says, and how far the guide reaches moves: the same line published 41 hours
+ahead one day and **17 the next**, so this answers "on now and tonight"
+dependably and "this weekend" often not at all. And a channel being listed is
+not a promise it plays — it is a shortlist, not a guarantee.
+
+One bug worth remembering, because it hid the whole feature: the channel list
+replaced its results with an empty panel whenever no channel *name* matched,
+which is precisely the search this exists for. "0 channels match" drew over
+the match it had just found. The empty panel now needs both kinds to be
+empty, and the line above the results counts what is on.
+
+The fake panel serves the case in miniature: channel 103 refuses with a 403
+and carries `bigmatch.a`, which `Big match (backup feed)` shares, with
+`BigMatch.B` spelling it with capitals and titling the slot generically, and
+`Something else entirely` on at the same moment to catch a rule that groups
+by time alone.
 ## The home screen
 
 The app opens on Home, and the bottom bar has four tabs: Home, Live TV, Films,

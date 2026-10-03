@@ -76,6 +76,7 @@ import com.ipterebi.app.ui.focusFill
 import com.ipterebi.app.ui.nightCard
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
+import com.ipterebi.app.ui.theme.tabular
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XmltvProgramme
 import com.ipterebi.core.channelInitials
@@ -106,6 +107,10 @@ fun ChannelsScreen(
 
     /** The channel a long press is asking about, if any. */
     var hiding by remember { mutableStateOf<LiveStream?>(null) }
+
+    // Which event is showing its channels. One at a time, and not remembered
+    // across searches: the list it belongs to is gone by then.
+    var openShowing by remember(state.query) { mutableStateOf<String?>(null) }
 
     Scaffold(
         topBar = {
@@ -195,7 +200,11 @@ fun ChannelsScreen(
                         CircularProgressIndicator()
                     }
 
-                state.visibleChannels.isEmpty() -> EmptyPanel(state)
+                // Only when there is nothing of either kind. A team name
+                // matches no channel name â€” nothing is called Croatia â€” so
+                // the empty panel used to win on exactly the search this
+                // feature exists for, and hide the match it had found.
+                state.visibleChannels.isEmpty() && state.showings.isEmpty() -> EmptyPanel(state)
 
                 else -> {
                     val categoryNames = remember(state.categories) {
@@ -206,6 +215,22 @@ fun ChannelsScreen(
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
+                        // What is *on* that matches, before the channels
+                        // *called* that. A team name matches no channel name,
+                        // so for the question people actually ask this is the
+                        // whole answer and the rows below are the fallback.
+                        items(state.showings, key = { "on:" + it.showing.title + it.showing.start }) { on ->
+                            ShowingRow(
+                                on = on,
+                                open = openShowing == on.showing.title + on.showing.start,
+                                onToggle = {
+                                    val key = on.showing.title + on.showing.start
+                                    openShowing = if (openShowing == key) null else key
+                                },
+                                onChannel = onChannel,
+                            )
+                        }
+
                         items(state.visibleChannels, key = { it.streamId }) { channel ->
                             // From the full guide on the device: a quick local
                             // lookup per row, never a request to the panel.
@@ -555,6 +580,11 @@ private fun SearchStatus(state: ChannelsUiState) {
             text = when {
                 state.indexing -> "Fetching every channel to searchâ€¦"
                 state.searchNote != null -> state.searchNote
+                // What is on counts as a match, or the line above the
+                // results contradicts them: a team search finds a programme
+                // and no channel name, and "0 channels match" over a list
+                // holding that match reads as a fault.
+                state.showings.isNotEmpty() -> onAndMatching(state.showings.size, count)
                 count == 1 -> "1 channel matches"
                 else -> "$count channels match"
             },
@@ -640,3 +670,88 @@ data class Move(
     val up: () -> Unit,
     val down: () -> Unit,
 )
+
+/**
+ * One event that matches the search, and the channels carrying it.
+ *
+ * Closed it is a single line â€” what it is, when, and how many channels have
+ * it. Open it lists them, and any one of them plays. That shape is the point
+ * of the whole feature: a line usually allows one stream, so the way out of a
+ * feed that buffers is another channel showing the same thing, and on twenty
+ * thousand channels nobody finds that by browsing.
+ *
+ * Marked with the time rather than a logo, because several of these are the
+ * same fixture at the same moment and the time is what tells an event from
+ * the repeat of it later.
+ */
+@Composable
+private fun ShowingRow(
+    on: ShowingOn,
+    open: Boolean,
+    onToggle: () -> Unit,
+    onChannel: (Int) -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(Corners.card)
+            .background(Night.quiet)
+            .focusFill()
+            .clickable(onClick = onToggle)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    on.showing.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Night.ink,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    whenAndWhere(on),
+                    style = MaterialTheme.typography.bodySmall.tabular(),
+                    color = Night.inkSoft,
+                    maxLines = 1,
+                )
+            }
+            QuietPill(if (open) "Hide" else "Show")
+        }
+        if (open) {
+            on.channels.forEach { channel ->
+                Text(
+                    channel.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Night.ink,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .clip(Corners.control)
+                        .focusFill()
+                        .clickable { onChannel(channel.streamId) }
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                )
+            }
+        }
+    }
+}
+
+/** "Today 15:15 · on 4 channels", or the count alone when it is on now. */
+private fun whenAndWhere(on: ShowingOn): String {
+    val time = java.time.Instant.ofEpochSecond(on.showing.start)
+        .atZone(java.time.ZoneId.systemDefault())
+        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
+    val count = on.channels.size
+    return "$time  ·  on $count channel" + (if (count == 1) "" else "s")
+}
+
+/** "2 on now" or "2 on now · 3 channels match", for the line above results. */
+private fun onAndMatching(showings: Int, channels: Int): String {
+    val on = "$showings on now"
+    if (channels == 0) return on
+    return on + "  ·  " + channels + " channel" + (if (channels == 1) "" else "s") + " match"
+}
