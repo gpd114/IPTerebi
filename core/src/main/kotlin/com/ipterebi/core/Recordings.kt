@@ -103,6 +103,21 @@ data class Recording(
     /** True while this recording wants the line at [nowSeconds]. */
     fun wants(nowSeconds: Long): Boolean =
         !finished && nowSeconds >= startSeconds && nowSeconds < stopSeconds
+
+    /**
+     * Whether there is something on the stick to play.
+     *
+     * Not the same question as whether it succeeded, and the two only came
+     * apart once the recorder learned to reconnect. A recording that ran out
+     * of attempts is Failed and says so, and it still holds however many
+     * minutes it got before the line went for good — the row itself
+     * promises that what was recorded up to then is kept. So the state
+     * decides the wording and this decides the key: anything with bytes and
+     * a file behind it plays, and OK on it must not quietly throw it away.
+     */
+    val watchable: Boolean
+        get() = bytes > 0 && document.isNotBlank() &&
+            (state == RecordingState.DONE || state == RecordingState.FAILED)
 }
 
 /**

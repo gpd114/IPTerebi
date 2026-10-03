@@ -28,6 +28,7 @@ class RecordingsTest {
         title: String = "A Programme",
         state: RecordingState = RecordingState.SCHEDULED,
         bytes: Long = 0,
+        document: String = "",
     ) = Recording(
         id = recordingId(stream, start),
         streamId = stream,
@@ -39,6 +40,7 @@ class RecordingsTest {
         programmeStop = stop,
         state = state,
         bytes = bytes,
+        document = document,
     )
 
     @Test
@@ -261,5 +263,55 @@ class RecordingsTest {
     fun `a nameless recording still gets a file name`() {
         val name = recordingFileName("", "", 0, ZoneId.of("UTC"))
         assertEquals("Recording - 1970-01-01 00-00.ts", name)
+    }
+
+    // What is worth playing back, which is not the same question as what
+    // succeeded. These exist because the recorder learned to reconnect and
+    // therefore learned to give up with a part-recording in hand.
+
+    
+    fun `a finished recording with a file is watchable`() {
+        val done = rec(1, 100, 200, state = RecordingState.DONE, bytes = 5_000, document = "/x/a.ts")
+        assertTrue(done.watchable)
+    }
+
+    
+    fun `one that gave up part way through is still watchable`() {
+        // The row says Failed and promises that what was recorded is kept, so
+        // OK on it has to play rather than delete.
+        val gaveUp = rec(1, 100, 200, state = RecordingState.FAILED, bytes = 4_148_000, document = "/x/a.ts")
+        assertTrue(gaveUp.watchable)
+    }
+
+    
+    fun `one that never got a byte is not`() {
+        // Refused before anything arrived: the file was deleted, and offering
+        // to play it would be offering a missing file.
+        val refused = rec(1, 100, 200, state = RecordingState.FAILED, bytes = 0, document = "")
+        assertFalse(refused.watchable)
+    }
+
+    
+    fun `bytes without a file are not watchable`() {
+        assertFalse(rec(1, 100, 200, state = RecordingState.DONE, bytes = 5_000).watchable)
+    }
+
+    
+    fun `what is still to come, or still going, is not watched`() {
+        // Booked has nothing yet; recording has a growing file, and opening
+        // that would be the app competing with itself for the one connection.
+        assertFalse(rec(1, 100, 200).watchable)
+        assertFalse(
+            rec(1, 100, 200, state = RecordingState.RECORDING, bytes = 9_000, document = "/x/a.ts")
+                .watchable,
+        )
+    }
+
+    
+    fun `a cancelled one is not offered either`() {
+        assertFalse(
+            rec(1, 100, 200, state = RecordingState.CANCELLED, bytes = 1, document = "/x/a.ts")
+                .watchable,
+        )
     }
 }
