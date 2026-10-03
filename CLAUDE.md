@@ -896,6 +896,34 @@ and carries `bigmatch.a`, which `Big match (backup feed)` shares, with
 `BigMatch.B` spelling it with capitals and titling the slot generically, and
 `Something else entirely` on at the same moment to catch a rule that groups
 by time alone.
+
+**On the box it is the error card**, in `TvLiveScreen`: the other feeds listed
+as buttons under Try again, and OK on one tunes the same screen's single
+player. No request is involved — the guide is in the box's database and the
+whole line is already in the `Lineup` — which is the point, because the panel
+refusing things is usually why the card is there. It logs what it found under
+`IPTerebiPlay`, because the box's screenshots come out blank over video and
+the log is the only way to see it.
+
+The TV guide has no search box yet, so the team search is the phone's for now.
+
+**Not yet seen working on a real line, and the reason is good news.** The
+owner's line refused nothing on 3 October: MPEG-TS played, HLS played (this
+panel really does serve `m3u8`, which is per-panel and worth knowing), the
+app's own honest user agent was accepted, and eight channels in a row came up
+first time. There was no failure to put a card on. What was measured on that
+line is the data the feature stands on: in the next twelve hours, **465 of
+6,238 slots were carried on two or more channels and 131 on four or more**.
+The widest are US affiliates sharing syndicated output under generic names
+— `Live: College Football` on 127 channels — while a pay-channel fixture
+sits on one guide channel, which may still be several playable streams under
+it. The log line is in place, so the first real failure will say what it
+offered.
+
+One thing to be careful of when reading these numbers: a first attempt at
+counting them grouped by `(start, title)` and then labelled each row with the
+longest title at that *start*, which pasted the wrong name onto real counts.
+Label a group with its own title.
 ## The home screen
 
 The app opens on Home, and the bottom bar has four tabs: Home, Live TV, Films,
@@ -1180,7 +1208,14 @@ out and the viewer picks a *volume* rather than a folder:
 `getExternalFilesDirs` gives the app a directory on each mounted volume, with
 no permission and no picker, and Settings lists them with the free space on
 each — which also answers "is the stick in?" without anyone reading a path.
-It matters because **the box has 737 MB free**, which is twelve to
+It matters because **the box has very little room, and less each time**: 737 MB
+free when recording was built, and **235 MB at 95% full** on 3 October, where a
+24 MB debug APK would not install at all. `pm trim-caches 800M` took it back to
+444 MB, which is what Android does for itself under pressure and the first thing
+to try. Its own guide database is 52 MB of that and the right thing not to
+delete: `GuideStore.commit` carries past programmes forward for catch-up
+channels, and the provider publishes only about a day of past, so clearing it
+throws away guide that cannot be fetched again. 737 MB was twelve to
 twenty-four minutes; there is a test in core saying an hour does not fit and
 neither does a quarter of an hour.
 
