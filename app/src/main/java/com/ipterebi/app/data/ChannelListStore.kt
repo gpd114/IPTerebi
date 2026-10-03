@@ -85,6 +85,18 @@ class ChannelListStore(private val context: Context) {
         }
     }
 
+    /**
+     * Replaces the favourites list wholesale, which is how its order changes.
+     *
+     * Only ever given a reordering of what is already there: the rules for
+     * what may be in it are `withFavouriteToggled` above.
+     */
+    suspend fun setFavourites(account: XtreamAccount, channels: List<LiveStream>) {
+        context.channelListStore.edit { prefs ->
+            prefs[favouritesKey(account)] = channels.encode()
+        }
+    }
+
     /** Called when a channel actually starts playing, not when one is tapped. */
     suspend fun recordWatched(account: XtreamAccount, channel: LiveStream) {
         context.channelListStore.edit { prefs ->

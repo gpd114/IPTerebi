@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
@@ -100,6 +102,8 @@ fun ChannelsScreen(
         }
     }
 
+    val ordering = state.reordering && state.shelf == Shelf.Favourites && !state.searching
+
     /** The channel a long press is asking about, if any. */
     var hiding by remember { mutableStateOf<LiveStream?>(null) }
 
@@ -144,6 +148,31 @@ fun ChannelsScreen(
                 // Hidden while searching: results come from every channel, so a
                 // chip would claim a filter that is not being applied.
                 ShelfChips(state = state, onSelect = viewModel::selectShelf)
+
+                // Putting favourites in order. Offered only where it means
+                // something — on that shelf, with more than one in it — and as
+                // a mode, because the row has no room for a drag handle and
+                // no spare gesture to start a drag with.
+                if (state.shelf == Shelf.Favourites && state.favourites.size > 1 && !state.searching) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = if (ordering) {
+                                "Move them with the arrows"
+                            } else {
+                                "In the order you starred them"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Night.inkSoft,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { viewModel.setReordering(!ordering) }) {
+                            Text(if (ordering) "Done" else "Reorder")
+                        }
+                    }
+                }
             }
 
             when {
@@ -196,6 +225,23 @@ fun ChannelsScreen(
                                 onClick = { onChannel(channel.streamId) },
                                 onStar = { viewModel.toggleFavourite(channel) },
                                 onHide = { hiding = channel },
+                                // Only on the favourites shelf, and only by
+                                // position in the stored list — which is the
+                                // one being reordered, not the filtered one
+                                // on screen.
+                                move = if (ordering) {
+                                    val at = state.favourites.indexOfFirst {
+                                        it.streamId == channel.streamId
+                                    }
+                                    Move(
+                                        canGoUp = at > 0,
+                                        canGoDown = at >= 0 && at < state.favourites.lastIndex,
+                                        up = { viewModel.moveFavourite(at, at - 1) },
+                                        down = { viewModel.moveFavourite(at, at + 1) },
+                                    )
+                                } else {
+                                    null
+                                },
                             )
                         }
                     }
@@ -332,6 +378,12 @@ private fun ChannelRow(
     /** What is on now, when the full guide knows. */
     onNow: XmltvProgramme? = null,
     nowSeconds: Long = 0,
+    /**
+     * While favourites are being put in order: the star gives way to a pair
+     * of arrows, because the star in that list is always on and a fifth
+     * control would not fit. Null everywhere else.
+     */
+    move: Move? = null,
 ) {
     Row(
         modifier = Modifier
@@ -401,6 +453,24 @@ private fun ChannelRow(
 
         if (channel.number > 0) {
             QuietPill("${channel.number}", Modifier.padding(start = 8.dp))
+        }
+
+        if (move != null) {
+            IconButton(onClick = move.up, enabled = move.canGoUp) {
+                Icon(
+                    imageVector = Icons.Filled.KeyboardArrowUp,
+                    contentDescription = "Move " + channel.name + " up",
+                    tint = if (move.canGoUp) Night.ink else Night.inkSoft.copy(alpha = 0.4f),
+                )
+            }
+            IconButton(onClick = move.down, enabled = move.canGoDown) {
+                Icon(
+                    imageVector = Icons.Filled.KeyboardArrowDown,
+                    contentDescription = "Move " + channel.name + " down",
+                    tint = if (move.canGoDown) Night.ink else Night.inkSoft.copy(alpha = 0.4f),
+                )
+            }
+            return@Row
         }
 
         IconButton(onClick = onStar) {
@@ -554,3 +624,19 @@ private fun ErrorPanel(
         }
     }
 }
+
+/**
+ * Moving one favourite up or down, while the list is being ordered.
+ *
+ * Buttons rather than a drag. There was no room for a handle — the row
+ * already carries a star, a number and a catch-up mark — and no spare
+ * gesture to start a drag with, since a long press is how a channel is
+ * hidden. Arrows also work under a remote, which the TV build inherits from
+ * here and could not have driven a drag with at all.
+ */
+data class Move(
+    val canGoUp: Boolean,
+    val canGoDown: Boolean,
+    val up: () -> Unit,
+    val down: () -> Unit,
+)

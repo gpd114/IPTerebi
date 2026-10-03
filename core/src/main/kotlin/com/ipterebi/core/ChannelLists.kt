@@ -75,3 +75,24 @@ const val RECENTS_LIMIT: Int = 20
  * built from it 404s — see [playableChannels].
  */
 val LiveStream.isPlayable: Boolean get() = streamId > 0
+
+/**
+ * Moves the favourite at [from] so that it sits at [to].
+ *
+ * Favourites are kept in the order they were built — starring appends — and
+ * this is how that order is changed on purpose. The order is the whole value
+ * of the list: a provider's filing is alphabetical at best, and the point of
+ * a favourites list is that the four channels actually watched are the first
+ * four.
+ *
+ * An index outside the list leaves it alone rather than throwing. A drag can
+ * end past either end, and a reorder that crashes is far worse than one that
+ * declines; the gesture simply reads as "put it back".
+ */
+fun List<LiveStream>.withFavouriteMoved(from: Int, to: Int): List<LiveStream> {
+    if (from == to) return this
+    if (from !in indices || to !in indices) return this
+    val moved = toMutableList()
+    moved.add(to, moved.removeAt(from))
+    return moved
+}

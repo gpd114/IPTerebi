@@ -2,6 +2,7 @@ package com.ipterebi.core
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertSame
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -167,5 +168,54 @@ class ChannelListsTest {
         assertTrue(list.holds(2))
         assertFalse(list.holds(3))
         assertFalse(emptyList<LiveStream>().holds(1))
+    }
+
+    @Test
+    fun `a favourite moves down the list`() {
+        val list = listOf(channel(1), channel(2), channel(3))
+        assertEquals(listOf(2, 3, 1), list.withFavouriteMoved(0, 2).map { it.streamId })
+    }
+
+    @Test
+    fun `a favourite moves up the list`() {
+        val list = listOf(channel(1), channel(2), channel(3))
+        assertEquals(listOf(3, 1, 2), list.withFavouriteMoved(2, 0).map { it.streamId })
+    }
+
+    @Test
+    fun `moving one place swaps neighbours`() {
+        val list = listOf(channel(1), channel(2), channel(3))
+        assertEquals(listOf(2, 1, 3), list.withFavouriteMoved(0, 1).map { it.streamId })
+    }
+
+    @Test
+    fun `moving somewhere it already is changes nothing`() {
+        val list = listOf(channel(1), channel(2))
+        assertSame(list, list.withFavouriteMoved(1, 1))
+    }
+
+    @Test
+    fun `a drag that ends past the end leaves the list alone`() {
+        // A reorder that throws is far worse than one that declines: the
+        // gesture simply reads as "put it back".
+        val list = listOf(channel(1), channel(2))
+        assertSame(list, list.withFavouriteMoved(0, 5))
+        assertSame(list, list.withFavouriteMoved(5, 0))
+        assertSame(list, list.withFavouriteMoved(0, -1))
+    }
+
+    @Test
+    fun `moving in an empty or single list is harmless`() {
+        assertSame(emptyList<LiveStream>(), emptyList<LiveStream>().withFavouriteMoved(0, 0))
+        val one = listOf(channel(1))
+        assertSame(one, one.withFavouriteMoved(0, 1))
+    }
+
+    @Test
+    fun `nothing is lost or duplicated by a move`() {
+        val list = (1..6).map { channel(it) }
+        val moved = list.withFavouriteMoved(4, 1)
+        assertEquals(list.size, moved.size)
+        assertEquals(list.map { it.streamId }.toSet(), moved.map { it.streamId }.toSet())
     }
 }
