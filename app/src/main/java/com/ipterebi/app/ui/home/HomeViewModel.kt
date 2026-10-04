@@ -57,6 +57,15 @@ data class HomeUiState(
     /** Their match, on now or next, with the channels carrying it. */
     val teamMatch: TeamMatch? = null,
     val teamChannels: List<LiveStream> = emptyList(),
+    /**
+     * True while the guide is being read for them.
+     *
+     * Without it the row says "nothing for them" from the first frame and
+     * only corrects itself seconds later, so a viewer who looks once reads a
+     * progress state as an answer. That is exactly what happened the first
+     * time this was tried on a real line.
+     */
+    val teamLooking: Boolean = false,
 )
 
 /**
@@ -92,15 +101,24 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
     private fun findTeam(account: XtreamAccount, team: String) {
         viewModelScope.launch {
             if (team.isBlank()) {
-                _state.update { it.copy(team = team, teamMatch = null, teamChannels = emptyList()) }
+                _state.update {
+                    it.copy(team = team, teamMatch = null, teamChannels = emptyList(), teamLooking = false)
+                }
                 return@launch
             }
+            _state.update { it.copy(team = team, teamLooking = true) }
             val found = runCatching {
                 val now = System.currentTimeMillis() / 1000
-                val guide = container.guide.whatsOn(account, now, now + TEAM_WINDOW_SECONDS)
-                val match = withContext(Dispatchers.Default) {
-                    teamMatch(guide.search(team), now)
-                } ?: return@runCatching null
+                // Sieved in the database before anything is folded. Reading
+                // the whole window to find one name meant 35,329 programmes
+                // and 5 MB of text on a real line, for 149 that matched.
+                val showings = container.guide.whatIsOnFor(
+                    account,
+                    team,
+                    now,
+                    now + TEAM_WINDOW_SECONDS,
+                )
+                val match = teamMatch(showings, now) ?: return@runCatching null
                 val line = container.lineChannels.all(account)
                     .withoutHidden(container.channelLists.hidden(account).first().hiddenIds())
                 match to match.showing.streams(line)
@@ -110,6 +128,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                     team = team,
                     teamMatch = found?.first,
                     teamChannels = found?.second.orEmpty(),
+                    teamLooking = false,
                 )
             }
         }
