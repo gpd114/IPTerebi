@@ -85,6 +85,73 @@ class YourTeamTest {
         assertTrue(match.onNow)
     }
 
+    // Telling a fixture from a mention of the name.
+
+    @Test
+    fun `a fixture beats a documentary that merely says the name`() {
+        // Real: searching "Belgium" with no match on found a History
+        // programme, which with nothing to outrank it won by default and made
+        // the row look like a fixture listing when it was not.
+        val found = listOf(
+            showing(now - 600, now + 3000, "The Fall of Belgium", feeds = 3),
+            showing(now - 600, now + 3000, "Belgium v France", feeds = 1),
+        )
+        assertEquals("Belgium v France", assertNotNull(teamMatch(found, now)).showing.title)
+    }
+
+    @Test
+    fun `a fixture later beats a mention sooner`() {
+        // What anyone wants from a team row is the next time they play, not
+        // the next time they are named.
+        val found = listOf(
+            showing(now + 600, now + 4200, "Belgium: A History", feeds = 4),
+            showing(now + 36_000, now + 43_200, "Belgium v Wales", feeds = 1),
+        )
+        val match = assertNotNull(teamMatch(found, now))
+        assertEquals("Belgium v Wales", match.showing.title)
+        assertTrue(!match.onNow)
+    }
+
+    @Test
+    fun `between two fixtures the widest carried still wins`() {
+        // The shape is a weak signal and sorts only above the feed count.
+        val found = listOf(
+            showing(now - 60, now + 3000, "Belgium v France", feeds = 2),
+            showing(now - 60, now + 3000, "Belgium v France on the other one", feeds = 8),
+        )
+        assertEquals(
+            "Belgium v France on the other one",
+            assertNotNull(teamMatch(found, now)).showing.title,
+        )
+    }
+
+    @Test
+    fun `V for Vendetta is not a fixture`() {
+        // Not invented: it turned up searching England on a real line. The
+        // separator has to sit between words.
+        assertTrue(!showing(now, now + 3600, "V for Vendetta", feeds = 1).looksLikeFixture)
+        assertTrue(!showing(now, now + 3600, "Match of the Day", feeds = 1).looksLikeFixture)
+        assertTrue(showing(now, now + 3600, "Croatia v England", feeds = 1).looksLikeFixture)
+        assertTrue(showing(now, now + 3600, "Man United vs Liverpool", feeds = 1).looksLikeFixture)
+        assertTrue(
+            showing(now, now + 3600, "UEFA Nations League: Croatia v England", feeds = 1)
+                .looksLikeFixture,
+        )
+    }
+
+    @Test
+    fun `on now still beats a fixture to come`() {
+        // The ordering between the two halves is unchanged: a feed dying
+        // during something is interrupting that, whatever is on later.
+        val found = listOf(
+            showing(now - 600, now + 3000, "Belgium: A History", feeds = 1),
+            showing(now + 7200, now + 10800, "Belgium v Spain", feeds = 6),
+        )
+        val match = assertNotNull(teamMatch(found, now))
+        assertEquals("Belgium: A History", match.showing.title)
+        assertTrue(match.onNow)
+    }
+
     // The name.
 
     @Test
