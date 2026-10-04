@@ -36,6 +36,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import android.content.Context
+import android.content.pm.PackageManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ipterebi.app.R
@@ -226,7 +229,12 @@ fun SectionTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+            .padding(
+                start = 16.dp,
+                end = 16.dp,
+                top = 8.dp + overscanInset().second,
+                bottom = 8.dp,
+            ),
     ) {
         Image(
             painter = painterResource(R.drawable.ic_mascot),
@@ -253,7 +261,12 @@ fun ScreenTopBar(title: String, onBack: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+            .padding(
+                start = 16.dp,
+                end = 16.dp,
+                top = 8.dp + overscanInset().second,
+                bottom = 8.dp,
+            ),
     ) {
         SquareIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", onBack)
         Spacer(Modifier.width(14.dp))
@@ -291,3 +304,38 @@ fun fieldColours(): TextFieldColors = OutlinedTextFieldDefaults.colors(
     unfocusedSupportingTextColor = Night.inkSoft,
     focusedSupportingTextColor = Night.inkSoft,
 )
+
+/**
+ * How far in from the edges a television needs its content.
+ *
+ * Televisions crop what they are sent — usually 2 to 5% a side — and the
+ * app had no margin at all. On a 1920x1080 box the navigation rail's
+ * longest label, "Recordings", sat **13 px** from the physical left edge and
+ * a screen title sat **29 px** from the top, measured identically on the
+ * emulator and on the owner's own box: that is how it was shown to be the
+ * television cropping rather than the layout. The R disappeared.
+ *
+ * 24dp and 12dp are 2.5% of a 960x540dp screen, which clears the usual
+ * case without stranding everything in the middle.
+ *
+ * Only on a television. A tablet shows the same rail and the same bars at
+ * 600dp and wider, loses nothing off its edges, and should not carry a
+ * margin for a fault it does not have — so this asks the system what it is
+ * rather than measuring the screen, because a tablet held sideways is the
+ * same shape as a television.
+ */
+@Composable
+fun overscanInset(): Pair<Dp, Dp> =
+    if (isTelevision(LocalContext.current)) OVERSCAN_SIDE to OVERSCAN_TOP else 0.dp to 0.dp
+
+private val OVERSCAN_SIDE = 24.dp
+private val OVERSCAN_TOP = 12.dp
+
+/**
+ * Whether this is a television, which crops the edges of what it is sent.
+ *
+ * Leanback is the question the launcher itself asks, and it is the right
+ * one: screen size would call a sideways tablet a television.
+ */
+fun isTelevision(context: Context): Boolean =
+    context.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
