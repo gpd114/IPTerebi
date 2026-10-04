@@ -371,7 +371,7 @@ private fun EmptyRow(title: String, detail: String) {
 private fun ChannelCard(channel: LiveStream, onClick: () -> Unit) {
     Column(
         modifier = Modifier
-            .width(82.dp)
+            .width(100.dp)
             .clip(Corners.tag)
             .focusFill(Corners.tag)
             .clickable(onClick = onClick)
@@ -411,11 +411,20 @@ private fun ChannelCard(channel: LiveStream, onClick: () -> Unit) {
                 modifier = Modifier.padding(top = 6.dp),
             )
         }
+        // Three lines, not two, and the card is wider than the tile it holds.
+        //
+        // A provider's channel names are mostly prefix — "UK:", "ENGLISH:",
+        // the country, then the quality — and what tells two of them apart is
+        // at the *end*: "UK: BBC ONE LONDON 4K" beside "UK: BBC ONE LONDON
+        // HD". Clipping takes exactly the part that distinguishes them, which
+        // is worst on the two rows where several feeds of one thing sit side
+        // by side: favourites, and the team's channels. Being unable to tell
+        // which is which there defeats the point of listing them.
         Text(
             channel.name,
             style = MaterialTheme.typography.bodySmall,
             color = Night.ink,
-            maxLines = 2,
+            maxLines = 3,
             overflow = TextOverflow.Ellipsis,
         )
     }
