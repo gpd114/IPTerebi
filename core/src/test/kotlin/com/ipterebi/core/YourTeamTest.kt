@@ -2,6 +2,7 @@ package com.ipterebi.core
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -18,6 +19,9 @@ class YourTeamTest {
 
     private val now = 1_000_000L
 
+    /** Most of these only exercise the ordering, so any name will do. */
+    private val team = "Belgium"
+
     @Test
     fun `what is on now beats what is coming`() {
         // The whole point: the list is wanted when a feed dies mid-match.
@@ -25,7 +29,7 @@ class YourTeamTest {
             showing(now + 3600, now + 7200, "Tonight's match", feeds = 9),
             showing(now - 600, now + 3000, "The match on now", feeds = 2),
         )
-        val match = assertNotNull(teamMatch(found, now))
+        val match = assertNotNull(teamMatch(found, now, team))
         assertEquals("The match on now", match.showing.title)
         assertTrue(match.onNow)
     }
@@ -38,7 +42,7 @@ class YourTeamTest {
             showing(now + 7200, now + 10800, "Saturday", feeds = 3),
             showing(now + 3600, now + 7200, "Sooner", feeds = 3),
         )
-        val match = assertNotNull(teamMatch(found, now))
+        val match = assertNotNull(teamMatch(found, now, team))
         assertEquals("Sooner", match.showing.title)
         assertTrue(!match.onNow)
     }
@@ -51,7 +55,7 @@ class YourTeamTest {
             showing(now - 60, now + 3000, "Transfer Talk mentions them", feeds = 1),
             showing(now - 60, now + 3000, "The fixture", feeds = 7),
         )
-        assertEquals("The fixture", assertNotNull(teamMatch(found, now)).showing.title)
+        assertEquals("The fixture", assertNotNull(teamMatch(found, now, team)).showing.title)
     }
 
     @Test
@@ -60,28 +64,28 @@ class YourTeamTest {
             showing(now + 600, now + 4200, "Also then", feeds = 2),
             showing(now + 600, now + 4200, "The fixture", feeds = 6),
         )
-        assertEquals("The fixture", assertNotNull(teamMatch(found, now)).showing.title)
+        assertEquals("The fixture", assertNotNull(teamMatch(found, now, team)).showing.title)
     }
 
     @Test
     fun `a match that has finished is not offered`() {
         val over = listOf(showing(now - 7200, now - 3600, "Yesterday", feeds = 5))
-        assertNull(teamMatch(over, now))
+        assertNull(teamMatch(over, now, "Belgium"))
     }
 
     @Test
     fun `nothing for them is nothing, which is most of the week`() {
-        assertNull(teamMatch(emptyList(), now))
+        assertNull(teamMatch(emptyList(), now, "Belgium"))
     }
 
     @Test
     fun `a match ending exactly now has finished`() {
-        assertNull(teamMatch(listOf(showing(now - 3600, now, "Just over", feeds = 4)), now))
+        assertNull(teamMatch(listOf(showing(now - 3600, now, "Just over", feeds = 4)), now, "x"))
     }
 
     @Test
     fun `a match starting exactly now is on`() {
-        val match = assertNotNull(teamMatch(listOf(showing(now, now + 3600, "Kick off", feeds = 4)), now))
+        val match = assertNotNull(teamMatch(listOf(showing(now, now + 3600, "Kick off", feeds = 4)), now, "x"))
         assertTrue(match.onNow)
     }
 
@@ -96,7 +100,7 @@ class YourTeamTest {
             showing(now - 600, now + 3000, "The Fall of Belgium", feeds = 3),
             showing(now - 600, now + 3000, "Belgium v France", feeds = 1),
         )
-        assertEquals("Belgium v France", assertNotNull(teamMatch(found, now)).showing.title)
+        assertEquals("Belgium v France", assertNotNull(teamMatch(found, now, team)).showing.title)
     }
 
     @Test
@@ -107,7 +111,7 @@ class YourTeamTest {
             showing(now + 600, now + 4200, "Belgium: A History", feeds = 4),
             showing(now + 36_000, now + 43_200, "Belgium v Wales", feeds = 1),
         )
-        val match = assertNotNull(teamMatch(found, now))
+        val match = assertNotNull(teamMatch(found, now, team))
         assertEquals("Belgium v Wales", match.showing.title)
         assertTrue(!match.onNow)
     }
@@ -121,22 +125,43 @@ class YourTeamTest {
         )
         assertEquals(
             "Belgium v France on the other one",
-            assertNotNull(teamMatch(found, now)).showing.title,
+            assertNotNull(teamMatch(found, now, team)).showing.title,
         )
     }
 
     @Test
-    fun `V for Vendetta is not a fixture`() {
-        // Not invented: it turned up searching England on a real line. The
-        // separator has to sit between words.
-        assertTrue(!showing(now, now + 3600, "V for Vendetta", feeds = 1).looksLikeFixture)
-        assertTrue(!showing(now, now + 3600, "Match of the Day", feeds = 1).looksLikeFixture)
-        assertTrue(showing(now, now + 3600, "Croatia v England", feeds = 1).looksLikeFixture)
-        assertTrue(showing(now, now + 3600, "Man United vs Liverpool", feeds = 1).looksLikeFixture)
-        assertTrue(
-            showing(now, now + 3600, "UEFA Nations League: Croatia v England", feeds = 1)
-                .looksLikeFixture,
-        )
+    fun `a provider writes the sides apart however it likes`() {
+        // Measured on a real line, all four of these. The dash is the one
+        // that cost a night: Germany played Greece, the guide wrote it
+        // "Nogomet: UEFA Liga nacija (M): Greece - Germany", and the row
+        // offered Bundesliga highlights on an Indian film channel instead.
+        fun fixture(title: String, team: String) =
+            showing(now, now + 3600, title, feeds = 1).looksLikeFixtureFor(team)
+
+        assertTrue(fixture("Croatia v England", "England"))
+        assertTrue(fixture("Man United vs Liverpool", "Liverpool"))
+        assertTrue(fixture("Nogomet: UEFA Liga nacija (M): Greece - Germany", "Germany"))
+        assertTrue(fixture("Slavia Prague / Lens", "Lens"))
+        assertTrue(fixture("UEFA Nations League: Croatia v England", "Croatia"))
+    }
+
+    @Test
+    fun `the team has to be one of the sides, not just in the title`() {
+        // What makes the wider set of separators safe. Titles are full of
+        // dashes and slashes that separate nothing: an earlier rule refused
+        // to recognise them at all because of it.
+        fun fixture(title: String, team: String) =
+            showing(now, now + 3600, title, feeds = 1).looksLikeFixtureFor(team)
+
+        // France is in the description of this one on a real line, never a side.
+        assertFalse(fixture("Slavia Prague / Lens", "France"))
+        assertFalse(fixture("UEFA Nations League 2026/27 - Match Day 3", "Germany"))
+        assertFalse(fixture("Bundesliga Highlights", "Germany"))
+        assertFalse(fixture("World War II With Tom Hanks", "Germany"))
+        // Not invented: it came up searching England on a real line.
+        assertFalse(fixture("V for Vendetta", "England"))
+        // A hyphen inside a word separates nothing.
+        assertFalse(fixture("U-Boat Wargamers", "Boat"))
     }
 
     @Test
@@ -146,12 +171,13 @@ class YourTeamTest {
         // championnat on now — both merely saying the word — and they beat
         // France v Italy that same evening, which is plainly the wrong answer
         // to "where are my team on".
+        val team = "France"
         val found = listOf(
             showing(now - 600, now + 3000, "Sports", feeds = 3),
             showing(now - 600, now + 3000, "Motocross: Championnat de France", feeds = 2),
             showing(now + 7200, now + 10800, "France vs Italy - UEFA Nations League", feeds = 1),
         )
-        val match = assertNotNull(teamMatch(found, now))
+        val match = assertNotNull(teamMatch(found, now, team))
         assertEquals("France vs Italy - UEFA Nations League", match.showing.title)
         assertTrue(!match.onNow)
     }
@@ -164,7 +190,7 @@ class YourTeamTest {
             showing(now - 600, now + 3000, "Belgium v Wales", feeds = 2),
             showing(now + 7200, now + 10800, "Belgium v Spain", feeds = 6),
         )
-        val match = assertNotNull(teamMatch(found, now))
+        val match = assertNotNull(teamMatch(found, now, team))
         assertEquals("Belgium v Wales", match.showing.title)
         assertTrue(match.onNow)
     }
@@ -177,7 +203,7 @@ class YourTeamTest {
             showing(now - 600, now + 3000, "Belgium: A History", feeds = 1),
             showing(now + 7200, now + 10800, "Alien Files Reopened", feeds = 2),
         )
-        val match = assertNotNull(teamMatch(found, now))
+        val match = assertNotNull(teamMatch(found, now, team))
         assertEquals("Belgium: A History", match.showing.title)
         assertTrue(match.onNow)
     }

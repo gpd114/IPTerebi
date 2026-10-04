@@ -24,6 +24,11 @@ data class TeamMatch(
     val showing: Showing,
     /** True while it is on; false when it is still to come. */
     val onNow: Boolean,
+    /**
+     * Whether this reads as the team playing, rather than as a programme
+     * that merely says their name. The row labels the two differently.
+     */
+    val isFixture: Boolean,
 )
 
 /**
@@ -42,7 +47,7 @@ data class TeamMatch(
  * most of the week and must read as "nothing this week" rather than as a
  * fault.
  */
-fun teamMatch(showings: List<Showing>, nowSeconds: Long): TeamMatch? {
+fun teamMatch(showings: List<Showing>, nowSeconds: Long, team: String): TeamMatch? {
     val live = showings.filter { nowSeconds >= it.start && nowSeconds < it.stop }
     val upcoming = showings.filter { it.start > nowSeconds }
 
@@ -52,19 +57,20 @@ fun teamMatch(showings: List<Showing>, nowSeconds: Long): TeamMatch? {
     // the word, and they beat France v Italy that same evening — which is
     // plainly the wrong answer to "where are my team on". A mention is only
     // worth showing when there is no fixture to show instead.
-    live.soonestFixture()?.let { return TeamMatch(it, onNow = true) }
-    upcoming.soonestFixture()?.let { return TeamMatch(it, onNow = false) }
+    live.soonestFixture(team)?.let { return TeamMatch(it, onNow = true, isFixture = true) }
+    upcoming.soonestFixture(team)?.let { return TeamMatch(it, onNow = false, isFixture = true) }
 
     // Nothing that reads as a fixture, so fall back to what there is: on now
     // first, because a feed dying during something is interrupting that.
-    if (live.isNotEmpty()) return TeamMatch(live.best(), onNow = true)
+    if (live.isNotEmpty()) return TeamMatch(live.best(team), onNow = true, isFixture = false)
     if (upcoming.isEmpty()) return null
-    return TeamMatch(upcoming.atSoonestStart().best(), onNow = false)
+    return TeamMatch(upcoming.atSoonestStart().best(team), onNow = false, isFixture = false)
 }
 
 /** The soonest of these that reads as a fixture, or null if none does. */
-private fun List<Showing>.soonestFixture(): Showing? =
-    filter { it.looksLikeFixture }.takeIf { it.isNotEmpty() }?.atSoonestStart()?.best()
+private fun List<Showing>.soonestFixture(team: String): Showing? =
+    filter { it.looksLikeFixtureFor(team) }.takeIf { it.isNotEmpty() }
+        ?.atSoonestStart()?.best(team)
 
 /** Everything here that starts at the earliest moment any of them does. */
 private fun List<Showing>.atSoonestStart(): List<Showing> {
@@ -78,28 +84,51 @@ private fun List<Showing>.atSoonestStart(): List<Showing> {
  * A fixture first, then the widest-carried, then the latest to have started
  * — which among things on now is the one most recently joined.
  */
-private fun List<Showing>.best(): Showing =
-    maxWith(compareBy({ it.looksLikeFixture }, { it.feeds }, { -it.start }))
+private fun List<Showing>.best(team: String): Showing =
+    maxWith(compareBy({ it.looksLikeFixtureFor(team) }, { it.feeds }, { -it.start }))
 
 /**
- * Whether this reads as one side against another.
+ * Whether this reads as [team] playing somebody, rather than as a programme
+ * that happens to say their name.
  *
- * A guide writes a fixture with the teams either side of a "v" or "vs" —
- * "UEFA Nations League: Croatia v England", "Man United vs Liverpool" — and
- * writes a programme that merely mentions a country without one. It is a
- * weak signal and it is used as one: it only sorts above the feed count, so
- * a widely carried fixture still beats a lone one.
+ * A guide writes a fixture with the sides either side of a separator, and
+ * every provider picks its own: "Croatia v England", "Belgium vs Türkiye",
+ * "Nogomet: UEFA Liga nacija (M): Greece - Germany". The last of those is why
+ * this is not simply a search for "v": Germany played Greece and the row
+ * offered Bundesliga highlights on an Indian film channel instead, because a
+ * dash was not a separator as far as this was concerned.
  *
- * The separator has to sit *between* words, which is what keeps "V for
- * Vendetta" from reading as a fixture. That film is not invented: it came up
- * while searching England on a real line.
+ * **The team has to be one of the sides**, not merely somewhere in the title,
+ * and that is what makes a wider set of separators safe. Titles are full of
+ * dashes — "UEFA Nations League 2026/27 - Match Day 3" — and slashes, and an
+ * earlier version of this rule refused to recognise them for exactly that
+ * reason. Asking that the name sit *beside* the separator costs nothing and
+ * settles it: "Slavia Prague / Lens" is not a France fixture however often
+ * its description says France.
+ *
+ * The separator must have spaces around it, so "U-Boat Wargamers" is one
+ * word and not a fixture, and the sides are read from the raw title because
+ * [normaliseForSearch] turns punctuation into spaces and would erase every
+ * separator but the lettered ones.
  */
-val Showing.looksLikeFixture: Boolean
-    get() {
-        val words = normaliseForSearch(title).split(' ')
-        val at = words.indexOfFirst { it == "v" || it == "vs" }
-        return at > 0 && at < words.lastIndex
-    }
+fun Showing.looksLikeFixtureFor(team: String): Boolean {
+    val wanted = normaliseForSearch(team)
+    if (wanted.isBlank()) return false
+    val sides = title.split(FIXTURE_SEPARATOR).filter { it.isNotBlank() }
+    if (sides.size < 2) return false
+    return sides.any { normaliseForSearch(it).hasWord(wanted) }
+}
+
+/** Whether these folded words appear in this folded text as whole words. */
+private fun String.hasWord(words: String): Boolean =
+    this == words || startsWith("$words ") || endsWith(" $words") || contains(" $words ")
+
+/**
+ * What a provider puts between two sides.
+ *
+ * Spaces either side throughout, which is what keeps hyphenated words out.
+ */
+private val FIXTURE_SEPARATOR = Regex("""\s+(?:vs?\.?|[-–—/])\s+""", RegexOption.IGNORE_CASE)
 
 /**
  * What a team name may be.
