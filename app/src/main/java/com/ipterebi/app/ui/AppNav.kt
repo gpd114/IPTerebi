@@ -236,7 +236,19 @@ fun AppNav(container: AppContainer) {
                             // between y 1028 and 1548.
                             val short =
                                 LocalConfiguration.current.screenHeightDp < SHORT_SCREEN_HEIGHT
-                            NavigationRail(containerColor = Color.Transparent) {
+                            // Clear of the overscan band: the rail is the only thing in the app
+
+                            // drawn tight against a physical edge, and "Recordings" was the
+
+                            // first label to lose a letter on a real television.
+
+                            NavigationRail(
+
+                                containerColor = Color.Transparent,
+
+                                modifier = Modifier.padding(start = overscanInset().first),
+
+                            ) {
                                 if (short) Spacer(Modifier.weight(1f))
                                 Section.entries.forEach { item ->
                                     // Where you are and where the remote is are two
