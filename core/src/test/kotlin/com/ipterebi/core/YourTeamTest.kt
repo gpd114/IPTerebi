@@ -140,12 +140,42 @@ class YourTeamTest {
     }
 
     @Test
-    fun `on now still beats a fixture to come`() {
-        // The ordering between the two halves is unchanged: a feed dying
-        // during something is interrupting that, whatever is on later.
+    fun `a fixture tonight beats a mention on now`() {
+        // The ordering that mattered most, and it was wrong the first time.
+        // "France" found France24's sports bulletin and a motocross
+        // championnat on now — both merely saying the word — and they beat
+        // France v Italy that same evening, which is plainly the wrong answer
+        // to "where are my team on".
+        val found = listOf(
+            showing(now - 600, now + 3000, "Sports", feeds = 3),
+            showing(now - 600, now + 3000, "Motocross: Championnat de France", feeds = 2),
+            showing(now + 7200, now + 10800, "France vs Italy - UEFA Nations League", feeds = 1),
+        )
+        val match = assertNotNull(teamMatch(found, now))
+        assertEquals("France vs Italy - UEFA Nations League", match.showing.title)
+        assertTrue(!match.onNow)
+    }
+
+    @Test
+    fun `a fixture on now beats a fixture later`() {
+        // Among fixtures the old ordering stands: the one being watched is
+        // the one a dying feed is interrupting.
+        val found = listOf(
+            showing(now - 600, now + 3000, "Belgium v Wales", feeds = 2),
+            showing(now + 7200, now + 10800, "Belgium v Spain", feeds = 6),
+        )
+        val match = assertNotNull(teamMatch(found, now))
+        assertEquals("Belgium v Wales", match.showing.title)
+        assertTrue(match.onNow)
+    }
+
+    @Test
+    fun `with no fixture at all, what is on now is still shown`() {
+        // A mention is worth showing when there is nothing better, just not
+        // in preference to a real match.
         val found = listOf(
             showing(now - 600, now + 3000, "Belgium: A History", feeds = 1),
-            showing(now + 7200, now + 10800, "Belgium v Spain", feeds = 6),
+            showing(now + 7200, now + 10800, "Alien Files Reopened", feeds = 2),
         )
         val match = assertNotNull(teamMatch(found, now))
         assertEquals("Belgium: A History", match.showing.title)

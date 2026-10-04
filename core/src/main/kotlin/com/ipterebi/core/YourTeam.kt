@@ -44,20 +44,32 @@ data class TeamMatch(
  */
 fun teamMatch(showings: List<Showing>, nowSeconds: Long): TeamMatch? {
     val live = showings.filter { nowSeconds >= it.start && nowSeconds < it.stop }
-    if (live.isNotEmpty()) return TeamMatch(live.best(), onNow = true)
-
     val upcoming = showings.filter { it.start > nowSeconds }
+
+    // A fixture outranks a mention whether it is on or not, and that ordering
+    // was the other way round at first. "France" found France24's sports
+    // bulletin and a motocross championnat on now, both of which merely say
+    // the word, and they beat France v Italy that same evening — which is
+    // plainly the wrong answer to "where are my team on". A mention is only
+    // worth showing when there is no fixture to show instead.
+    live.soonestFixture()?.let { return TeamMatch(it, onNow = true) }
+    upcoming.soonestFixture()?.let { return TeamMatch(it, onNow = false) }
+
+    // Nothing that reads as a fixture, so fall back to what there is: on now
+    // first, because a feed dying during something is interrupting that.
+    if (live.isNotEmpty()) return TeamMatch(live.best(), onNow = true)
     if (upcoming.isEmpty()) return null
-    // A fixture anywhere ahead beats anything that merely says the name, even
-    // a sooner one. Searching "Belgium" with no match on turned up a History
-    // documentary, which with nothing to outrank it won by default and made
-    // the row look like a fixture listing when it was not. What someone wants
-    // from a team row is the next time they play, not the next time they are
-    // mentioned.
-    val fixtures = upcoming.filter { it.looksLikeFixture }
-    val pool = fixtures.ifEmpty { upcoming }
-    val soonest = pool.minOf { it.start }
-    return TeamMatch(pool.filter { it.start == soonest }.best(), onNow = false)
+    return TeamMatch(upcoming.atSoonestStart().best(), onNow = false)
+}
+
+/** The soonest of these that reads as a fixture, or null if none does. */
+private fun List<Showing>.soonestFixture(): Showing? =
+    filter { it.looksLikeFixture }.takeIf { it.isNotEmpty() }?.atSoonestStart()?.best()
+
+/** Everything here that starts at the earliest moment any of them does. */
+private fun List<Showing>.atSoonestStart(): List<Showing> {
+    val soonest = minOf { it.start }
+    return filter { it.start == soonest }
 }
 
 /**
