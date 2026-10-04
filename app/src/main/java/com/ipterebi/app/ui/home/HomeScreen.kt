@@ -115,7 +115,21 @@ fun HomeScreen(
                 item {
                     RowHeading(
                         title = state.team,
-                        tag = state.teamMatch?.let { if (it.onNow) "On now" else "Next" }.orEmpty(),
+                        // A mention is labelled as one. With nothing in the
+                        // guide that reads as a fixture the row falls back to
+                        // whatever says the name, and dressing that as "Next"
+                        // is how a wartime documentary, a motocross
+                        // championnat and a Bundesliga listing on an Indian
+                        // film channel each came to look like the team's
+                        // match. Shown, because seeing it beats seeing
+                        // nothing — but not passed off as something it isn't.
+                        tag = state.teamMatch?.let {
+                            when {
+                                !it.isFixture -> "Mentioned"
+                                it.onNow -> "On now"
+                                else -> "Next"
+                            }
+                        }.orEmpty(),
                         onOpen = null,
                         row = teamRow.takeIf { state.teamChannels.isNotEmpty() },
                     )
