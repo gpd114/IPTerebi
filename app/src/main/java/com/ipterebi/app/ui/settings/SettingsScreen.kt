@@ -113,6 +113,37 @@ fun SettingsScreen(
             }
 
             Panel {
+                SectionTitle("Your team")
+                var team by remember { mutableStateOf(container.team.team.value) }
+                DpadTextField(Modifier.fillMaxWidth()) { fieldModifier ->
+                    OutlinedTextField(
+                        value = team,
+                        onValueChange = { team = it },
+                        label = { Text("Team name") },
+                        singleLine = true,
+                        colors = fieldColours(),
+                        shape = MaterialTheme.shapes.large,
+                        modifier = fieldModifier.fillMaxWidth(),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SecondaryButton(
+                        text = if (team != container.team.team.value) "Save" else "Saved",
+                        onClick = { container.team.set(team) },
+                        enabled = team != container.team.team.value,
+                        height = 42.dp,
+                    )
+                }
+                Hint(
+                    "Home then lists every channel showing them, so when a feed goes " +
+                        "bad there is somewhere to switch to without hunting for it. " +
+                        "Type it the way your guide writes it — \"Man Utd\" and " +
+                        "\"Manchester United\" are not the same to a provider. Leave it " +
+                        "empty for no row.",
+                )
+            }
+
+            Panel {
                 SectionTitle("Line")
                 Column {
                     Text(

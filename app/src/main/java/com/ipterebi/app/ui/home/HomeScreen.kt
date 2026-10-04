@@ -95,6 +95,7 @@ fun HomeScreen(
     // the TV emulator: the cards are focusable and are candidates in the
     // search; they simply never win it. So each heading hands Down to its own
     // row, and the row, being a focus group, passes it to the first card.
+    val teamRow = remember { FocusRequester() }
     val channelRow = remember { FocusRequester() }
     val filmRow = remember { FocusRequester() }
     val episodeRow = remember { FocusRequester() }
@@ -107,6 +108,57 @@ fun HomeScreen(
             modifier = Modifier.padding(padding).fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
         ) {
+            // Above everything, because when it is on it is the reason the
+            // television is on. Absent entirely when no team is named, so
+            // nobody who has not asked for it sees a row explaining itself.
+            if (state.team.isNotBlank()) {
+                item {
+                    RowHeading(
+                        title = state.team,
+                        tag = state.teamMatch?.let { if (it.onNow) "On now" else "Next" }.orEmpty(),
+                        onOpen = null,
+                        row = teamRow.takeIf { state.teamChannels.isNotEmpty() },
+                    )
+                }
+                item {
+                    val match = state.teamMatch
+                    if (match == null) {
+                        EmptyRow(
+                            title = "Nothing for ${state.team} in the guide",
+                            detail = "The guide reaches only as far as your provider publishes, " +
+                                "which is often about a day. Settings → Your team changes the name.",
+                        )
+                    } else {
+                        Column {
+                            Text(
+                                match.showing.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = Night.ink,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp),
+                            )
+                            Text(
+                                teamWhen(match) + "  ·  on ${state.teamChannels.size} channel" +
+                                    (if (state.teamChannels.size == 1) "" else "s"),
+                                style = MaterialTheme.typography.bodySmall.tabular(),
+                                color = Night.inkSoft,
+                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                            )
+                            LazyRow(
+                                modifier = Modifier.focusRequester(teamRow).rightStaysInRow().focusGroup(),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                items(state.teamChannels, key = { it.streamId }) { channel ->
+                                    ChannelCard(channel) { onPlayChannel(channel) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             item {
                 RowHeading(
                     title = "Live TV",
@@ -407,7 +459,7 @@ private fun WatchedCard(item: WatchedItem, width: androidx.compose.ui.unit.Dp, r
         Text(
             listOf(item.detail, remainingLabel(item.remainingMs).takeIf { item.durationMs > 0 }.orEmpty())
                 .filter { it.isNotBlank() }
-                .joinToString(" · "),
+                .joinToString(" � "),
             style = MaterialTheme.typography.labelSmall.tabular(),
             color = Night.inkSoft,
             maxLines = 1,
@@ -498,4 +550,16 @@ private fun Modifier.rightStaysInRow(): Modifier = focusProperties {
     exit = { direction ->
         if (direction == FocusDirection.Right) FocusRequester.Cancel else FocusRequester.Default
     }
+}
+
+/** "15:00 – 17:00" for a match, with the day when it is not today. */
+private fun teamWhen(match: com.ipterebi.core.TeamMatch): String {
+    val zone = java.time.ZoneId.systemDefault()
+    val from = java.time.Instant.ofEpochSecond(match.showing.start).atZone(zone)
+    val to = java.time.Instant.ofEpochSecond(match.showing.stop).atZone(zone)
+    val today = java.time.LocalDate.now(zone)
+    val clock = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+    val day = if (from.toLocalDate() == today) "" else
+        java.time.format.DateTimeFormatter.ofPattern("EEE d MMM, ").format(from)
+    return day + clock.format(from) + " – " + clock.format(to)
 }

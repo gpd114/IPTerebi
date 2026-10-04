@@ -5,6 +5,7 @@ import android.util.Log
 import com.ipterebi.app.data.ChannelListStore
 import com.ipterebi.app.data.MediaRepository
 import com.ipterebi.app.data.LineChannels
+import com.ipterebi.app.data.TeamStore
 import com.ipterebi.app.data.ListStore
 import com.ipterebi.app.data.RecordingStore
 import com.ipterebi.app.data.WatchStore
@@ -79,6 +80,9 @@ class AppContainer(context: Context) {
     /** Starred and recently watched channels, per line. */
     /** Every channel on the line, for searching what is on and for finding other feeds. */
     val lineChannels = LineChannels(xtream)
+
+    /** The team whose channels Home lists. One name, typed once. */
+    val team = TeamStore(context.applicationContext)
 
     val channelLists = ChannelListStore(context.applicationContext)
 
