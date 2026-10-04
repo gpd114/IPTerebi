@@ -51,7 +51,6 @@ import com.ipterebi.app.ui.channels.tileColour
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.theme.tabular
-import com.ipterebi.core.looksLikeFixture
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.ListedItem
 import com.ipterebi.core.SavedKind
@@ -126,7 +125,7 @@ fun HomeScreen(
                         // nothing — but not passed off as something it isn't.
                         tag = state.teamMatch?.let {
                             when {
-                                !it.showing.looksLikeFixture -> "Mentioned"
+                                !it.isFixture -> "Mentioned"
                                 it.onNow -> "On now"
                                 else -> "Next"
                             }

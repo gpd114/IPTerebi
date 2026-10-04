@@ -118,7 +118,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                     now,
                     now + TEAM_WINDOW_SECONDS,
                 )
-                val match = teamMatch(showings, now) ?: return@runCatching null
+                val match = teamMatch(showings, now, team) ?: return@runCatching null
                 val line = container.lineChannels.all(account)
                     .withoutHidden(container.channelLists.hidden(account).first().hiddenIds())
                 match to match.showing.streams(line)
