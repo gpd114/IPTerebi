@@ -266,6 +266,51 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
             }
         }
 
+    /**
+     * Programmes overlapping [from]..[to] whose title or description holds
+     * [needle], as a plain substring.
+     *
+     * A coarse sieve, not the rule: `mentioning` in `core/` decides what
+     * really matches, and does it on words rather than substrings. This only
+     * exists to stop the caller folding the whole window to find a handful.
+     * On a real line the difference is **35,329 programmes and 5 MB of text
+     * against the 149 that mention England** — seconds of work on a phone,
+     * during which the screen had nothing to show but a wrong answer.
+     *
+     * SQLite's LIKE is case-insensitive for ASCII, which is what team names
+     * mostly are. It is not accent-insensitive, so a term typed without the
+     * accent its guide uses will be sieved out here before the real rule
+     * ever sees it. The honest fix for that is a folded column written at
+     * download time, and it is not worth 15 MB on a box with 235 MB free.
+     */
+    fun mentioning(
+        line: String,
+        needle: String,
+        from: Long,
+        to: Long,
+        limit: Int = 2_000,
+    ): List<XmltvProgramme> {
+        val like = "%" + needle.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
+        return readableDatabase.rawQuery(
+            "SELECT p.channel, p.start, p.stop, p.title, p.description FROM programme p " +
+                "JOIN guide g ON p.line = g.line AND p.gen = g.gen " +
+                "WHERE p.line = ? AND p.stop > ? AND p.start < ? " +
+                "AND (p.title LIKE ? ESCAPE '!' OR p.description LIKE ? ESCAPE '!') " +
+                "ORDER BY p.start LIMIT ?",
+            arrayOf(line, from.toString(), to.toString(), like, like, limit.toString()),
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    add(
+                        XmltvProgramme(
+                            c.getString(0), c.getLong(1), c.getLong(2), c.getString(3), c.getString(4),
+                        ),
+                    )
+                }
+            }
+        }
+    }
+
     /** Forgets [line]'s guide, when it is signed out of. */
     fun clear(line: String) {
         val db = writableDatabase
