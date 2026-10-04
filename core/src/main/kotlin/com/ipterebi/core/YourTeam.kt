@@ -44,15 +44,50 @@ data class TeamMatch(
  */
 fun teamMatch(showings: List<Showing>, nowSeconds: Long): TeamMatch? {
     val live = showings.filter { nowSeconds >= it.start && nowSeconds < it.stop }
-    if (live.isNotEmpty()) {
-        return TeamMatch(live.maxWith(compareBy({ it.feeds }, { -it.start })), onNow = true)
-    }
-    val next = showings.filter { it.start > nowSeconds }.minByOrNull { it.start } ?: return null
-    // Everything starting at that same moment, so the widest-carried of them
-    // is chosen rather than whichever happened to be first in the list.
-    val together = showings.filter { it.start == next.start }
-    return TeamMatch(together.maxByOrNull { it.feeds } ?: next, onNow = false)
+    if (live.isNotEmpty()) return TeamMatch(live.best(), onNow = true)
+
+    val upcoming = showings.filter { it.start > nowSeconds }
+    if (upcoming.isEmpty()) return null
+    // A fixture anywhere ahead beats anything that merely says the name, even
+    // a sooner one. Searching "Belgium" with no match on turned up a History
+    // documentary, which with nothing to outrank it won by default and made
+    // the row look like a fixture listing when it was not. What someone wants
+    // from a team row is the next time they play, not the next time they are
+    // mentioned.
+    val fixtures = upcoming.filter { it.looksLikeFixture }
+    val pool = fixtures.ifEmpty { upcoming }
+    val soonest = pool.minOf { it.start }
+    return TeamMatch(pool.filter { it.start == soonest }.best(), onNow = false)
 }
+
+/**
+ * The most likely of these to be the match.
+ *
+ * A fixture first, then the widest-carried, then the latest to have started
+ * — which among things on now is the one most recently joined.
+ */
+private fun List<Showing>.best(): Showing =
+    maxWith(compareBy({ it.looksLikeFixture }, { it.feeds }, { -it.start }))
+
+/**
+ * Whether this reads as one side against another.
+ *
+ * A guide writes a fixture with the teams either side of a "v" or "vs" —
+ * "UEFA Nations League: Croatia v England", "Man United vs Liverpool" — and
+ * writes a programme that merely mentions a country without one. It is a
+ * weak signal and it is used as one: it only sorts above the feed count, so
+ * a widely carried fixture still beats a lone one.
+ *
+ * The separator has to sit *between* words, which is what keeps "V for
+ * Vendetta" from reading as a fixture. That film is not invented: it came up
+ * while searching England on a real line.
+ */
+val Showing.looksLikeFixture: Boolean
+    get() {
+        val words = normaliseForSearch(title).split(' ')
+        val at = words.indexOfFirst { it == "v" || it == "vs" }
+        return at > 0 && at < words.lastIndex
+    }
 
 /**
  * What a team name may be.
