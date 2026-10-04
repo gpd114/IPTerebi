@@ -99,6 +99,7 @@ import com.ipterebi.core.Recording
 import com.ipterebi.core.Scheduling
 import com.ipterebi.core.recordingId
 import com.ipterebi.core.LiveStream
+import com.ipterebi.core.streams
 import com.ipterebi.core.StreamFormat
 import com.ipterebi.core.StreamReconnect
 import com.ipterebi.core.XtreamAccount
@@ -236,6 +237,61 @@ private fun TvLive(
     val reconnectDelay = remember { AtomicLong(0) }
     val flags = remember { TuneFlags() }
     var error by remember { mutableStateOf<String?>(null) }
+
+    // The other channels carrying what the tuned one has on, looked up only
+    // once something has failed: on a healthy stream it would be a guide scan
+    // per channel change that nothing ever reads. Local throughout — the
+    // guide is in the box's own database and the line is already in the
+    // lineup — so no panel request is involved in working around the panel.
+    var otherFeeds by remember { mutableStateOf<List<LiveStream>>(emptyList()) }
+    var otherFeedsTitle by remember { mutableStateOf("") }
+    LaunchedEffect(error, tunedId, state.lineup) {
+        if (error == null) {
+            otherFeeds = emptyList()
+            return@LaunchedEffect
+        }
+        val here = tuned
+        val line = state.lineup?.all
+        // Said before the guards rather than after them, because "no feeds
+        // offered" has several causes and they are not distinguishable from
+        // a silent screen — which is the whole reason this log exists.
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                TAG_PLAY,
+                "other feeds: looking for ${here?.name ?: "(no channel)"}, " +
+                    "epg=${here?.epgChannelId?.ifBlank { "(blank)" } ?: "-"}, " +
+                    "line=${line?.size ?: -1}, signed in=${account != null}",
+            )
+        }
+        if (here == null || line == null || account == null) return@LaunchedEffect
+        val found = runCatching {
+            val showing = container.guide.elsewhere(
+                account,
+                here.epgChannelId,
+                System.currentTimeMillis() / 1000,
+            ) ?: return@runCatching null
+            // All of it bar the stream that just failed, which can leave
+            // another stream on this very guide channel — the provider's own
+            // backup feed, and often the best one to take.
+            showing to showing.streams(line).filterNot { it.streamId == here.streamId }
+        }.getOrNull()
+        otherFeedsTitle = found?.first?.title.orEmpty()
+        otherFeeds = found?.second?.take(TV_OTHER_FEEDS).orEmpty()
+        // The box's screenshots come out blank over video, so the log is the
+        // only way to see what this found. Channel names only — a stream id
+        // means nothing off its own panel and a URL would be a password.
+        if (BuildConfig.DEBUG) {
+            Log.d(
+                TAG_PLAY,
+                "other feeds for ${here.name}: " + when {
+                    found == null -> "none (no guide for this channel, or nothing else carries it)"
+                    otherFeeds.isEmpty() -> "none playable of ${found.first.feeds} guide channels"
+                    else -> "${otherFeeds.size} of ${found.first.feeds} guide channels " +
+                        "for \"${found.first.title}\" — " + otherFeeds.joinToString { it.name }
+                },
+            )
+        }
+    }
     var reconnecting by remember { mutableStateOf(false) }
     var waitingForLine by remember { mutableStateOf(false) }
     var released by remember { mutableStateOf(false) }
@@ -744,6 +800,28 @@ private fun TvLive(
                 Spacer(Modifier.height(18.dp))
                 val retry = remember { FocusRequester() }
                 TvButton("Try again", onClick = { attempt++ }, modifier = Modifier.focusRequester(retry))
+
+                // The other channels carrying what this one had on. The whole
+                // point on a one-connection line: the way out of a dead feed
+                // is another channel showing the same thing, and up/down only
+                // walks the group it happens to be in.
+                //
+                // Every part of this is already on the box — the guide in its
+                // database, the line in the lineup — which matters because
+                // the panel refusing things is usually why this card is here.
+                if (otherFeeds.isNotEmpty()) {
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        otherFeedsTitle.ifBlank { "Also on" } + " — also on ${otherFeeds.size}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = TvInkSoft,
+                        textAlign = TextAlign.Center,
+                    )
+                    otherFeeds.forEach { feed ->
+                        Spacer(Modifier.height(8.dp))
+                        TvButton(feed.name, onClick = { tune(feed) })
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
                 Text("▲ ▼ another channel", style = MaterialTheme.typography.labelSmall, color = TvInkSoft)
                 LaunchedEffect(message) { runCatching { retry.requestFocus() } }
@@ -1046,3 +1124,12 @@ private const val BANNER_MS = 5_000L
  * enough to be useful and short enough not to fill a stick by accident.
  */
 private const val FALLBACK_RECORD_SECONDS = 3_600L
+
+/**
+ * How many other feeds the error card offers on a television.
+ *
+ * Fewer than the phone's five: these are full-width buttons over the picture
+ * and the remote walks them one press at a time, so a long list is a long
+ * walk. A real line can carry one slot on 127 channels.
+ */
+private const val TV_OTHER_FEEDS = 4

@@ -240,7 +240,20 @@ public class FakePanel {
                 // the list if they got through.
                 String news = "{\"num\":1,\"name\":\"Test News HD\",\"stream_id\":101,\"category_id\":\"1\",\"stream_icon\":\"\",\"epg_channel_id\":\"news.test\",\"tv_archive\":1,\"tv_archive_duration\":4}," +
                     "{\"num\":\"2\",\"name\":\"Test Pattern TV\",\"stream_id\":\"102\",\"category_id\":1,\"tv_archive\":1,\"tv_archive_duration\":0}," +
-                    "{\"num\":3,\"name\":\"Refused (connection limit)\",\"stream_id\":103,\"category_id\":\"1\"}," +
+                    // Refused, and carrying a match three other channels also
+                    // have on — so the error card has somewhere to send you.
+                    "{\"num\":3,\"name\":\"Refused (connection limit)\",\"stream_id\":103,\"category_id\":\"1\",\"epg_channel_id\":\"bigmatch.a\"}," +
+                    // The provider's own backup, under the *same* epg id as
+                    // the feed that failed. Nothing else tests that: taking
+                    // the failed channel out by guide id would hide this.
+                    "{\"num\":11,\"name\":\"Big match (backup feed)\",\"stream_id\":109,\"category_id\":\"1\",\"epg_channel_id\":\"bigmatch.a\"}," +
+                    // A capital in the epg id, which a real line sends
+                    // alongside the lower-case spelling of the same channel.
+                    "{\"num\":12,\"name\":\"Big match (regional)\",\"stream_id\":110,\"category_id\":\"1\",\"epg_channel_id\":\"BigMatch.B\"}," +
+                    "{\"num\":13,\"name\":\"Big match (other provider)\",\"stream_id\":111,\"category_id\":\"1\",\"epg_channel_id\":\"bigmatch.c\"}," +
+                    // On at the same moment and nothing to do with it, so a
+                    // rule that groups by time alone fails here.
+                    "{\"num\":14,\"name\":\"Something else entirely\",\"stream_id\":112,\"category_id\":\"1\",\"epg_channel_id\":\"other.test\"}," +
                     "{\"num\":6,\"name\":\"Drops every 20 s\",\"stream_id\":104,\"category_id\":\"1\"}," +
                     "{\"num\":7,\"name\":\"Drops, then off air\",\"stream_id\":105,\"category_id\":\"1\"}," +
                     "{\"num\":8,\"name\":\"Line busy for 15 s\",\"stream_id\":106,\"category_id\":\"1\"}," +
@@ -351,6 +364,8 @@ public class FakePanel {
         // one that proves the window is honoured rather than assumed.
         long earlierStart = now - 6 * 3600, earlierEnd = now - 5 * 3600;
         long ancientStart = now - 5 * 24 * 3600, ancientEnd = ancientStart + 3600;
+        // The match, on now and running on, so it is what "what is on" finds.
+        long matchStart = now - 30 * 60, matchStop = now + 90 * 60;
         java.time.format.DateTimeFormatter f = java.time.format.DateTimeFormatter
             .ofPattern("yyyyMMddHHmmss Z").withZone(java.time.ZoneId.of("Europe/London"));
         java.util.function.LongFunction<String> t = s -> f.format(Instant.ofEpochSecond(s));
@@ -375,6 +390,20 @@ public class FakePanel {
             "<programme start=\"whenever\" stop=\"" + t.apply(now) + "\" channel=\"sport.test\"><title>Unreadable</title></programme>\n" +
             "<programme start=\"" + t.apply(start) + "\" stop=\"" + t.apply(end) + "\" channel=\"elsewhere.test\">" +
             "<title>Nobody's channel</title></programme>\n" +
+            // One match on four channels, written the way a real line writes
+            // it: two give the slot a generic name and put the teams only in
+            // the description, one gives the fixture in full, and the fourth
+            // is on at the same time and unrelated. Measured on a real line —
+            // Croatia v England was on seven feeds and five of them said only
+            // "Nations League" — and this is that case in miniature.
+            "<programme start=\"" + t.apply(matchStart) + "\" stop=\"" + t.apply(matchStop) + "\" channel=\"bigmatch.a\">" +
+            "<title>Nations League</title><desc>Croatia v England from Zagreb.</desc></programme>\n" +
+            "<programme start=\"" + t.apply(matchStart) + "\" stop=\"" + t.apply(matchStop) + "\" channel=\"BigMatch.B\">" +
+            "<title>Nations League</title><desc>Croatia v England from Zagreb.</desc></programme>\n" +
+            "<programme start=\"" + t.apply(matchStart) + "\" stop=\"" + t.apply(matchStop) + "\" channel=\"bigmatch.c\">" +
+            "<title>UEFA Nations League: Croatia v England</title></programme>\n" +
+            "<programme start=\"" + t.apply(matchStart) + "\" stop=\"" + t.apply(matchStop) + "\" channel=\"other.test\">" +
+            "<title>Antiques Roadshow</title><desc>Nothing to do with the football.</desc></programme>\n" +
             "</tv>\n";
     }
 

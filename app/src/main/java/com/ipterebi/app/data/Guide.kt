@@ -5,6 +5,10 @@ import android.net.ConnectivityManager
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.EpgListing
 import com.ipterebi.core.GuideClock
+import com.ipterebi.core.SAME_EVENT_SLACK_SECONDS
+import com.ipterebi.core.Showing
+import com.ipterebi.core.WhatsOnIndex
+import com.ipterebi.core.showingOf
 import com.ipterebi.core.XmltvProgramme
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.XtreamClient
@@ -202,6 +206,53 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
         if (epgChannelId.isBlank()) null
         else withContext(Dispatchers.IO) {
             store.programmes(account.lineKey, epgChannelId, after = at, limit = 1).firstOrNull()?.takeIf { it.start <= at }
+        }
+
+    /**
+     * The other channels showing whatever [epgChannelId] has on at [at].
+     *
+     * The answer to "this feed has gone, where else is the match". Entirely a
+     * local query: the window around the programme is read from the guide
+     * already on the device and grouped by [showingOf], so a failing stream
+     * costs no panel request to work around — which matters, because the
+     * panel refusing things is usually why we are here.
+     *
+     * Null when this channel has no guide, when the programme is unknown, or
+     * when nothing else carries it. All three are ordinary.
+     */
+    suspend fun elsewhere(account: XtreamAccount, epgChannelId: String, at: Long): Showing? {
+        if (epgChannelId.isBlank()) return null
+        return withContext(Dispatchers.IO) {
+            val line = account.lineKey
+            val playing = store.programmes(line, epgChannelId, after = at, limit = 1)
+                .firstOrNull()?.takeIf { it.start <= at } ?: return@withContext null
+            // Only what could possibly be the same event: a programme whose
+            // start is within the slack the rule allows. Asking for the
+            // playing programme's whole span looks equivalent and is not
+            // — Strictly Come Dancing runs two and a half hours, and that
+            // window held 3,163 rows on a real line against 168 within a
+            // quarter of an hour of its start. The rule would have thrown
+            // all but those away anyway; the box just had to grind through
+            // them first, and did not finish.
+            val near = store.startingNear(
+                line,
+                playing.start - SAME_EVENT_SLACK_SECONDS,
+                playing.start + SAME_EVENT_SLACK_SECONDS,
+            )
+            showingOf(playing, near)
+        }
+    }
+
+    /**
+     * Everything on between [from] and [to], folded once for searching.
+     *
+     * Built off the main thread and handed back whole, because the screen
+     * searches it on every keystroke and the whole point of the index is that
+     * the folding has already happened — see [WhatsOnIndex].
+     */
+    suspend fun whatsOn(account: XtreamAccount, from: Long, to: Long): WhatsOnIndex =
+        withContext(Dispatchers.IO) {
+            WhatsOnIndex(store.inWindow(account.lineKey, from, to))
         }
 
     /** When [account]'s full guide was last fetched, in epoch millis; null when it never has been. */

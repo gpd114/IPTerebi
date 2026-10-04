@@ -8,6 +8,9 @@ import com.ipterebi.app.AppContainer
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.NameIndex
+import com.ipterebi.core.Showing
+import com.ipterebi.core.WhatsOnIndex
+import com.ipterebi.core.streams
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.XtreamCategory
 import com.ipterebi.core.XtreamException
@@ -47,6 +50,15 @@ sealed interface Shelf {
     data class Panel(val categoryId: String?) : Shelf
 }
 
+/**
+ * One programme, and the channels on this line carrying it.
+ *
+ * The guide answers in `epg_channel_id`s; a screen needs things to press. A
+ * provider carries one match as the HD cut, a backup and three regional
+ * variants, so this is usually longer than the guide channel count.
+ */
+data class ShowingOn(val showing: Showing, val channels: List<LiveStream>)
+
 data class ChannelsUiState(
     val categories: List<XtreamCategory> = emptyList(),
     val shelf: Shelf = Shelf.Panel(null),
@@ -76,6 +88,14 @@ data class ChannelsUiState(
     /** The full channel list is being fetched for the first search. */
     val indexing: Boolean = false,
     /** Why search is only covering [listed], when the full list could not be had. */
+    /**
+     * What is on that matches the search, with the channels carrying it.
+     *
+     * Separate from [results], which is channels matched by name: a search
+     * for a team matches no channel name at all, and this is the half that
+     * answers it.
+     */
+    val showings: List<ShowingOn> = emptyList(),
     val searchNote: String? = null,
     /**
      * Channels the viewer has hidden. Taken out of everything this state
@@ -161,6 +181,9 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
      * it is made once, only when somebody asks to search, and never to browse.
      */
     private var index: NameIndex<LiveStream>? = null
+
+    /** The guide for the searchable window, folded once. Built with [index]. */
+    private var whatsOn: WhatsOnIndex? = null
     private var indexJob: Job? = null
 
     /**
@@ -256,8 +279,24 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
         val results = withContext(Dispatchers.Default) {
             source?.search(query) ?: listed.searchByName(query) { it.name }
         }
+        // What is *on* that matches, as well as what is *called* that. A
+        // search for a team finds nothing by name — no channel is called
+        // Croatia — so without this the answer to the question people
+        // actually ask is "no channel on this line matches".
+        val events = withContext(Dispatchers.Default) {
+            val line = container.lineChannels.cached(account ?: return@withContext emptyList())
+                .withoutHidden(_state.value.hidden.hiddenIds())
+            whatsOn?.search(query).orEmpty()
+                .map { it to it.streams(line) }
+                // Nothing to press is nothing to show: a programme whose
+                // channels are all hidden, or which the line does not carry
+                // under that guide id at all.
+                .filter { (_, streams) -> streams.isNotEmpty() }
+                .take(MAX_SHOWINGS)
+                .map { (showing, streams) -> ShowingOn(showing, streams) }
+        }
         // A slow search must not overwrite the results of a newer one.
-        _state.update { if (it.query == query) it.copy(results = results) else it }
+        _state.update { if (it.query == query) it.copy(results = results, showings = events) else it }
     }
 
     private fun ensureIndex() {
@@ -266,8 +305,16 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
         indexJob = viewModelScope.launch {
             _state.update { it.copy(indexing = true, searchNote = null) }
             try {
-                val everything = container.xtream.liveStreams(account, categoryId = null)
+                // Through the shared cache, so the channel-name index and
+                // the what's-on lookup share one several-megabyte request
+                // rather than making it each.
+                val everything = container.lineChannels.all(account)
                 index = withContext(Dispatchers.Default) { NameIndex(everything) { it.name } }
+                // The guide for the window a search can reach, folded once.
+                // The same fetch, because a search for a team name wants both
+                // answers — the channel called that, and the match on it.
+                val now = System.currentTimeMillis() / 1000
+                whatsOn = container.guide.whatsOn(account, now, now + WHATS_ON_WINDOW_SECONDS)
                 _state.update { it.copy(indexing = false) }
                 _state.value.query.takeIf { it.isNotBlank() }?.let { runSearch(it) }
             } catch (e: CancellationException) {
@@ -424,3 +471,22 @@ class ChannelsViewModel(private val container: AppContainer) : ViewModel() {
  * times over every channel on the line.
  */
 private const val SEARCH_DEBOUNCE_MS = 150L
+
+/**
+ * How far ahead a search for what is on looks.
+ *
+ * A day. The guide reaches only as far as the provider publishes, which on a
+ * real line was 17 hours ahead one day and 41 the next, so this is a ceiling
+ * rather than a promise — and asking for more would only widen a scan that
+ * already covers everything there is.
+ */
+private const val WHATS_ON_WINDOW_SECONDS = 24L * 3600
+
+/**
+ * How many events a search offers.
+ *
+ * A generic slot name is carried very widely — 127 channels shared one on the
+ * line this was measured against — and a search is a list above the channels,
+ * not instead of them.
+ */
+private const val MAX_SHOWINGS = 6

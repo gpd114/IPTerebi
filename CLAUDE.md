@@ -817,6 +817,149 @@ Reordering writes the whole list back through `setFavourites`, so the stored
 order is the order, and everything reading it follows: the shelf, and the
 Live TV row on Home.
 
+## Finding a match across the channels carrying it
+
+A line usually allows one stream, so when a feed buffers or dies the only
+move left is another channel showing the same thing. Finding that by browsing
+a line of 21,077 channels filed into categories called `EN - 2020 & OLD` is
+hopeless. The guide already on the device knows the answer, so it answers:
+
+- **Searching finds what is *on*, not only what a channel is *called*.** A
+  team name matches no channel name — nothing is called Croatia — so the
+  search box now reports both: events above, channels matched by name below.
+- **A failing stream offers the other feeds.** The error card lists them and
+  switching happens inside the player screen, by changing which channel it is
+  on, never by navigating — which would animate a second player in over the
+  top and hold two connections against a line that allows one.
+
+The rules are `core/WhatsOn.kt`, tested, and every one of them was settled by
+measuring one real line's `xmltv.php` — 100,192 programmes across 1,366
+channels, read off the box — rather than guessed. Each measurement killed a
+simpler design:
+
+- **The description matters as much as the title.** Croatia v England was on
+  seven feeds and five of them titled it only "Nations League", with the teams
+  in the description. Searching titles alone found two of the seven.
+- **Grouping by identical title is wrong**, which was the first design. The
+  same fixture arrived titled three ways — "UEFA Nations League: Croatia v
+  England", "Nations League", "Kick Off - Croatia v England" — so exact titles
+  split one event into three. And in the other direction `Live: College
+  Football` was on **127 channels**, a generic slot name covering *different*
+  games on different affiliates, so exact titles also glue unrelated matches
+  into one. An event is therefore a close start, an overlap, and the shorter
+  title's real words appearing in the longer one.
+- **The longest title wins, not the commonest.** Five channels said "Nations
+  League" and two gave the fixture, so a majority picks the vague one.
+- **Noise is ranked down, not filtered out.** Searching "England" also finds
+  darts, two cricket ODIs, "7 News Today in New England" and "Out of England".
+  No word-boundary rule helps — England is a whole word in "New England" — and
+  this app is not going to carry a football database. What separates them is
+  how many channels carry it: the match is on seven, the news programme on
+  one. So events are ordered by that and the viewer picks from a short list,
+  rather than the app pretending to know. Measured against the real guide, the
+  actual match ranks first with the other 33 England-mentioning channels below
+  it.
+- **`epg_channel_id` arrives in inconsistent case.** One line sent both
+  `SkySport3.nz` and `skysport3.nz`, and `SkySportsCricket.uk` beside
+  `skysportscricket.uk`. Folded, or the same channel is offered twice.
+- **The channel being watched is kept in the event, and only its failed
+  *stream* is dropped.** A provider carries ITV1 as the HD cut, the FHD cut
+  and a backup under one guide id, so when a feed dies the best thing to
+  switch to is very often another stream on the *same* guide channel. Taking
+  the guide channel out would hide exactly those. Hence `showingOf`, which
+  keeps it, beside `alsoShowing`, which does not.
+
+**It is all local, and that is the point.** `GuideStore.inWindow` reads the
+window from the database on the device and `WhatsOnIndex` folds the text once
+— 12,584 programmes and 1.8 MB on a real line, far too much to re-fold per
+keystroke, which is the lesson `NameIndex` already learnt for channel names.
+The panel refusing things is usually why there is an error card at all, so
+working around it must not need the panel's help. `LineChannels` holds the
+whole channel list that maps guide ids to things that can be pressed, so the
+channel search and this share one several-megabyte request instead of making
+it each.
+
+
+**It ground to a halt on a real line, and only a real line could show it.**
+Shipped, then measured on the owner's box against their own provider: the
+lookup never returned. No error, no card, no crash — the log said it had
+started and then nothing, for as long as anyone cared to wait. Two faults,
+both now numbers rather than opinions:
+
+- **The window was the playing programme's whole span.** Strictly Come Dancing
+  runs two and a half hours, and asking for everything overlapping it returned
+  **3,163 rows across 160 start times**; a band of a quarter of an hour either
+  side of its start holds **168**. Two programmes can only be one event when
+  their starts are close, so the rule discarded nearly all of it anyway. Hence
+  `GuideStore.startingNear`, which asks by `start` rather than by overlap — a
+  different question from `inWindow`, which is why both exist.
+- **The grouping was quadratic with a normaliser inside the comparison.** Each
+  programme was compared against every event gathered so far, folding both
+  titles with `normaliseForSearch` every time: a quarter of a million
+  comparisons and half a million NFD normalisations for one window. It now
+  folds each title once and walks events in start order, dropping those too
+  far behind to match again. Same answers, **9 ms** where it had never come
+  back.
+
+This is the `NameIndex` lesson — re-folding thousands of strings is the slow
+part — met again one layer down. It was applied to the matching when this was
+written and missed in the grouping, which is worth remembering: the index only
+helps the half it covers. `WhatsOnTest` now builds a real line's shape, 4,000
+programmes across 200 slots, as a guard against it returning quietly.
+
+Writing that test turned up a quirk worth knowing: words of one or two letters
+are skipped when titles are compared, so **two titles differing only by a
+number read as one event** — "Match Day 3" and "Match Day 4" group. Left that
+way deliberately, because the same rule is what merges "Nations League" into
+"UEFA Nations League: Croatia v England", and the worst case is a channel
+offered that is showing the next fixture rather than this one. There is a test
+saying so, so it is a decision and not an accident.
+
+**Two things limit it, both the provider's.** It only knows what the guide
+says, and how far the guide reaches moves: the same line published 41 hours
+ahead one day and **17 the next**, so this answers "on now and tonight"
+dependably and "this weekend" often not at all. And a channel being listed is
+not a promise it plays — it is a shortlist, not a guarantee.
+
+One bug worth remembering, because it hid the whole feature: the channel list
+replaced its results with an empty panel whenever no channel *name* matched,
+which is precisely the search this exists for. "0 channels match" drew over
+the match it had just found. The empty panel now needs both kinds to be
+empty, and the line above the results counts what is on.
+
+The fake panel serves the case in miniature: channel 103 refuses with a 403
+and carries `bigmatch.a`, which `Big match (backup feed)` shares, with
+`BigMatch.B` spelling it with capitals and titling the slot generically, and
+`Something else entirely` on at the same moment to catch a rule that groups
+by time alone.
+
+**On the box it is the error card**, in `TvLiveScreen`: the other feeds listed
+as buttons under Try again, and OK on one tunes the same screen's single
+player. No request is involved — the guide is in the box's database and the
+whole line is already in the `Lineup` — which is the point, because the panel
+refusing things is usually why the card is there. It logs what it found under
+`IPTerebiPlay`, because the box's screenshots come out blank over video and
+the log is the only way to see it.
+
+The TV guide has no search box yet, so the team search is the phone's for now.
+
+**Not yet seen working on a real line, and the reason is good news.** The
+owner's line refused nothing on 3 October: MPEG-TS played, HLS played (this
+panel really does serve `m3u8`, which is per-panel and worth knowing), the
+app's own honest user agent was accepted, and eight channels in a row came up
+first time. There was no failure to put a card on. What was measured on that
+line is the data the feature stands on: in the next twelve hours, **465 of
+6,238 slots were carried on two or more channels and 131 on four or more**.
+The widest are US affiliates sharing syndicated output under generic names
+— `Live: College Football` on 127 channels — while a pay-channel fixture
+sits on one guide channel, which may still be several playable streams under
+it. The log line is in place, so the first real failure will say what it
+offered.
+
+One thing to be careful of when reading these numbers: a first attempt at
+counting them grouped by `(start, title)` and then labelled each row with the
+longest title at that *start*, which pasted the wrong name onto real counts.
+Label a group with its own title.
 ## The home screen
 
 The app opens on Home, and the bottom bar has four tabs: Home, Live TV, Films,
@@ -1101,7 +1244,14 @@ out and the viewer picks a *volume* rather than a folder:
 `getExternalFilesDirs` gives the app a directory on each mounted volume, with
 no permission and no picker, and Settings lists them with the free space on
 each — which also answers "is the stick in?" without anyone reading a path.
-It matters because **the box has 737 MB free**, which is twelve to
+It matters because **the box has very little room, and less each time**: 737 MB
+free when recording was built, and **235 MB at 95% full** on 3 October, where a
+24 MB debug APK would not install at all. `pm trim-caches 800M` took it back to
+444 MB, which is what Android does for itself under pressure and the first thing
+to try. Its own guide database is 52 MB of that and the right thing not to
+delete: `GuideStore.commit` carries past programmes forward for catch-up
+channels, and the provider publishes only about a day of past, so clearing it
+throws away guide that cannot be fetched again. 737 MB was twelve to
 twenty-four minutes; there is a test in core saying an hour does not fit and
 neither does a quarter of an hour.
 
