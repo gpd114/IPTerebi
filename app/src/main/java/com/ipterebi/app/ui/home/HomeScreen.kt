@@ -122,7 +122,15 @@ fun HomeScreen(
                 }
                 item {
                     val match = state.teamMatch
-                    if (match == null) {
+                    if (match == null && state.teamLooking) {
+                        // Reading the guide. Saying "nothing" here and
+                        // correcting it a moment later is how a viewer comes
+                        // away believing the answer is no.
+                        EmptyRow(
+                            title = "Looking for ${state.team}\u2026",
+                            detail = "Reading the guide.",
+                        )
+                    } else if (match == null) {
                         EmptyRow(
                             title = "Nothing for ${state.team} in the guide",
                             detail = "The guide reaches only as far as your provider publishes, " +

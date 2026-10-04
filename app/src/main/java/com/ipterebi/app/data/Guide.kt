@@ -6,6 +6,8 @@ import com.ipterebi.core.LiveStream
 import com.ipterebi.core.EpgListing
 import com.ipterebi.core.GuideClock
 import com.ipterebi.core.SAME_EVENT_SLACK_SECONDS
+import com.ipterebi.core.mentioning
+import com.ipterebi.core.showings
 import com.ipterebi.core.Showing
 import com.ipterebi.core.WhatsOnIndex
 import com.ipterebi.core.showingOf
@@ -254,6 +256,34 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
         withContext(Dispatchers.IO) {
             WhatsOnIndex(store.inWindow(account.lineKey, from, to))
         }
+
+    /**
+     * What is on between [from] and [to] matching [term], grouped.
+     *
+     * For one name rather than for typing into: the database sieves on the
+     * term's longest word first, so only a handful of programmes are folded
+     * instead of the whole window. Finding England on a real line meant
+     * folding 35,329 programmes and 5 MB of text to reach 149 of them; this
+     * reads those 149.
+     *
+     * The sieve is a substring and the rule is not, so [mentioning] still
+     * decides what actually matches — "eng" will not pass as England here
+     * any more than it does anywhere else.
+     */
+    suspend fun whatIsOnFor(
+        account: XtreamAccount,
+        term: String,
+        from: Long,
+        to: Long,
+    ): List<Showing> = withContext(Dispatchers.IO) {
+        // The longest word is the most selective, and short ones like "fc"
+        // would drag half the schedule through the precise rule for nothing.
+        val needle = term.trim().split(Regex("\\s+")).maxByOrNull { it.length }.orEmpty()
+        if (needle.isBlank()) return@withContext emptyList()
+        store.mentioning(account.lineKey, needle, from, to)
+            .mentioning(term)
+            .showings()
+    }
 
     /** When [account]'s full guide was last fetched, in epoch millis; null when it never has been. */
     suspend fun fetchedAt(account: XtreamAccount): Long? = withContext(Dispatchers.IO) { store.fetchedAt(account.lineKey) }
