@@ -35,6 +35,7 @@ import com.ipterebi.app.ui.PrimaryButton
 import com.ipterebi.app.ui.ScreenTopBar
 import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.fieldColours
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +62,13 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = viewModel(factory = SettingsViewModel.factory(container)),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // Saving puts the field down. Without this the caret stays blinking in
+    // it afterwards, so a saved value still reads as one being typed —
+    // which is the owner's word for it: it should look locked in until it
+    // is clicked again. Clearing focus is all it takes, because
+    // DpadTextField ends editing when focus leaves.
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(state.signedOut) {
         if (state.signedOut) onSignedOut()
@@ -129,7 +137,10 @@ fun SettingsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SecondaryButton(
                         text = if (team != container.team.team.value) "Save" else "Saved",
-                        onClick = { container.team.set(team) },
+                        onClick = {
+                            container.team.set(team)
+                            focusManager.clearFocus()
+                        },
                         enabled = team != container.team.team.value,
                         height = 42.dp,
                     )
@@ -194,7 +205,10 @@ fun SettingsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SecondaryButton(
                         text = if (state.userAgentChanged) "Apply" else "Saved",
-                        onClick = viewModel::applyUserAgent,
+                        onClick = {
+                            viewModel.applyUserAgent()
+                            focusManager.clearFocus()
+                        },
                         enabled = state.userAgentChanged,
                         height = 42.dp,
                     )
