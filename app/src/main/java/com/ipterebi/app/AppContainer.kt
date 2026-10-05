@@ -8,7 +8,6 @@ import com.ipterebi.app.data.LineChannels
 import com.ipterebi.app.data.ReminderStore
 import com.ipterebi.app.data.TeamStore
 import com.ipterebi.app.data.ListStore
-import com.ipterebi.app.data.RecordingStore
 import com.ipterebi.app.data.WatchStore
 import com.ipterebi.app.data.CredentialStore
 import com.ipterebi.app.data.EpisodeListing
@@ -32,28 +31,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 class AppContainer(context: Context) {
 
     /**
-     * For the few things that need one after construction: a document tree,
-     * an alarm being re-armed, a notification being posted.
+     * For the few things that need one after construction: an alarm being
+     * re-armed, a notification being posted, and on the TV branch a document
+     * tree.
      *
-     * Named `appContext` on both branches now. It arrived as `context` on
-     * main and `appContext` here, which conflicted every time the two were
-     * merged \x2d\x2d a conflict in `app/`, which is the kind CI refuses to
-     * resolve on its own and rightly so.
+     * Called `appContext` on both branches. It arrived as `context` here and
+     * `appContext` there, and the two then conflicted on every merge -- in
+     * `app/`, which is the kind CI refuses to resolve by itself and rightly
+     * so. One name costs nothing.
      */
     val appContext: Context = context.applicationContext
 
     val credentials = CredentialStore(context.applicationContext)
 
-    /**
-     * One HTTP client for the whole app: the panel API, and the recorder that
-     * writes a channel to a file. Sharing it shares the connection pool and
-     * the timeouts, and means a recording is opened exactly the way every
-     * other request to this panel is.
-     */
-    val http = defaultXtreamHttpClient()
-
     val xtream = XtreamClient(
-        http = http,
+        http = defaultXtreamHttpClient(),
         log = { line -> if (BuildConfig.DEBUG) Log.d(TAG_API, line) },
     )
 
@@ -82,9 +74,6 @@ class AppContainer(context: Context) {
 
     /** The viewer's own lists of films and series, per line. See ListStore. */
     val lists = ListStore(context.applicationContext)
-
-    /** What is to be recorded, what is recording, and where it is written. */
-    val recordings = RecordingStore(context.applicationContext)
 
     /** Starred and recently watched channels, per line. */
     /** Every channel on the line, for searching what is on and for finding other feeds. */
