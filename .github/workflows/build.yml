@@ -45,6 +45,13 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
 
+      # R8 only runs on the release build, and what it breaks it breaks
+      # silently: a stripped serializer fails at the first panel response and
+      # nothing in a debug build would ever show it. Cheap to keep honest
+      # here, expensive to find out from a user.
+      - name: Build release APK, so R8 is exercised
+        run: gradle assembleRelease --no-daemon
+
       - uses: actions/upload-artifact@v4
         with:
           name: ipterebi-debug-apk

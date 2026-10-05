@@ -126,6 +126,35 @@ serialization plugin are all 2.1.21 and must stay equal, because the Compose
 compiler plugin is versioned with Kotlin rather than with Compose.
 
 
+
+**The release build is minified, and that was never true until now.** R8 had
+never run over this code: CI built debug, the owner's devices ran debug, and
+`isMinifyEnabled` was false. What R8 breaks here is parsing, and it breaks it
+silently — the panel's answers are decoded through serializers the plugin
+generates and nothing refers to by name, so R8 sees dead code and removes
+them. A release would then sign in, ask for the channel list and fail to read
+the reply, which looks exactly like the provider's fault.
+
+`app/proguard-rules.pro` keeps them, along with the hand-written
+`FlexibleIntSerializer` and `FlexibleStringSerializer`, which are reached only
+from annotations — the one shape R8 cannot see through. Media3 is kept whole
+because its session service is resolved through the manifest.
+
+CI builds release on every change for this reason. It is the only place the
+rules are checked, and a broken rule costs nothing to find here and a bad
+report to find anywhere else.
+
+It is worth doing for its own sake too: **4.4 MB against 23.9 MB**, which is
+most of a fifth, and the box has had as little as 235 MB free.
+
+**Still unsigned, deliberately.** A release key is the owner's to make and
+keep. The build was proved by signing it with the local debug key by hand and
+driving it on the `googletv34` emulator: it signed in, fetched and parsed
+`get_live_streams`, downloaded `xmltv.php`, opened a stream and asked for
+`get_short_epg` — the whole decode path, under R8, with the debug logging
+gone. That is the test that matters; distribution is a separate question and
+nothing is tagged yet.
+
 **CI builds both branches, and tries every change against the TV one.** A
 change can be green on main and break the box: they share `core/` and nearly
 all of `app/`, and `tv` adds screens main knows nothing about. That happened
