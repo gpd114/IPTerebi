@@ -51,6 +51,8 @@ import com.ipterebi.app.ui.channels.tileColour
 import com.ipterebi.app.ui.theme.Corners
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.theme.tabular
+import androidx.compose.foundation.layout.Spacer
+import com.ipterebi.app.ui.QuietPill
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.ListedItem
 import com.ipterebi.core.SavedKind
@@ -160,13 +162,30 @@ fun HomeScreen(
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(start = 16.dp, end = 16.dp),
                             )
-                            Text(
-                                teamWhen(match) + "  ·  on ${state.teamChannels.size} channel" +
-                                    (if (state.teamChannels.size == 1) "" else "s"),
-                                style = MaterialTheme.typography.bodySmall.tabular(),
-                                color = Night.inkSoft,
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                            )
+                            ) {
+                                Text(
+                                    teamWhen(match) + "  ·  on ${state.teamChannels.size} channel" +
+                                        (if (state.teamChannels.size == 1) "" else "s"),
+                                    style = MaterialTheme.typography.bodySmall.tabular(),
+                                    color = Night.inkSoft,
+                                )
+                                // Only for something still to come. A match
+                                // already under way has no moment left to be
+                                // warned about, and Android delivers an alarm
+                                // set in the past at once.
+                                if (!match.onNow && state.teamChannels.isNotEmpty()) {
+                                    Spacer(Modifier.width(10.dp))
+                                    QuietPill(
+                                        text = if (state.teamReminded) "Reminder set" else "Remind me",
+                                        modifier = Modifier.clickable { viewModel.toggleTeamReminder() },
+                                        fill = if (state.teamReminded) Night.cobalt else Night.quiet,
+                                        colour = if (state.teamReminded) Color.White else Night.quietText,
+                                    )
+                                }
+                            }
                             LazyRow(
                                 modifier = Modifier.focusRequester(teamRow).rightStaysInRow().focusGroup(),
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp),

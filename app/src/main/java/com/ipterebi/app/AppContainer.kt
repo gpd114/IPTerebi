@@ -5,6 +5,7 @@ import android.util.Log
 import com.ipterebi.app.data.ChannelListStore
 import com.ipterebi.app.data.MediaRepository
 import com.ipterebi.app.data.LineChannels
+import com.ipterebi.app.data.ReminderStore
 import com.ipterebi.app.data.TeamStore
 import com.ipterebi.app.data.ListStore
 import com.ipterebi.app.data.WatchStore
@@ -28,6 +29,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
  * anything more would be scaffolding around nothing.
  */
 class AppContainer(context: Context) {
+
+    /** The application context, for the few things that need one later. */
+    val context: Context = context.applicationContext
 
     val credentials = CredentialStore(context.applicationContext)
 
@@ -67,6 +71,9 @@ class AppContainer(context: Context) {
     val lineChannels = LineChannels(xtream)
 
     /** The team whose channels Home lists. One name, typed once. */
+    /** Programmes someone asked to be told about. */
+    val reminders = ReminderStore(context.applicationContext)
+
     val team = TeamStore(context.applicationContext)
 
     val channelLists = ChannelListStore(context.applicationContext)
