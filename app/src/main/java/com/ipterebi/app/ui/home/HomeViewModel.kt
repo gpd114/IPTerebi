@@ -175,7 +175,7 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
         if (!reminder.worthSetting(System.currentTimeMillis() / 1000) && !state.teamReminded) return
         viewModelScope.launch {
             container.reminders.toggle(account, reminder)
-            ReminderAlarms.arm(container.context)
+            ReminderAlarms.arm(container.appContext)
             _state.update { it.copy(teamReminded = !it.teamReminded) }
         }
     }
