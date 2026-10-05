@@ -5,6 +5,7 @@ import android.util.Log
 import com.ipterebi.app.data.ChannelListStore
 import com.ipterebi.app.data.MediaRepository
 import com.ipterebi.app.data.LineChannels
+import com.ipterebi.app.data.ReminderStore
 import com.ipterebi.app.data.TeamStore
 import com.ipterebi.app.data.ListStore
 import com.ipterebi.app.data.RecordingStore
@@ -30,7 +31,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 class AppContainer(context: Context) {
 
-    /** For the few things that need one after construction, such as a document tree. */
+    /**
+     * For the few things that need one after construction: a document tree,
+     * an alarm being re-armed, a notification being posted.
+     *
+     * Named `appContext` on both branches now. It arrived as `context` on
+     * main and `appContext` here, which conflicted every time the two were
+     * merged \x2d\x2d a conflict in `app/`, which is the kind CI refuses to
+     * resolve on its own and rightly so.
+     */
     val appContext: Context = context.applicationContext
 
     val credentials = CredentialStore(context.applicationContext)
@@ -82,6 +91,9 @@ class AppContainer(context: Context) {
     val lineChannels = LineChannels(xtream)
 
     /** The team whose channels Home lists. One name, typed once. */
+    /** Programmes someone asked to be told about. */
+    val reminders = ReminderStore(context.applicationContext)
+
     val team = TeamStore(context.applicationContext)
 
     val channelLists = ChannelListStore(context.applicationContext)

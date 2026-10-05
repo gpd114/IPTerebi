@@ -25,6 +25,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import com.ipterebi.app.playback.ReminderAlarms
+import com.ipterebi.core.Reminder
+import com.ipterebi.core.holdsReminder
+import com.ipterebi.core.reminderId
+import com.ipterebi.core.worthSetting
 import com.ipterebi.core.TeamMatch
 import com.ipterebi.core.teamMatch
 import com.ipterebi.core.streams
@@ -66,6 +71,8 @@ data class HomeUiState(
      * time this was tried on a real line.
      */
     val teamLooking: Boolean = false,
+    /** Whether a reminder is already set for the match on the row. */
+    val teamReminded: Boolean = false,
 )
 
 /**
@@ -123,14 +130,53 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                     .withoutHidden(container.channelLists.hidden(account).first().hiddenIds())
                 match to match.showing.streams(line)
             }.getOrNull()
+            // Whether one is already set, read back with the match. Without
+            // this the pill says "Remind me" again every time the screen is
+            // rebuilt, however many are actually set.
+            val set = found?.let { (match, channels) ->
+                val channel = channels.firstOrNull()
+                channel != null && container.reminders.now(account)
+                    .holdsReminder(reminderId(channel.streamId, match.showing.start))
+            } ?: false
             _state.update {
                 it.copy(
                     team = team,
                     teamMatch = found?.first,
                     teamChannels = found?.second.orEmpty(),
                     teamLooking = false,
+                    teamReminded = set,
                 )
             }
+        }
+    }
+
+    /**
+     * Asks to be told when the team's match is about to start, or stops
+     * asking.
+     *
+     * The reminder names the first channel on the row, because it has to name
+     * one to put on and that is the one the row leads with. Nothing is
+     * offered for a match already under way: its moment would be in the past
+     * and Android delivers a past alarm at once.
+     */
+    fun toggleTeamReminder() {
+        val state = _state.value
+        val account = state.account ?: return
+        val match = state.teamMatch ?: return
+        val channel = state.teamChannels.firstOrNull() ?: return
+        val reminder = Reminder(
+            id = reminderId(channel.streamId, match.showing.start),
+            streamId = channel.streamId,
+            channelName = channel.name,
+            title = match.showing.title,
+            startSeconds = match.showing.start,
+            stopSeconds = match.showing.stop,
+        )
+        if (!reminder.worthSetting(System.currentTimeMillis() / 1000) && !state.teamReminded) return
+        viewModelScope.launch {
+            container.reminders.toggle(account, reminder)
+            ReminderAlarms.arm(container.appContext)
+            _state.update { it.copy(teamReminded = !it.teamReminded) }
         }
     }
 

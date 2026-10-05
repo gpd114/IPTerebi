@@ -35,8 +35,17 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 had never run over this code until now, which is the whole
+            // reason for turning it on: a release that strips a serializer
+            // fails at the first panel response, and nothing in a debug
+            // build would ever have shown it.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // Unsigned on purpose. A release key is the owner's to make and
+            // keep; this build is tested by signing it with the local debug
+            // key by hand, which is good enough to prove R8 and useless for
+            // distribution -- exactly the right way round.
         }
     }
 

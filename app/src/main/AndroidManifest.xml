@@ -5,6 +5,17 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- So the stream survives the screen timing out mid-programme. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!--
+      Reminders. A reminder is a notification and nothing else, so unlike the
+      media one it genuinely needs asking on Android 13 and later: without it
+      the post is dropped silently and a programme starts with nobody told.
+      The alarm is exact where the system allows and falls back where it does
+      not, which is why USE_EXACT_ALARM is not demanded here.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!--
       Playing on with the screen off. Without a foreground service Android
       freezes an app with nothing on screen within seconds, stream and all.
@@ -103,8 +114,13 @@
           has any business starting a recording, and unlike the media session
           there is no system component that needs to find it.
         -->
+        <service
+            android:name=".playback.RecordingService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <!--
-          The alarm going off, and the box having come back on. A reboot loses
+          The recording alarm, and the box having come back on. A reboot loses
           every alarm Android was holding, so without BOOT_COMPLETED a box
           unplugged in the afternoon records nothing that evening.
         -->
@@ -117,9 +133,21 @@
             </intent-filter>
         </receiver>
 
-        <service
-            android:name=".playback.RecordingService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync" />
+        <!--
+          The reminder alarm, on the same terms. Two receivers rather than one
+          with two actions: a reminder posts a notification and is done, a
+          recording takes the line and writes a file for an hour, and sharing
+          an entry point between them would only invite one to be mistaken for
+          the other.
+        -->
+        <receiver
+            android:name=".playback.ReminderAlarmReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.ipterebi.app.REMINDER_DUE" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>
