@@ -30,8 +30,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
  */
 class AppContainer(context: Context) {
 
-    /** The application context, for the few things that need one later. */
-    val context: Context = context.applicationContext
+    /**
+     * For the few things that need one after construction: an alarm being
+     * re-armed, a notification being posted, and on the TV branch a document
+     * tree.
+     *
+     * Called `appContext` on both branches. It arrived as `context` here and
+     * `appContext` there, and the two then conflicted on every merge -- in
+     * `app/`, which is the kind CI refuses to resolve by itself and rightly
+     * so. One name costs nothing.
+     */
+    val appContext: Context = context.applicationContext
 
     val credentials = CredentialStore(context.applicationContext)
 
