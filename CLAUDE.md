@@ -482,6 +482,24 @@ is at fault — a panel that does not list `m3u8` will not serve it.
 - **Default the scheme to http, not https.** Panels are overwhelmingly plain
   HTTP on a high port. Assuming https fails at the handshake and produces an
   error that names TLS, which sends you looking in entirely the wrong place.
+- **A provider that has fallen over must say so in seconds, not a minute.** The
+  connect timeout is per *route*, and a host behind a CDN resolves to several
+  addresses, so a 15-second connect timeout with a retry on top left the
+  sign-in screen sitting for about a minute — long enough that the app looks
+  hung rather than the provider looking down. The short calls (sign-in, and
+  "check the line") are therefore bounded as a whole by `QUICK_CALL_SECONDS`,
+  an OkHttp `callTimeout` that covers DNS, every route and the retry; connect
+  is 8 s. The long ones are deliberately *not* bounded: a channel list on cheap
+  hosting really does take half a minute, and `xmltv.php` is 76 MB.
+
+  And the message matters as much as the wait. `describeNetworkFailure` turns
+  each failure into the thing to try — a name that will not resolve asks about
+  a typo *and* about the device being online, because a phone with no signal
+  fails identically; a refused connection points at the port; a TLS failure
+  suggests plain http. No figure is quoted for a timeout, because whichever of
+  the two budgets ran out first is not knowable from the exception: on the
+  emulator against an unroutable address it gave up at 11 seconds, and a
+  message promising 15 would have been a small lie.
 - **A default user agent gets refused by a meaningful share of panels.** Every
   mainstream IPTV client identifies as VLC or ffmpeg for exactly this reason.
   The tell is a 403 on the *stream* while every API call succeeds, which reads
@@ -989,6 +1007,94 @@ One thing to be careful of when reading these numbers: a first attempt at
 counting them grouped by `(start, title)` and then labelled each row with the
 longest title at that *start*, which pasted the wrong name onto real counts.
 Label a group with its own title.
+
+## A second guide, or several
+
+Everything built on the guide is limited by what the provider publishes, and
+on a real line that is thin: 40 hours ahead one day and 17 the next, 1,366
+channels of 21,077 covered at all, and a fixture carried by seven feeds named
+on one of them. So Settings takes extra XMLTV addresses and they are fetched
+with the provider's own.
+
+**Several, not one, and that is the owner's requirement rather than a
+flourish.** They watch the Premier League, so a UK sports guide is the obvious
+source — and the three o'clock Saturday kick-offs are not broadcast in the UK
+at all, so the feeds carrying them are foreign and so are their listings. One
+country's guide cannot answer both. `MAX_GUIDE_SOURCES` is four: two for that,
+and room for another country without turning a refresh into a download of
+everything anyone has ever published.
+
+The rules are `core/ExtraGuide.kt`, tested. Two hard parts, and neither is the
+fetching:
+
+- **Which of their channels is which of ours.** The id first, case-folded,
+  because plenty of publishers copy their ids from the same few public
+  sources. Failing that the name with the decoration taken off — `guideKey`
+  drops a country or language prefix before a colon, maps `&` to "and"
+  (this provider writes `ENGLISH: AND FLIX` where a public guide writes
+  `&flix`), and drops the words that say how a channel is delivered rather
+  than which channel it is: 4k, uhd, fhd, hd, hevc, backup and the rest. What
+  it will *not* do is guess. A name that reduces to something two of the
+  line's channels share is dropped rather than attached to one of them at
+  random, because a guide on the wrong channel is worse than no guide: it is
+  wrong with confidence, on a screen built to be trusted. The line really
+  does carry ITV1 London twice.
+- **What to keep.** Only where the provider said nothing: a channel it has no
+  guide for at all, or a stretch beyond where its guide reaches — `GuideSpan`
+  per channel, and `worthKeepingBeyond`. Never a hole inside the provider's
+  own stretch. It is closer to what it is actually broadcasting, a gap there
+  is usually a junction rather than a mistake, and two sources interleaved
+  across one evening is a guide nobody can read. A source is judged against
+  what the earlier ones added as well, which is why its spans are merged in
+  only once it has finished: within one document a channel's programmes need
+  not arrive in order, and widening the span mid-stream would start refusing a
+  source its own earlier entries.
+
+Three things about the fetching itself:
+
+- **It goes into the same writer, and so the same generation.** The extra
+  sources are part of that download, not a second one, and nothing is
+  committed until they have all had their turn. A source that fails is logged
+  and skipped — the provider's guide is already in the writer by then and is
+  worth having on its own.
+- **It is sniffed for gzip, not asked.** Nearly every public source is served
+  as `.xml.gz`, because a week of every channel is a hundred megabytes of
+  text, and OkHttp only unwraps gzip it negotiated itself. Neither the file
+  name nor the content type can be trusted — publishers serve `.gz` typed
+  `text/xml`, and the fake panel does exactly that on purpose — so
+  `maybeGunzip` reads the two magic bytes, which an XMLTV document cannot
+  begin with.
+- **A source is logged by `guideSourceLabel`, never by its URL.** Some
+  publishers put a subscriber token in the query, and a token in a log is the
+  same mistake as a stream URL in a log.
+
+**Not keyed on the line**, unlike favourites, hidden channels and the viewer's
+own lists. Those hold a provider's stream ids, which mean nothing on another
+panel; a public guide describes channels, so it survives changing provider —
+the one time somebody is least likely to want to set this up again.
+`ExtraGuideStore`, plain preferences.
+
+Settings carries a **Fetch now** beside Save, which is not a convenience: a
+refresh runs at most every twelve hours, so without it somebody who had just
+pasted two addresses would see nothing change until tomorrow and conclude they
+had typed them wrong. Saving also puts the tidied list back in the field, so a
+line that was not an address visibly goes at once rather than being dropped
+silently in a background refresh hours later where nobody would see it. And a
+guide source defaults to **https** where a panel defaults to http, which looks
+like an inconsistency and is the opposite: panels are plain HTTP on high ports,
+public guides are ordinary websites.
+
+Proved on the `phone34` emulator against the fake panel's two extra sources,
+one of them gzipped: `UK: FILM FOUR HD`, which the provider's `xmltv.php` says
+nothing whatever about, gained three programmes — two from the UK source and
+the later one from the foreign one — and the channel list drew "The Saturday
+Film" under it where it had been blank. `news.test` gained a programme past
+where the provider stops and not the one inside it; `sport.test` gained the
+kick-off four hours out, which is the three o'clock case; the two ITV1 London
+cuts gained nothing, because the name is ambiguous; and the foreign source's
+programme overlapping what the UK one had just added was dropped while the
+later one was kept.
+
 ## Your team
 
 The thing this was asked for, in the owner's words: *"find out which

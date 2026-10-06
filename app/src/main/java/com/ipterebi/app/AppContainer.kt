@@ -12,6 +12,7 @@ import com.ipterebi.app.data.RecordingStore
 import com.ipterebi.app.data.WatchStore
 import com.ipterebi.app.data.CredentialStore
 import com.ipterebi.app.data.EpisodeListing
+import com.ipterebi.app.data.ExtraGuideStore
 import com.ipterebi.app.data.Guide
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.Series
@@ -99,8 +100,19 @@ class AppContainer(context: Context) {
 
     val channelLists = ChannelListStore(context.applicationContext)
 
+    /**
+     * Extra XMLTV sources, typed in Settings, filling in what the provider's
+     * own guide does not reach. Not keyed on the line: see ExtraGuideStore.
+     */
+    val extraGuides = ExtraGuideStore(context.applicationContext)
+
     /** What is on: the full guide kept on the device, and short answers put right. */
-    val guide = Guide(context.applicationContext, xtream, log = { line -> if (BuildConfig.DEBUG) Log.d(TAG_API, line) })
+    val guide = Guide(
+        context.applicationContext,
+        xtream,
+        extraSources = { extraGuides.sources.value },
+        log = { line -> if (BuildConfig.DEBUG) Log.d(TAG_API, line) },
+    )
 }
 
 /** Every panel request and its result, credentials stripped. Debug only. */

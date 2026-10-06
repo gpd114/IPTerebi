@@ -71,6 +71,36 @@ public class FakePanel {
                 ex.getResponseHeaders().set("Content-Type", "application/xml; charset=utf-8");
                 ex.sendResponseHeaders(200, body.length);
                 try (OutputStream out = ex.getResponseBody()) { out.write(body); }
+            } else if (path.startsWith("/extra-epg")) {
+                // A second guide, as a public XMLTV publisher serves one: no
+                // credentials, channel ids that are nothing like the
+                // provider's, and names written plainly rather than with the
+                // provider's country prefix and quality. The app has to match
+                // them by what is left when that decoration comes off.
+                //
+                // Two of them, because the owner's reason for wanting this
+                // needs two: a sports guide for the country they watch in, and
+                // another for the countries carrying the three o'clock
+                // Saturday kick-offs that are not shown here.
+                boolean gz = path.endsWith(".gz");
+                boolean abroad = path.contains("-de");
+                byte[] body = (abroad ? extraXmltvAbroad() : extraXmltvUk())
+                    .getBytes(StandardCharsets.UTF_8);
+                if (gz) {
+                    java.io.ByteArrayOutputStream packed = new java.io.ByteArrayOutputStream();
+                    try (java.util.zip.GZIPOutputStream zip = new java.util.zip.GZIPOutputStream(packed)) {
+                        zip.write(body);
+                    }
+                    body = packed.toByteArray();
+                }
+                log("EXTRA GUIDE " + path + "  " + body.length + " bytes"
+                    + (gz ? " gzipped" : "") + "  ua=" + ua);
+                // Deliberately typed as XML even when it is gzipped, because
+                // publishers do exactly that: the app must sniff the two magic
+                // bytes rather than believe the header or the file name.
+                ex.getResponseHeaders().set("Content-Type", "application/xml; charset=utf-8");
+                ex.sendResponseHeaders(200, body.length);
+                try (OutputStream out = ex.getResponseBody()) { out.write(body); }
             } else if (path.equals("/player_api.php")) {
                 String action = q.getOrDefault("action", "");
                 log("API " + (action.isEmpty() ? "(sign-in)" : action) + " "
@@ -254,6 +284,19 @@ public class FakePanel {
                     // On at the same moment and nothing to do with it, so a
                     // rule that groups by time alone fails here.
                     "{\"num\":14,\"name\":\"Something else entirely\",\"stream_id\":112,\"category_id\":\"1\",\"epg_channel_id\":\"other.test\"}," +
+                    // Two for the second guide to fill in. Film Four is on the
+                    // line with a guide id the provider's own xmltv.php says
+                    // nothing whatever about — which is the ordinary case
+                    // (one real line carried 21,077 channels and its guide
+                    // covered 1,366) and the one a second source is for.
+                    "{\"num\":15,\"name\":\"UK: FILM FOUR HD\",\"stream_id\":113,\"category_id\":\"1\",\"epg_channel_id\":\"filmfour.uk\"}," +
+                    // And the same channel twice, as a provider carries it:
+                    // two cuts under two guide ids, whose names reduce to one
+                    // thing. A second source naming "ITV1 London" cannot say
+                    // which of these it means, so it must be refused rather
+                    // than attached to one of them at random.
+                    "{\"num\":16,\"name\":\"UK: ITV1 LONDON HD\",\"stream_id\":114,\"category_id\":\"1\",\"epg_channel_id\":\"itv1london.hd\"}," +
+                    "{\"num\":17,\"name\":\"UK: ITV1 LONDON FHD\",\"stream_id\":115,\"category_id\":\"1\",\"epg_channel_id\":\"itv1london.fhd\"}," +
                     "{\"num\":6,\"name\":\"Drops every 20 s\",\"stream_id\":104,\"category_id\":\"1\"}," +
                     "{\"num\":7,\"name\":\"Drops, then off air\",\"stream_id\":105,\"category_id\":\"1\"}," +
                     "{\"num\":8,\"name\":\"Line busy for 15 s\",\"stream_id\":106,\"category_id\":\"1\"}," +
@@ -407,6 +450,96 @@ public class FakePanel {
             "</tv>\n";
     }
 
+
+    /**
+     * The first extra source: a UK sports guide, as a public publisher serves
+     * one.
+     *
+     * Everything here is a case the matching has to get right, and each one
+     * fails differently if it does not:
+     *
+     * - **Test News** is matched by name alone. Its id here is nothing like
+     *   the provider's `news.test`, which is the ordinary situation: two
+     *   publishers numbering the same channel their own way. It carries one
+     *   programme inside the provider's own stretch, which must be refused —
+     *   the provider is closer to what it is actually broadcasting — and one
+     *   beyond where the provider stops, which must be kept.
+     * - **Film Four** is the case this feature exists for: the line carries
+     *   it and the provider's guide says nothing at all about it, so its row
+     *   on the channel list is blank. Both programmes should appear.
+     * - **ITV1 London** must produce nothing. The line carries it twice, as
+     *   an HD cut and an FHD cut under different guide ids, so the name
+     *   reduces to something two of our channels share and the match is
+     *   refused rather than guessed. A guide on the wrong channel is worse
+     *   than no guide.
+     * - **Nothing At All** is not on the line and must be ignored, like
+     *   `elsewhere.test` in the provider's own guide.
+     */
+    static String extraXmltvUk() {
+        long now = Instant.now().getEpochSecond();
+        // The provider's news.test runs from 20 minutes ago to 70 minutes
+        // ahead, so this is inside it and this is past the end of it.
+        long insideStart = now + 10 * 60, insideStop = now + 40 * 60;
+        long beyondStart = now + 3 * 3600, beyondStop = beyondStart + 3600;
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE tv SYSTEM \"xmltv.dtd\">\n" +
+            "<tv generator-info-name=\"fake extra guide (uk)\">\n" +
+            "<channel id=\"uk.testnews\"><display-name>Test News</display-name></channel>\n" +
+            "<channel id=\"ff.uk\"><display-name>Film Four</display-name></channel>\n" +
+            "<channel id=\"itv1.london.uk\"><display-name>ITV1 London</display-name></channel>\n" +
+            "<channel id=\"nothing.uk\"><display-name>Nothing At All</display-name></channel>\n" +
+            "<programme start=\"" + xmltvTime(insideStart) + "\" stop=\"" + xmltvTime(insideStop) + "\" channel=\"uk.testnews\">" +
+            "<title>Should not appear</title><desc>The provider already covers this hour.</desc></programme>\n" +
+            "<programme start=\"" + xmltvTime(beyondStart) + "\" stop=\"" + xmltvTime(beyondStop) + "\" channel=\"uk.testnews\">" +
+            "<title>Newsnight</title><desc>Past where the provider's guide stops.</desc></programme>\n" +
+            "<programme start=\"" + xmltvTime(now - 30 * 60) + "\" stop=\"" + xmltvTime(now + 60 * 60) + "\" channel=\"ff.uk\">" +
+            "<title>The Saturday Film</title><desc>On a channel the provider lists with no guide at all.</desc></programme>\n" +
+            "<programme start=\"" + xmltvTime(now + 60 * 60) + "\" stop=\"" + xmltvTime(now + 150 * 60) + "\" channel=\"ff.uk\">" +
+            "<title>The Late Film</title></programme>\n" +
+            "<programme start=\"" + xmltvTime(now) + "\" stop=\"" + xmltvTime(now + 3600) + "\" channel=\"itv1.london.uk\">" +
+            "<title>Ambiguous, so dropped</title><desc>Two of the line's channels reduce to this name.</desc></programme>\n" +
+            "<programme start=\"" + xmltvTime(now) + "\" stop=\"" + xmltvTime(now + 3600) + "\" channel=\"nothing.uk\">" +
+            "<title>Not on this line either</title></programme>\n" +
+            "</tv>\n";
+    }
+
+    /**
+     * The second extra source: a foreign guide, which is the half of the
+     * owner's requirement a UK one cannot answer.
+     *
+     * Three o'clock Saturday kick-offs are not broadcast in the UK, so the
+     * channels carrying them are abroad and so are their listings. This is
+     * that: a kick-off on Sport One well past where the provider's guide
+     * reaches.
+     *
+     * It also carries two Film Four programmes, and only the later one should
+     * appear. The first overlaps what the UK source has already added, which
+     * is what proves a source is judged against what the earlier ones
+     * contributed and not only against the provider.
+     */
+    static String extraXmltvAbroad() {
+        long now = Instant.now().getEpochSecond();
+        // The provider's sport.test stops two hours out.
+        long kickOff = now + 4 * 3600, fullTime = kickOff + 2 * 3600;
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE tv SYSTEM \"xmltv.dtd\">\n" +
+            "<tv generator-info-name=\"fake extra guide (abroad)\">\n" +
+            "<channel id=\"sport1.de\"><display-name>Sport One</display-name></channel>\n" +
+            "<channel id=\"ff.de\"><display-name>Film Four</display-name></channel>\n" +
+            "<programme start=\"" + xmltvTime(kickOff) + "\" stop=\"" + xmltvTime(fullTime) + "\" channel=\"sport1.de\">" +
+            "<title>Premier League: Rovers v United</title>" +
+            "<desc>The three o'clock kick-off, listed only where it is shown.</desc></programme>\n" +
+            "<programme start=\"" + xmltvTime(now) + "\" stop=\"" + xmltvTime(now + 90 * 60) + "\" channel=\"ff.de\">" +
+            "<title>Should not appear either</title><desc>The UK source already filled this.</desc></programme>\n" +
+            "<programme start=\"" + xmltvTime(now + 150 * 60) + "\" stop=\"" + xmltvTime(now + 210 * 60) + "\" channel=\"ff.de\">" +
+            "<title>The Midnight Film (abroad)</title><desc>After everything the UK source added.</desc></programme>\n" +
+            "</tv>\n";
+    }
+
+    /** An XMLTV time with its offset stated, as the format requires. */
+    static String xmltvTime(long seconds) {
+        return java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss Z")
+            .withZone(java.time.ZoneId.of("Europe/London"))
+            .format(Instant.ofEpochSecond(seconds));
+    }
     static String listing(String id, String title, String desc, long start, long stop) {
         Base64.Encoder b = Base64.getEncoder();
         return "{\"id\":\"" + id + "\",\"epg_id\":\"news.test\",\"title\":\"" +

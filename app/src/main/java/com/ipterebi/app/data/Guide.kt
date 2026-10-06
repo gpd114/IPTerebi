@@ -5,6 +5,13 @@ import android.net.ConnectivityManager
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.EpgListing
 import com.ipterebi.core.GuideClock
+import com.ipterebi.core.GuideSpan
+import com.ipterebi.core.NO_SPAN
+import com.ipterebi.core.guideSourceLabel
+import com.ipterebi.core.matchGuideChannels
+import com.ipterebi.core.plus
+import com.ipterebi.core.worthKeepingBeyond
+import com.ipterebi.core.XmltvChannel
 import com.ipterebi.core.SAME_EVENT_SLACK_SECONDS
 import com.ipterebi.core.mentioning
 import com.ipterebi.core.showings
@@ -38,7 +45,17 @@ import java.util.concurrent.atomic.AtomicBoolean
  * its offset — so it answers first. See [GuideClock] for how the first real
  * line's `get_short_epg` came to be two hours out.
  */
-class Guide(context: Context, private val xtream: XtreamClient, private val log: (String) -> Unit) {
+class Guide(
+    context: Context,
+    private val xtream: XtreamClient,
+    /**
+     * Extra XMLTV sources to fill in behind the provider's own guide, read
+     * each time a refresh runs rather than captured, so changing them in
+     * Settings takes effect at the next one. See ExtraGuideStore.
+     */
+    private val extraSources: () -> List<String> = { emptyList() },
+    private val log: (String) -> Unit,
+) {
 
     private val store = GuideStore(context)
     val clock = GuideClock()
@@ -139,13 +156,23 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
                 // to point at. Measured rather than assumed.
                 var earliest = Long.MAX_VALUE
                 var latest = Long.MIN_VALUE
+                // How far it reaches per channel, which is a different
+                // question and the one an extra source is judged against:
+                // the provider published 40 hours one day and 17 the next,
+                // and covered 1,366 channels of 21,077. See addExtraGuides.
+                val spans = HashMap<String, GuideSpan>()
                 xtream.xmltv(account) {
                     if (it.channel in wanted) {
                         writer.add(it)
+                        spans[it.channel] = (spans[it.channel] ?: NO_SPAN).plus(it)
                         if (it.start < earliest) earliest = it.start
                         if (it.stop > latest) latest = it.stop
                     }
                 }
+                // Into the same writer and so the same generation: the extra
+                // sources are part of this download, not a second one, and
+                // nothing is committed until they have all had their turn.
+                addExtraGuides(account, streams, writer, spans)
                 val fetchedAt = System.currentTimeMillis()
                 writer.commit(fetchedAt, keepPastFor = withArchive)
                 failedAt.remove(line)
@@ -169,6 +196,80 @@ class Guide(context: Context, private val xtream: XtreamClient, private val log:
         }
     }
 
+    /**
+     * Adds whatever the extra XMLTV sources know that the provider does not.
+     *
+     * Each source is a whole public guide — every channel its publisher
+     * covers, often a week of them — and almost none of it is this line's. So
+     * three things happen in one streaming pass, and the order matters:
+     *
+     * 1. **Their channels are matched to ours.** XMLTV puts its `<channel>`
+     *    elements before its `<programme>` elements, so the list is complete
+     *    by the time the first programme arrives and the mapping can be built
+     *    then — one download rather than two. [matchGuideChannels] refuses to
+     *    guess, so a channel it cannot place contributes nothing.
+     * 2. **Only what the provider did not cover is kept**, by
+     *    [worthKeepingBeyond]: a channel the provider said nothing about, or
+     *    a stretch beyond where its guide reached. Never a hole inside it —
+     *    the provider is closer to what it is actually broadcasting, and two
+     *    sources interleaved across one evening is a guide nobody can read.
+     * 3. **What this source added counts against the next one.** Its spans
+     *    are merged into [spans] only once it has finished, not as it goes:
+     *    within one document a channel's programmes need not arrive in order,
+     *    and widening the span mid-stream would start refusing the source its
+     *    own earlier entries.
+     *
+     * A source that fails is logged and skipped. The provider's guide is
+     * already in the writer by now and is worth having on its own; losing it
+     * because somebody's free XMLTV host was down would be the wrong trade.
+     */
+    private suspend fun addExtraGuides(
+        account: XtreamAccount,
+        streams: Collection<LiveStream>,
+        writer: GuideStore.Writer,
+        spans: MutableMap<String, GuideSpan>,
+    ) {
+        val sources = extraSources()
+        if (sources.isEmpty()) return
+        val ours = streams.toList()
+        for (source in sources) {
+            val label = guideSourceLabel(source)
+            val added = HashMap<String, GuideSpan>()
+            try {
+                val theirs = ArrayList<XmltvChannel>()
+                var mapping: Map<String, String>? = null
+                xtream.xmltvFrom(
+                    source = source,
+                    userAgent = account.userAgent,
+                    onChannel = { theirs += it },
+                ) { programme ->
+                    val map = mapping ?: matchGuideChannels(ours, theirs)
+                        // Folded, because a guide id arrives in inconsistent
+                        // case even within one line: SkySport3.nz beside
+                        // skysport3.nz on the first real one.
+                        .mapKeys { (theirId, _) -> theirId.lowercase() }
+                        .also { mapping = it }
+                    val mine = map[programme.channel.lowercase()]
+                    if (mine != null && worthKeepingBeyond(programme, spans[mine] ?: NO_SPAN)) {
+                        writer.add(programme.copy(channel = mine))
+                        added[mine] = (added[mine] ?: NO_SPAN).plus(programme)
+                    }
+                }
+                log("  $label: filled in ${added.size} of our channels")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("  $label not used: ${e.message}")
+            }
+            for ((channel, span) in added) {
+                val had = spans[channel] ?: NO_SPAN
+                spans[channel] = GuideSpan(
+                    earliest = minOf(had.earliest, span.earliest),
+                    latest = maxOf(had.latest, span.latest),
+                )
+            }
+        }
+    }
     /**
      * What is on [epgChannelId] (or, failing that, stream [streamId]) from now,
      * right-clocked, or empty when nothing is known. Blocking: call off the
