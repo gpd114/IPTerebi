@@ -79,6 +79,8 @@ import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.app.ui.theme.tabular
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XmltvProgramme
+import com.ipterebi.core.carriedOnLabel
+import com.ipterebi.core.spreadByChannel
 import com.ipterebi.core.channelInitials
 import kotlinx.coroutines.delay
 
@@ -720,7 +722,10 @@ private fun ShowingRow(
             QuietPill(if (open) "Hide" else "Show")
         }
         if (open) {
-            on.channels.forEach { channel ->
+            // One of each channel before any second cut of the same one:
+            // see spreadByChannel. The variants stay, because another stream
+            // of the same channel is often the best thing to switch to.
+            on.channels.spreadByChannel().forEach { channel ->
                 Text(
                     channel.name,
                     style = MaterialTheme.typography.bodyMedium,
@@ -745,8 +750,10 @@ private fun whenAndWhere(on: ShowingOn): String {
     val time = java.time.Instant.ofEpochSecond(on.showing.start)
         .atZone(java.time.ZoneId.systemDefault())
         .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
-    val count = on.channels.size
-    return "$time  ·  on $count channel" + (if (count == 1) "" else "s")
+    // The guide channels, not the streams. A provider carries the same
+    // channel many times over -- three became thirty-six on a real line --
+    // and the streams overstate how many places there are to go.
+    return "$time  ·  " + carriedOnLabel(on.showing.feeds, on.channels.size)
 }
 
 /** "2 on now" or "2 on now · 3 channels match", for the line above results. */

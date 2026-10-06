@@ -347,4 +347,82 @@ class WhatsOnTest {
         assertTrue(WhatsOnIndex(emptyList()).search("England").isEmpty())
         assertTrue(WhatsOnIndex(match).search("").isEmpty())
     }
+
+    // One per channel before any second. Measured on the owner's line: an
+    // event on three guide channels was being listed as thirty-six, because
+    // the provider carries each one as HD, SD, RAW, HEVC HD and HEVC 4K.
+
+    private fun stream(id: Int, epg: String) =
+        LiveStream(streamId = id, name = "ch$id", epgChannelId = epg)
+
+    @Test
+    fun `every different channel comes before any second stream`() {
+        val spread = listOf(
+            stream(1, "sky.uk"), stream(2, "sky.uk"), stream(3, "sky.uk"),
+            stream(4, "tnt.uk"), stream(5, "tnt.uk"),
+            stream(6, "bbc.uk"),
+        ).spreadByChannel()
+        // Three different channels first, then the seconds, then the third.
+        assertEquals(listOf(1, 4, 6, 2, 5, 3), spread.map { it.streamId })
+    }
+
+    @Test
+    fun `the variants are kept, not filtered`() {
+        // A line carries ITV1 as the HD cut, the FHD cut and a backup under
+        // one guide id, and when a feed dies another stream of the same
+        // channel is very often the best thing to switch to.
+        val streams = listOf(stream(1, "itv.uk"), stream(2, "itv.uk"), stream(3, "itv.uk"))
+        assertEquals(3, streams.spreadByChannel().size)
+    }
+
+    @Test
+    fun `guide ids are folded, as a real line sends them`() {
+        // One line sent SkySport3.nz beside skysport3.nz.
+        val spread = listOf(
+            stream(1, "SkySport3.nz"), stream(2, "skysport3.nz"), stream(3, "other.uk"),
+        ).spreadByChannel()
+        assertEquals(listOf(1, 3, 2), spread.map { it.streamId })
+    }
+
+    @Test
+    fun `a channel with no guide id is not spread with the others`() {
+        // Nothing is known to share it, so nothing should be interleaved
+        // with it as though it were the same channel.
+        val spread = listOf(
+            stream(1, ""), stream(2, ""), stream(3, "sky.uk"),
+        ).spreadByChannel()
+        assertEquals(3, spread.size)
+        assertEquals(setOf(1, 2, 3), spread.map { it.streamId }.toSet())
+    }
+
+    @Test
+    fun `one channel per stream is left exactly as it was`() {
+        // The common case, and it must not be reordered: the provider's own
+        // numbering decides ties.
+        val streams = listOf(stream(1, "a.uk"), stream(2, "b.uk"), stream(3, "c.uk"))
+        assertEquals(streams, streams.spreadByChannel())
+    }
+
+    @Test
+    fun `nothing and one thing are returned unchanged`() {
+        assertTrue(emptyList<LiveStream>().spreadByChannel().isEmpty())
+        val one = listOf(stream(1, "a.uk"))
+        assertEquals(one, one.spreadByChannel())
+    }
+
+    // Saying what is carrying it.
+
+    @Test
+    fun `the label separates channels from feeds`() {
+        // "on 36 channels" overstated how many places there were to go when
+        // one failed, and read as nonsense beside a list that was plainly the
+        // same three names repeated.
+        assertEquals("on 3 channels · 36 feeds", carriedOnLabel(guideChannels = 3, feeds = 36))
+    }
+
+    @Test
+    fun `one number is enough when they agree`() {
+        assertEquals("on 4 channels", carriedOnLabel(guideChannels = 4, feeds = 4))
+        assertEquals("on 1 channel", carriedOnLabel(guideChannels = 1, feeds = 1))
+    }
 }
