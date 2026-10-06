@@ -751,9 +751,16 @@ with the provider's own.
 flourish.** They watch the Premier League, so a UK sports guide is the obvious
 source — and the three o'clock Saturday kick-offs are not broadcast in the UK
 at all, so the feeds carrying them are foreign and so are their listings. One
-country's guide cannot answer both. `MAX_GUIDE_SOURCES` is four: two for that,
-and room for another country without turning a refresh into a download of
-everything anyone has ever published.
+country's guide cannot answer both.
+
+**`MAX_GUIDE_SOURCES` is eight, and it was four for about a day.** Four was
+meant as two for the above plus room for another country, and the arithmetic
+was simply wrong: asked what they actually watch, the owner named the UK and
+Ireland *and* the United States, Canada and Australia, which is five addresses
+before anyone has thought about it. Eight is headroom rather than a second
+guess. The real cost is the download — each source is a few megabytes gzipped
+and about ten seconds, fetched together after the provider's own guide, so
+eight is roughly a minute on the box, twice a day at most.
 
 The rules are `core/ExtraGuide.kt`, tested. Two hard parts, and neither is the
 fetching:
