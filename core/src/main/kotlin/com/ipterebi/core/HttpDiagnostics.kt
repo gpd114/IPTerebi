@@ -15,8 +15,11 @@ package com.ipterebi.core
  * every reconnect for about fifteen seconds after the phone left Wi-Fi, while
  * the panel still counted the connection that had dropped, and then let the
  * next one in.
+ *
+ * Internal rather than private: multiview shares them, being the one feature
+ * that asks a panel for several streams on purpose.
  */
-private val CONNECTION_LIMIT_CODES = setOf(456, 458)
+internal val CONNECTION_LIMIT_CODES = setOf(456, 458)
 
 private const val AT_CONNECTION_LIMIT = "The line has hit its connection limit. If " +
     "nothing else is playing, the panel may still be counting a connection that " +
