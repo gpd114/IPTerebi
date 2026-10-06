@@ -173,3 +173,81 @@ fun GuideSpan.plus(programme: XmltvProgramme): GuideSpan = GuideSpan(
  */
 fun worthKeepingBeyond(theirs: XmltvProgramme, ours: GuideSpan): Boolean =
     ours.empty || theirs.stop <= ours.earliest || theirs.start >= ours.latest
+
+/**
+ * How many extra sources may be set.
+ *
+ * Not a round number for its own sake. The owner's reason for wanting a
+ * second guide at all is the Premier League: a UK sports source for the
+ * matches shown here, and at least one foreign source for the three o'clock
+ * Saturday games, which are not broadcast in the UK and so are listed only
+ * where they are. That is two, and a third and fourth leave room for another
+ * country without turning a guide refresh into a download of everything
+ * anyone has ever published. Each one is tens of megabytes and they are
+ * fetched together.
+ */
+const val MAX_GUIDE_SOURCES = 4
+
+/**
+ * The XMLTV sources in a typed block of text, tidied.
+ *
+ * One per line is what the field invites, but people paste, so commas and
+ * spaces separate them too — neither can occur inside a URL, so splitting on
+ * them cannot break one.
+ *
+ * Blank is how extra sources are turned off, as blank is how the team row is.
+ * Anything that is not URL-shaped is dropped rather than kept to fail later:
+ * a guide refresh happens in the background, hours after the typing, and an
+ * error there has nowhere to be seen.
+ */
+fun cleanGuideSources(raw: String): List<String> =
+    raw.split('\n', '\r', '\t', ' ', ',', ';')
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .map { withScheme(it) }
+        .filter { looksLikeUrl(it) }
+        .distinct()
+        .take(MAX_GUIDE_SOURCES)
+
+/**
+ * **A guide source defaults to https, where a panel defaults to http.**
+ *
+ * That looks like an inconsistency and is the opposite. Panels are
+ * overwhelmingly plain HTTP on a high port, and assuming https there fails at
+ * the handshake with an error naming TLS, which sends you looking in the
+ * wrong place. A public guide is an ordinary website on an ordinary port,
+ * served by people who have had a certificate for years, and assuming http
+ * there earns a redirect at best.
+ */
+private fun withScheme(candidate: String): String =
+    if (candidate.contains("://")) candidate else "https://$candidate"
+
+private fun looksLikeUrl(candidate: String): Boolean {
+    if (!candidate.startsWith("http://", ignoreCase = true) &&
+        !candidate.startsWith("https://", ignoreCase = true)
+    ) return false
+    val authority = candidate.substringAfter("://")
+        .substringBefore('/').substringBefore('?').substringBefore('#')
+    // A dot or a port: a bare word is a typo, not a host. `localhost:8080`
+    // passes on the port, which is what a source served off the same machine
+    // as a test panel looks like.
+    return '.' in authority || ':' in authority
+}
+
+/**
+ * A source named short enough to log and to show.
+ *
+ * **It drops the query, and that is the point as much as the length.** Some
+ * publishers put a subscriber token in it, and a token in a log is the same
+ * mistake as a stream URL in a log — see `String.withoutCredentialValues`.
+ * The host and the file are what identify a source to the person who typed
+ * it; nothing else is anyone's business.
+ */
+fun guideSourceLabel(url: String): String {
+    val afterScheme = url.substringAfter("://", url)
+    val host = afterScheme.substringBefore('/').substringBefore('?').substringBefore('#')
+    val file = afterScheme.substringAfter('/', "")
+        .substringBefore('?').substringBefore('#')
+        .trimEnd('/').substringAfterLast('/')
+    return if (file.isBlank()) host else "$host/$file"
+}

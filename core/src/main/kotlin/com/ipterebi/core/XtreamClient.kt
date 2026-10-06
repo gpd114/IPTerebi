@@ -15,7 +15,9 @@ import okhttp3.Request
 import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
+import java.io.PushbackInputStream
 import java.util.concurrent.TimeUnit
+import java.util.zip.GZIPInputStream
 /**
  * How long a call that is only asking whether the line is alive may take, in
  * total — connecting, the DNS behind it, and every route OkHttp tries.
@@ -353,6 +355,85 @@ class XtreamClient(
     }
 
     /**
+     * An XMLTV document from anywhere, read the same way as [xmltv].
+     *
+     * The provider's own guide is the limit on everything built on top of it,
+     * and on a real line it is a thin one: 40 hours ahead one day and 17 the
+     * next, and a fixture carried by seven channels named on one of them. A
+     * public source fills that in — see [guideKey] for the hard part, which is
+     * deciding which of its channels are the line's.
+     *
+     * **Three things are different from a panel's own guide.**
+     *
+     * It may be gzipped, and usually is: publishers serve `.xml.gz` because
+     * a week of every channel is a hundred megabytes of text and a tenth of
+     * that compressed. OkHttp only unwraps gzip it asked for, so this sniffs
+     * the two magic bytes instead of trusting the file name or the content
+     * type, both of which are often wrong.
+     *
+     * It is logged by [guideSourceLabel], not by its URL, because some
+     * publishers put a subscriber token in the query.
+     *
+     * And it is nobody's fault but the source's when it fails, so the caller
+     * is expected to carry on without it: [Guide] fetches these after the
+     * provider's own guide and keeps what it got either way.
+     */
+    suspend fun xmltvFrom(
+        source: String,
+        userAgent: String,
+        onChannel: (XmltvChannel) -> Unit = {},
+        onProgramme: (XmltvProgramme) -> Unit,
+    ): XmltvSummary = withContext(Dispatchers.IO) {
+        val job = coroutineContext[Job]
+        val label = guideSourceLabel(source)
+        val url = source.toHttpUrlOrNull()
+            ?: throw XtreamException("$label is not an address this can fetch.")
+        log("GET $label")
+        val request = Request.Builder().url(url).header("User-Agent", userAgent).build()
+        val response = try {
+            http.newCall(request).execute()
+        } catch (e: IOException) {
+            throw XtreamException(describeNetworkFailure(e, url.host), e)
+        }
+        response.use {
+            if (!it.isSuccessful) {
+                throw XtreamException("$label answered HTTP ${it.code} rather than a TV guide.")
+            }
+            val body = it.body ?: throw XtreamException("$label sent nothing.")
+            // Counted before unwrapping, so the figure in the log is what the
+            // download actually cost — which for a gzipped week of listings is
+            // a tenth of what is read out of it.
+            val counted = CountingInputStream(body.byteStream())
+            var channels = 0
+            var programmes = 0
+            val started = System.currentTimeMillis()
+            try {
+                readXmltv(
+                    input = maybeGunzip(counted)
+                        .reader(body.contentType()?.charset() ?: Charsets.UTF_8),
+                    onChannel = { channel -> channels++; onChannel(channel) },
+                    onProgramme = { programme ->
+                        job?.ensureActive()
+                        programmes++
+                        onProgramme(programme)
+                    },
+                )
+            } catch (e: IOException) {
+                throw XtreamException(
+                    "$label stopped downloading part-way: ${e.message ?: "connection lost"}.",
+                    e,
+                )
+            }
+            XmltvSummary(channels, programmes, counted.count).also { summary ->
+                log(
+                    "  $label: ${summary.channels} channels, ${summary.programmes} programmes, " +
+                        "${summary.bytes / 1024} KB in ${System.currentTimeMillis() - started} ms"
+                )
+            }
+        }
+    }
+
+    /**
      * Where the video actually is. The credentials sit in the path, not in a
      * header, so this string is as sensitive as the password itself — never log
      * it, and be careful about putting it anywhere a crash reporter can see.
@@ -544,4 +625,25 @@ private class CountingInputStream(input: InputStream) : FilterInputStream(input)
 
     override fun read(b: ByteArray, off: Int, len: Int): Int =
         super.read(b, off, len).also { if (it > 0) count += it }
+}
+
+/**
+ * [input], unwrapped if it is gzipped.
+ *
+ * **Sniffed, not asked.** Nearly every public XMLTV source is served as
+ * `.xml.gz`, because a week of every channel is a hundred megabytes of text,
+ * and OkHttp only unwraps gzip it negotiated itself. Neither the file name nor
+ * the content type can be trusted — publishers serve `.gz` as `text/xml`, and
+ * plain XML from a URL ending `.gz` — but the two magic bytes at the front of
+ * a gzip member cannot be anything else, since an XMLTV document starts with
+ * `<` or a byte-order mark.
+ */
+private fun maybeGunzip(input: InputStream): InputStream {
+    val peekable = PushbackInputStream(input, 2)
+    val first = peekable.read()
+    if (first < 0) return peekable
+    val second = peekable.read()
+    if (second >= 0) peekable.unread(second)
+    peekable.unread(first)
+    return if (first == 0x1f && second == 0x8b) GZIPInputStream(peekable) else peekable
 }

@@ -44,7 +44,9 @@ import com.ipterebi.app.playback.ActivePlayback
 import com.ipterebi.app.ui.home.HomeChannels
 import com.ipterebi.app.ui.theme.Appearance
 import com.ipterebi.app.ui.theme.Night
+import com.ipterebi.core.MAX_GUIDE_SOURCES
 import com.ipterebi.core.StreamFormat
+import com.ipterebi.core.cleanGuideSources
 import com.ipterebi.core.UserAgents
 import com.ipterebi.core.connectionsLabel
 import com.ipterebi.core.expiryLabel
@@ -90,6 +92,10 @@ fun SettingsScreen(
             val context = LocalContext.current
             // What "Free the line" did, said under it until the screen is left.
             var freed by remember { mutableStateOf<String?>(null) }
+            // A guide download is one at a time for the whole app, so this is
+            // true whoever started it — including the channel list, which
+            // offers one when the phone has no guide yet.
+            val fetchingGuide by container.guide.downloading.collectAsStateWithLifecycle()
 
             // First, as in Debritsu: the one setting that changes everything
             // else on the screen as it is pressed.
@@ -151,6 +157,65 @@ fun SettingsScreen(
                         "Type it the way your guide writes it — \"Man Utd\" and " +
                         "\"Manchester United\" are not the same to a provider. Leave it " +
                         "empty for no row.",
+                )
+            }
+
+            Panel {
+                SectionTitle("Extra TV guides")
+                var guides by remember { mutableStateOf(container.extraGuides.asTyped()) }
+                val savedGuides by container.extraGuides.sources.collectAsStateWithLifecycle()
+                val guidesChanged = cleanGuideSources(guides) != savedGuides
+                DpadTextField(Modifier.fillMaxWidth()) { fieldModifier ->
+                    OutlinedTextField(
+                        value = guides,
+                        onValueChange = { guides = it },
+                        label = { Text("XMLTV addresses, one per line") },
+                        minLines = 2,
+                        maxLines = MAX_GUIDE_SOURCES,
+                        colors = fieldColours(),
+                        shape = MaterialTheme.shapes.large,
+                        modifier = fieldModifier.fillMaxWidth(),
+                    )
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SecondaryButton(
+                        // Saving puts the tidied list back in the field, so a
+                        // line that was not an address visibly goes now rather
+                        // than being quietly dropped tonight.
+                        text = if (guidesChanged) "Save" else "Saved",
+                        onClick = {
+                            container.extraGuides.set(guides)
+                            guides = container.extraGuides.asTyped()
+                            focusManager.clearFocus()
+                        },
+                        enabled = guidesChanged,
+                        height = 42.dp,
+                    )
+                    if (savedGuides.isNotEmpty()) {
+                        SecondaryButton(
+                            text = if (fetchingGuide) "Fetching…" else "Fetch now",
+                            onClick = viewModel::refreshGuideNow,
+                            enabled = !fetchingGuide && account != null,
+                            height = 42.dp,
+                        )
+                    }
+                }
+                Hint(
+                    "Public XMLTV guides, to fill in what your provider's own guide " +
+                        "leaves out — the channels it has nothing for, and the days " +
+                        "beyond where it stops. Where the two cover the same programme " +
+                        "your provider wins; these only fill the silence.",
+                )
+                Hint(
+                    "Up to ${MAX_GUIDE_SOURCES}, one per line, and a gzipped .xml.gz is " +
+                        "fine. A sports guide for the country you watch in, plus one for " +
+                        "the countries carrying kick-offs that are not shown here, is the " +
+                        "usual pair. Nothing is filled in for you: find a source you " +
+                        "trust and paste its address. Fetching one is tens of megabytes, " +
+                        "so it happens with the provider's own guide, not on its own.",
                 )
             }
 

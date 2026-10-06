@@ -115,6 +115,20 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    /**
+     * Fetches the full guide now — the provider's own and every extra
+     * source, in one pass.
+     *
+     * Here because of what changing the sources otherwise costs: a refresh
+     * happens at most every twelve hours, so somebody who has just pasted
+     * two addresses would see nothing change until tomorrow and conclude
+     * they had typed them wrong.
+     */
+    fun refreshGuideNow() {
+        val account = _state.value.account ?: return
+        container.guide.refreshNow(account)
+    }
+
     /** Brings a hidden channel back into every list it was taken out of. */
     fun showChannel(channel: LiveStream) {
         val account = _state.value.account ?: return
