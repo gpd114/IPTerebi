@@ -287,3 +287,61 @@ fun Showing.streams(channels: List<LiveStream>): List<LiveStream> {
     return this.channels.flatMap { byChannel[it].orEmpty() }
 }
 
+
+/**
+ * These streams with one per guide channel before any second.
+ *
+ * **A provider carries the same channel many times over**, and on the owner's
+ * line that turns three channels into thirty-six: Sky Sports+ as HD, SD, RAW,
+ * HEVC HD and HEVC 4K, Sky Sports Main Event as RAW, HD, VIP HD and VIP HD
+ * hevc. Listed in the provider's own order, the first several rows under an
+ * event are all the same channel in different clothes, which is the one thing
+ * a viewer whose picture has just died does not need.
+ *
+ * Round-robin rather than filtered, because the variants are not noise. A
+ * line carries ITV1 as the HD cut, the FHD cut and a backup under one guide
+ * id, and when a feed dies another stream of the *same* channel is very often
+ * the best thing to switch to — the same reason [showingOf] keeps the channel
+ * being watched. So every different channel comes first, then every channel's
+ * second stream, and so on: both answers, in the order they are wanted.
+ *
+ * Order within a channel is kept, and so is the order the channels first
+ * appear, so a provider's own numbering still decides ties.
+ */
+fun List<LiveStream>.spreadByChannel(): List<LiveStream> {
+    if (size < 2) return this
+    val groups = LinkedHashMap<String, MutableList<LiveStream>>()
+    for (stream in this) {
+        // Folded, because a real line sends SkySport3.nz beside skysport3.nz.
+        // A channel with no guide id is its own group, keyed on its stream id:
+        // nothing is known to share it, so nothing should be spread with it.
+        val key = stream.epgChannelId.lowercase().ifBlank { "#${stream.streamId}" }
+        groups.getOrPut(key) { mutableListOf() } += stream
+    }
+    if (groups.size == size) return this
+    val spread = ArrayList<LiveStream>(size)
+    var round = 0
+    while (spread.size < size) {
+        for (group in groups.values) group.getOrNull(round)?.let(spread::add)
+        round++
+    }
+    return spread
+}
+
+/**
+ * "on 3 channels · 36 feeds" — what is carrying an event, honestly.
+ *
+ * **The two numbers are different questions and only one of them was being
+ * answered.** The count shown used to be the streams, so an event on three
+ * channels that a provider happens to carry a dozen ways each read as "on 36
+ * channels" — which overstates how many places there are to go when one
+ * fails, and reads as nonsense beside a list that is plainly the same three
+ * names repeated.
+ *
+ * The feeds are still worth saying, because they are what can be pressed. So
+ * both, and only when they differ.
+ */
+fun carriedOnLabel(guideChannels: Int, feeds: Int): String {
+    val channels = "on $guideChannels channel" + if (guideChannels == 1) "" else "s"
+    return if (feeds > guideChannels) "$channels · $feeds feeds" else channels
+}

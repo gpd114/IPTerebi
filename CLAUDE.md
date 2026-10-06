@@ -915,6 +915,29 @@ simpler design:
   switch to is very often another stream on the *same* guide channel. Taking
   the guide channel out would hide exactly those. Hence `showingOf`, which
   keeps it, beside `alsoShowing`, which does not.
+- **A channel and a feed are different numbers, and only one was being
+  reported.** Found the first time search ran on the owner's own box:
+  "arsenal" put **Lost Grounds · on 36 channels** at the top, over a list that
+  was plainly the same few names repeated — `UK: SKY SPORTS + HD`, `+ SD`,
+  `+ RAW`, `+ HEVC HD`, `+ HEVC 4K`, then Main Event in four more cuts. The
+  guide was asked and said **three**: three distinct `epg_channel_id`s, which
+  the provider carries thirty-six ways between them.
+
+  The *ranking* was right all along — `Showing.feeds` is distinct guide
+  channels and sorts on those, which is why a programme merely naming Arsenal
+  on three channels beat the fixtures on one. What was wrong was the label and
+  the list. `carriedOnLabel` now says "on 3 channels · 36 feeds", both numbers
+  and only when they differ; the streams overstate how many places there are
+  to go when one fails, and reading "36" beside three repeated names is the
+  kind of thing that makes a screen look broken.
+
+  And `spreadByChannel` puts one of every channel before any channel's second
+  stream. Round-robin rather than filtered, because the variants are not
+  noise: the bullet above is the reason — another stream of the *same* guide
+  channel is very often the best thing to switch to. So both answers, in the
+  order they are wanted. Order within a channel is kept and so is the order
+  the channels first appear, so the provider's own numbering still decides
+  ties.
 
 **It is all local, and that is the point.** `GuideStore.inWindow` reads the
 window from the database on the device and `WhatsOnIndex` folds the text once
