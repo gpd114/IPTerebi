@@ -1251,6 +1251,50 @@ already using it" while nothing was playing at all. The screen now keeps the
 *code* and words it at draw time from the live count, and all three settled on
 "1 pane". Anything else that explains one pane in terms of the others has to
 do the same.
+
+**How the grid is arranged, and why it is a hold.** It opened on the
+favourites and that was all — the owner's first two questions on seeing it
+were "how do you add which channels you want" and "can you change how many",
+and the answer to both was no. The obvious fix was number keys, one to four,
+which is how a set-top box does everything. **Their remote has no number
+keys**, which also quietly kills the "number keys straight to a channel" the
+Live TV screen advertises.
+
+So: **hold OK on a pane** → *Change channel*, *Add a pane*, *Remove this
+pane*. Arrows move between panes and OK moves the sound, which leaves holding
+OK as the only free gesture — and it is the one this app already means "do
+something to this thing" by, on a channel and on a poster.
+
+- **The hold is read as a key repeat, not as a long click.** A remote whose OK
+  key repeats — the owner's box does — sends a press, a stream of repeats and
+  a release, so the first repeat *is* the hold and arrives while the key is
+  still down. `combinedClickable` measures elapsed time instead, which a
+  repeating remote never gives it cleanly and which no synthetic key event
+  gives it at all: it did nothing on the emulator and would have been shipped
+  untested.
+- **A fresh press has a repeat count of zero, so it clears the flag.** The
+  release that ends a hold is eaten by the panel the hold just opened, never
+  by the pane, so the flag was being left set and the next ordinary press did
+  nothing. This is the same rule `deafUntilPressed` turns on, met from the
+  other side.
+- **Focus is put back on the grid whenever a panel closes.** A panel takes
+  focus into itself and leaves nothing holding it on the way out; a grid with
+  no focus is one the remote cannot drive at all, and the screen simply stopped
+  responding. The grid takes focus on open for the same reason — without it no
+  pane is ever focused and the hold can never happen.
+- **The picker is the groups then their channels**, the same shape Live TV
+  browses, and none of it costs a request: `TvLiveViewModel` already holds the
+  whole lineup. Something already up is shown and **refused rather than
+  hidden** — a channel missing from a list you are looking straight at reads
+  as a fault.
+- **The arrangement is kept per line** (`MultiStore`, plain preferences, keyed
+  on `lineKey`). Channel 4271 on one provider is not channel 4271 on another,
+  so a grid carried across lines would open on four things nobody chose.
+
+Driven on `googletv34`: a pane changed in place and kept its sound, four panes
+became three with the sound moving to the first that was left, "Add a pane"
+reappeared once there was room, and the stored arrangement went `109,101,102,
+103` → `101,102,103` as it went.
 **What is still unproven is a real provider.** The owner's line is the only
 real one available and it is the case this cannot work on, so what has been
 shown is the screen behaving correctly against a panel that refuses — not a

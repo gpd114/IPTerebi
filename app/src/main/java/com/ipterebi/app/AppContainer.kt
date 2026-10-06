@@ -8,6 +8,7 @@ import com.ipterebi.app.data.LineChannels
 import com.ipterebi.app.data.ReminderStore
 import com.ipterebi.app.data.TeamStore
 import com.ipterebi.app.data.ListStore
+import com.ipterebi.app.data.MultiStore
 import com.ipterebi.app.data.RecordingStore
 import com.ipterebi.app.data.WatchStore
 import com.ipterebi.app.data.CredentialStore
@@ -99,6 +100,9 @@ class AppContainer(context: Context) {
     val team = TeamStore(context.applicationContext)
 
     val channelLists = ChannelListStore(context.applicationContext)
+
+    /** The multiview grid as it was left, per line. See MultiStore. */
+    val multi = MultiStore(context.applicationContext)
 
     /**
      * Extra XMLTV sources, typed in Settings, filling in what the provider's
