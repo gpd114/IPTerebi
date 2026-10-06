@@ -988,7 +988,8 @@ refusing things is usually why the card is there. It logs what it found under
 `IPTerebiPlay`, because the box's screenshots come out blank over video and
 the log is the only way to see it.
 
-The TV guide has no search box yet, so the team search is the phone's for now.
+The TV guide itself still has no search box in it; searching on the box is
+its own screen on the rail. See "Searching on the television" below.
 
 **Not yet seen working on a real line, and the reason is good news.** The
 owner's line refused nothing on 3 October: MPEG-TS played, HLS played (this
@@ -1115,6 +1116,50 @@ programme overlapping what the UK one had just added was dropped while the
 later one was kept.
 
 
+
+## Searching on the television
+
+The TV build had none. This file said so — "the TV guide has no search box
+yet, so the team search is the phone's for now" — and that is now closed:
+a **Search** item on the rail, `ui/tv/TvSearchScreen.kt`.
+
+**It answers the same two questions the phone's does, in the same order**, and
+for the same reason that was learnt there: a team name matches no channel
+*name* — nothing is called Croatia — so what is **on** is reported above what
+is **called** that, rather than instead of it. Each event names every channel
+carrying it, as rows that tune them, because the moment somebody searches a
+team is the moment a picture has just gone.
+
+Nothing underneath is new. `LineChannels` is the shared cache, so this and the
+channel list make one several-megabyte request rather than one each;
+`NameIndex` folds the names once and `WhatsOnIndex` the guide once. The window
+is a day, because the same line published 41 hours ahead one day and 17 the
+next, and six events, because `Live: College Football` was on 127 channels and
+the point is a list short enough to pick from.
+
+Two things about it are specific to a remote, and both were found by driving
+it rather than by thinking about it:
+
+- **The field takes focus when the screen opens.** Focus arrives on the rail,
+  which runs down the left, while the field sits across the top — so pressing
+  Right from "Search", six rows down, finds nothing level with it and nothing
+  happens at all. Somebody who opened a search screen wants to type. Safe
+  because `DpadTextField` is click-to-edit: focus alone does not summon the
+  keyboard, which is the trap it exists to avoid.
+- **Typing is the expensive part, so the line is fetched while they are still
+  hunting for letters** rather than on the first keystroke. On a phone the
+  request and the typing overlap anyway; on a D-pad the typing is long enough
+  that the request can hide inside it entirely.
+
+And the standing advice is in the empty state: a team searched every week
+belongs in Settings, where the row on Home finds it without anybody spelling
+it out on a remote. The search is for the other times.
+
+Proved on the `googletv34` emulator against the fake panel: **croatia** gave
+"UEFA Nations League: Croatia v England · on 4 channels" with the four feeds
+listed and no channel section, because nothing is called that; **news** gave
+the channel and no events. The unrelated programme on at the same moment
+stayed out of both.
 ## Several channels at once
 
 Asked for, cancelled, and asked for again — "I want to have the multi screen

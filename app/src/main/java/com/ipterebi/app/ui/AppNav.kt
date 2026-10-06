@@ -83,6 +83,7 @@ import com.ipterebi.app.ui.tv.TvRecordingsScreen
 import com.ipterebi.app.ui.tv.TvSeriesScreen
 import com.ipterebi.app.ui.tv.TvLiveScreen
 import com.ipterebi.app.ui.tv.TvMultiScreen
+import com.ipterebi.app.ui.tv.TvSearchScreen
 
 object Route {
     const val LOGIN = "login"
@@ -103,6 +104,9 @@ object Route {
 
     /** Several channels at once; the TV build only. See TvMultiScreen. */
     const val TV_MULTI = "tv/multi"
+
+    /** Searching, TV only: the phone has its own on the channel list. */
+    const val TV_SEARCH = "tv/search"
 
     /**
      * Playing a recording back: a file on the box, not anything the panel
@@ -170,6 +174,9 @@ private enum class Section(
     // Last, and deliberately: on a line that allows one stream this is a
     // curiosity rather than where anyone starts the evening. See
     // core/MultiView.kt.
+    // Above Multi, because a search is something people reach for and
+    // multiview is a curiosity on a one-connection line.
+    SEARCH(Route.TV_SEARCH, "Search", R.drawable.ic_nav_search),
     MULTI(Route.TV_MULTI, "Multi", R.drawable.ic_nav_multi),
 }
 
@@ -507,6 +514,20 @@ fun AppNav(container: AppContainer) {
                                     },
                                     onBack = { nav.popBackStack() },
                                 )
+                            }
+
+                            // Searching, TV only. The phone has its own on
+                            // the channel list; the TV had none at all.
+                            composable(Route.TV_SEARCH) {
+                                val signedIn = current as? AccountState.SignedIn
+                                if (signedIn != null) {
+                                    TvSearchScreen(
+                                        container = container,
+                                        onPlay = { channel ->
+                                            nav.navigate(Route.tvLive(channel.streamId))
+                                        },
+                                    )
+                                }
                             }
 
                             // Several channels at once. TV only, and see
