@@ -889,6 +889,18 @@ built first and taken back out; it is in the history if it is ever wanted.
   that says "nothing" the moment a match ends is a row nobody trusts. The
   guide reaches only as far as the provider publishes, so this is a ceiling
   and usually not reached.
+- **The day is named, always** (`matchWhenLabel`, tested). The row showed the
+  clock alone for anything happening today and added a date only for another
+  day, on the reasoning that today needs no saying. Against a fixture it does:
+  the owner looked at "11:00 – 13:00" over a Champions League tie and said it
+  could confuse somebody, and they were right — the only thing placing that
+  time was the ON NOW tag beside the team's name, which is an inference, made
+  at a glance, by someone who has just lost a picture. Near days get a word
+  ("Today", "Tomorrow") because that is how people say them and a word reads
+  quicker across a room than "Tue 6 Oct"; further off gets the weekday as well
+  as the date, because "11 Oct" does not answer "is that the weekend".
+  Yesterday is in there for one real case — a match that kicked off at 23:30
+  and is still on at half past midnight is on now, and started yesterday.
 
 Type the name the way the guide writes it. "Man Utd" and "Manchester
 United" are not the same thing to a provider, and nothing here second-

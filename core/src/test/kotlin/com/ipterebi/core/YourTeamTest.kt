@@ -234,4 +234,91 @@ class YourTeamTest {
         assertEquals("Manchester United", cleanTeamName("Manchester United"))
         assertEquals("1. FC Köln", cleanTeamName("1. FC Köln"))
     }
+
+    // When a match is on, in words. The owner's report: a Champions League
+    // tie showing "11:00 – 13:00" and nothing saying which day.
+
+    private val london = java.time.ZoneId.of("Europe/London")
+    private val uk = java.util.Locale.UK
+
+    /** Unix seconds for a local time in London, so the cases read as dates. */
+    private fun at(date: String, time: String): Long =
+        java.time.LocalDateTime.parse("${date}T$time")
+            .atZone(london).toEpochSecond()
+
+    @Test
+    fun `today is named rather than left to be inferred`() {
+        // Not "11:00 – 13:00". The only thing placing that was the ON NOW
+        // tag, which is an inference made at a glance by somebody who has
+        // just lost a picture.
+        assertEquals(
+            "Today 11:00 – 13:00",
+            matchWhenLabel(
+                startSeconds = at("2026-10-06", "11:00"),
+                stopSeconds = at("2026-10-06", "13:00"),
+                nowSeconds = at("2026-10-06", "12:15"),
+                zone = london,
+                locale = uk,
+            ),
+        )
+    }
+
+    @Test
+    fun `tomorrow is a word, not a date`() {
+        assertEquals(
+            "Tomorrow 20:00 – 22:00",
+            matchWhenLabel(
+                startSeconds = at("2026-10-07", "20:00"),
+                stopSeconds = at("2026-10-07", "22:00"),
+                nowSeconds = at("2026-10-06", "12:15"),
+                zone = london,
+                locale = uk,
+            ),
+        )
+    }
+
+    @Test
+    fun `further off gets the weekday as well as the date`() {
+        // "11 Oct" alone does not answer "is that the weekend".
+        assertEquals(
+            "Sun 11 Oct, 15:00 – 17:00",
+            matchWhenLabel(
+                startSeconds = at("2026-10-11", "15:00"),
+                stopSeconds = at("2026-10-11", "17:00"),
+                nowSeconds = at("2026-10-06", "12:15"),
+                zone = london,
+                locale = uk,
+            ),
+        )
+    }
+
+    @Test
+    fun `a match that began last night is yesterday, and still on`() {
+        // The one case that needs it: kick-off at 23:30, half past midnight
+        // now, and the row is showing it as on now.
+        assertEquals(
+            "Yesterday 23:30 – 01:30",
+            matchWhenLabel(
+                startSeconds = at("2026-10-05", "23:30"),
+                stopSeconds = at("2026-10-06", "01:30"),
+                nowSeconds = at("2026-10-06", "00:30"),
+                zone = london,
+                locale = uk,
+            ),
+        )
+    }
+
+    @Test
+    fun `the day is the viewer's, not the clock's`() {
+        // 23:00 in London on the 6th is 00:00 on the 7th in Berlin, and the
+        // row must say what the person reading it would say.
+        val start = at("2026-10-06", "23:00")
+        val stop = at("2026-10-07", "01:00")
+        val now = at("2026-10-06", "22:00")
+        assertTrue(matchWhenLabel(start, stop, now, london, uk).startsWith("Today "))
+        assertTrue(
+            matchWhenLabel(start, stop, now, java.time.ZoneId.of("Europe/Berlin"), uk)
+                .startsWith("Tomorrow "),
+        )
+    }
 }

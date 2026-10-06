@@ -602,14 +602,11 @@ private fun Modifier.rightStaysInRow(): Modifier = focusProperties {
     }
 }
 
-/** "15:00 – 17:00" for a match, with the day when it is not today. */
-private fun teamWhen(match: com.ipterebi.core.TeamMatch): String {
-    val zone = java.time.ZoneId.systemDefault()
-    val from = java.time.Instant.ofEpochSecond(match.showing.start).atZone(zone)
-    val to = java.time.Instant.ofEpochSecond(match.showing.stop).atZone(zone)
-    val today = java.time.LocalDate.now(zone)
-    val clock = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
-    val day = if (from.toLocalDate() == today) "" else
-        java.time.format.DateTimeFormatter.ofPattern("EEE d MMM, ").format(from)
-    return day + clock.format(from) + " – " + clock.format(to)
-}
+/** "15:00 – 17:00" for a match, with the day always named.
+ *  The rule, and why, is [com.ipterebi.core.matchWhenLabel]. */
+private fun teamWhen(match: com.ipterebi.core.TeamMatch): String =
+    com.ipterebi.core.matchWhenLabel(
+        startSeconds = match.showing.start,
+        stopSeconds = match.showing.stop,
+        nowSeconds = System.currentTimeMillis() / 1000,
+    )
