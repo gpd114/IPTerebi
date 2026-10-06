@@ -122,4 +122,54 @@ class NetworkFailureTest {
     fun `no message anywhere names the host and stops`() {
         assertEquals("Could not reach panel.example.", describeNetworkFailure(java.io.IOException(), host = "panel.example"))
     }
+
+    // A line that has worked before gets different advice.
+
+    @Test
+    fun `a working line is not told to check for a typo`() {
+        // The owner's point: on a line that has run for weeks the address
+        // cannot have a typo in it, so saying so is noise in front of the
+        // answer.
+        val message = describeNetworkFailure(
+            java.net.UnknownHostException("Unable to resolve host"),
+            "panel.example",
+            knownGood = true,
+        )
+        assertFalse(message.contains("typo"))
+        assertTrue(message.contains("offline") || message.contains("their end"))
+    }
+
+    @Test
+    fun `a first sign-in still is`() {
+        val message = describeNetworkFailure(
+            java.net.UnknownHostException("Unable to resolve host"),
+            "panel.example",
+        )
+        assertTrue(message.contains("typo"))
+    }
+
+    @Test
+    fun `a working line is not told about ports either`() {
+        val message = describeNetworkFailure(
+            java.net.ConnectException("ECONNREFUSED"),
+            "panel.example",
+            knownGood = true,
+        )
+        assertFalse(message.contains("different ports"))
+        assertTrue(message.contains("restarted") || message.contains("listening"))
+    }
+
+    @Test
+    fun `whose end it is does not change with it`() {
+        // The half that is useful either way: told quickly, and told it is
+        // not the app.
+        for (known in listOf(true, false)) {
+            val message = describeNetworkFailure(
+                java.net.SocketTimeoutException("timeout"),
+                "panel.example",
+                knownGood = known,
+            )
+            assertTrue(message.contains("their end") || message.contains("down or overloaded"))
+        }
+    }
 }

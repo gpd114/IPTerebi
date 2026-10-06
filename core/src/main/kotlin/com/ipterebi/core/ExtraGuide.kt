@@ -132,3 +132,44 @@ fun worthKeeping(
     theirs: XmltvProgramme,
     oursFor: List<XmltvProgramme>,
 ): Boolean = oursFor.none { it.start < theirs.stop && theirs.start < it.stop }
+
+/**
+ * How far the provider's own guide reaches for one channel.
+ *
+ * Two numbers per channel rather than every programme it holds: a real line
+ * is a hundred thousand programmes and the question being asked of them is
+ * only "does the provider already cover this moment".
+ */
+data class GuideSpan(val earliest: Long, val latest: Long) {
+    /** A channel the provider said nothing about at all. */
+    val empty: Boolean get() = earliest > latest
+}
+
+/** The span of nothing, which every programme falls outside. */
+val NO_SPAN = GuideSpan(Long.MAX_VALUE, Long.MIN_VALUE)
+
+/** [GuideSpan] widened to include [programme]. */
+fun GuideSpan.plus(programme: XmltvProgramme): GuideSpan = GuideSpan(
+    earliest = minOf(earliest, programme.start),
+    latest = maxOf(latest, programme.stop),
+)
+
+/**
+ * Whether a second source's programme is worth keeping against [ours].
+ *
+ * Outside what the provider gave, or on a channel it gave nothing for. Two
+ * cases, and they are the two that matter:
+ *
+ * - **A channel with no guide at all.** The ordinary case: a line carried
+ *   21,077 channels and the provider's `xmltv.php` covered 1,366 of them.
+ * - **Beyond the provider's horizon.** It published 40 hours one day and 17
+ *   the next, while keeping seven days of recordings — so the far end is
+ *   where a second source earns its place.
+ *
+ * What it will *not* do is fill a hole inside the provider's own stretch.
+ * The provider is closer to what it is actually broadcasting, a gap there is
+ * usually a junction rather than a mistake, and two sources interleaved
+ * across one evening is a guide nobody can read.
+ */
+fun worthKeepingBeyond(theirs: XmltvProgramme, ours: GuideSpan): Boolean =
+    ours.empty || theirs.stop <= ours.earliest || theirs.start >= ours.latest

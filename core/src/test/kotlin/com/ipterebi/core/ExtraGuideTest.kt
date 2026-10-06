@@ -158,4 +158,44 @@ class ExtraGuideTest {
         assertTrue(worthKeeping(prog(500, 600), oursFor = listOf(prog(400, 500))))
         assertTrue(worthKeeping(prog(500, 600), oursFor = listOf(prog(600, 700))))
     }
+
+    // How far the provider reached, and what a second source may add.
+
+    @Test
+    fun `a channel the provider said nothing about takes everything`() {
+        // The ordinary case: a line carried 21,077 channels and the
+        // provider's xmltv covered 1,366 of them.
+        assertTrue(NO_SPAN.empty)
+        assertTrue(worthKeepingBeyond(prog(500, 600), NO_SPAN))
+    }
+
+    @Test
+    fun `beyond the provider horizon is kept`() {
+        // Where a second source earns its place: this line published 40
+        // hours one day and 17 the next while keeping seven days of
+        // recordings.
+        val ours = NO_SPAN.plus(prog(100, 200)).plus(prog(200, 300))
+        assertEquals(100, ours.earliest)
+        assertEquals(300, ours.latest)
+        assertTrue(worthKeepingBeyond(prog(300, 400), ours))
+        assertTrue(worthKeepingBeyond(prog(0, 100), ours))
+    }
+
+    @Test
+    fun `inside the provider stretch is left alone`() {
+        // The provider is closer to what it is actually broadcasting, a gap
+        // there is usually a junction, and two sources interleaved across
+        // one evening is a guide nobody can read.
+        val ours = NO_SPAN.plus(prog(100, 300))
+        assertFalse(worthKeepingBeyond(prog(150, 250), ours))
+        assertFalse(worthKeepingBeyond(prog(50, 150), ours))
+        assertFalse(worthKeepingBeyond(prog(250, 350), ours))
+    }
+
+    @Test
+    fun `touching the edge counts as outside`() {
+        val ours = NO_SPAN.plus(prog(100, 300))
+        assertTrue(worthKeepingBeyond(prog(0, 100), ours))
+        assertTrue(worthKeepingBeyond(prog(300, 400), ours))
+    }
 }

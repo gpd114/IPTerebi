@@ -87,7 +87,22 @@ fun describeEpisodeHttpError(code: Int): String = describeOnDemandHttpError(code
  * worst days: the day their provider's server falls over, and the day they
  * type the address in wrong.
  */
-fun describeNetworkFailure(failure: Throwable?, host: String): String {
+fun describeNetworkFailure(
+    failure: Throwable?,
+    host: String,
+    /**
+     * Whether this line has signed in successfully before.
+     *
+     * The owner's point, and a fair one: advice about a typo or a wrong port
+     * only makes sense the first time. On a line that has been working for
+     * weeks the address cannot have a typo in it, so saying so is noise in
+     * front of the answer. What stays useful either way is being told
+     * quickly, and told whose end it is: when their box's configured host
+     * stopped answering, the line had worked for weeks and the app still sat
+     * there for a minute looking frozen.
+     */
+    knownGood: Boolean = false,
+): String {
     val kind = failure?.let { it::class.java.simpleName }.orEmpty()
     val detail = failure?.message.orEmpty()
 
@@ -96,14 +111,25 @@ fun describeNetworkFailure(failure: Throwable?, host: String): String {
         // network at all — and the two are told apart by trying anything else,
         // which is what the second sentence asks for.
         kind == "UnknownHostException" || detail.contains("Unable to resolve host") ->
-            "Could not find $host. Check the address for a typo — and check " +
-                "this device is online, because a phone with no connection " +
-                "fails in exactly this way."
+            if (knownGood) {
+                "Could not find $host. This device is probably offline — or the " +
+                    "provider's address has stopped resolving, which is their end."
+            } else {
+                "Could not find $host. Check the address for a typo — and check " +
+                    "this device is online, because a phone with no connection " +
+                    "fails in exactly this way."
+            }
 
         // Something is listening and said no, at once. A wrong port does this.
         kind == "ConnectException" || detail.contains("ECONNREFUSED", ignoreCase = true) ->
-            "$host refused the connection. The port is the usual culprit: a " +
-                "panel's web page and its API are often on different ports."
+            if (knownGood) {
+                "$host refused the connection. Nothing is listening on that " +
+                    "port now, so the provider has most likely restarted or " +
+                    "moved something."
+            } else {
+                "$host refused the connection. The port is the usual culprit: a " +
+                    "panel's web page and its API are often on different ports."
+            }
 
         // Connected — or tried to — and nothing came back. No figure is quoted,
         // because the wait that ended is whichever of the connect timeout and
