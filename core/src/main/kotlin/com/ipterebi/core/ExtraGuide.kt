@@ -200,16 +200,21 @@ fun worthKeepingBeyond(theirs: XmltvProgramme, ours: GuideSpan): Boolean =
 /**
  * How many extra sources may be set.
  *
- * Not a round number for its own sake. The owner's reason for wanting a
- * second guide at all is the Premier League: a UK sports source for the
- * matches shown here, and at least one foreign source for the three o'clock
- * Saturday games, which are not broadcast in the UK and so are listed only
- * where they are. That is two, and a third and fourth leave room for another
- * country without turning a guide refresh into a download of everything
- * anyone has ever published. Each one is tens of megabytes and they are
- * fetched together.
+ * **Four, and the owner wanted five on the first day.** The reasoning for
+ * four was sound and the arithmetic was wrong: a UK sports guide for the
+ * Premier League, a foreign one for the three o'clock Saturday kick-offs
+ * that are not broadcast in the UK, and "room for another country". Asked
+ * what they actually watch, the answer was the UK and Ireland *and* the
+ * United States, Canada and Australia — a line carries all of them, and a
+ * guide for each is one address apiece.
+ *
+ * So eight, which is headroom rather than a second guess. What it costs is
+ * the download: each source is a few megabytes gzipped and ten seconds or so,
+ * and they are fetched together, after the provider's own guide. Eight of
+ * them is about a minute on a TV box, twice a day at most. That is the real
+ * bound, and it is nowhere near reached.
  */
-const val MAX_GUIDE_SOURCES = 4
+const val MAX_GUIDE_SOURCES = 8
 
 /**
  * The XMLTV sources in a typed block of text, tidied.
