@@ -35,6 +35,14 @@ data class TeamMatch(
      * that merely says their name. The row labels the two differently.
      */
     val isFixture: Boolean,
+    /**
+     * Every channel carrying it calls it a repeat, so the row can say so.
+     *
+     * Worth showing rather than only ranking on: a three-week-old Champions
+     * League tie on a weekday morning reads as nonsense until the row admits
+     * what it is.
+     */
+    val repeat: Boolean = false,
 )
 
 /**
@@ -63,8 +71,23 @@ fun teamMatch(showings: List<Showing>, nowSeconds: Long, team: String): TeamMatc
     // the word, and they beat France v Italy that same evening — which is
     // plainly the wrong answer to "where are my team on". A mention is only
     // worth showing when there is no fixture to show instead.
-    live.soonestFixture(team)?.let { return TeamMatch(it, onNow = true, isFixture = true) }
-    upcoming.soonestFixture(team)?.let { return TeamMatch(it, onNow = false, isFixture = true) }
+    //
+    // **A repeat ranks below a real fixture, on now or not**, and that was
+    // found on the owner's box rather than reasoned out. Arsenal were not
+    // playing at all that day, and the row announced "Napoli vs. Arsenal, ON
+    // NOW" — a Champions League first-matchday tie from three weeks before,
+    // being replayed on a Chilean feed at eleven in the morning. Their words:
+    // "we already played napoli ages ago, it must be way off".
+    //
+    // Nothing in the title tells a replay from a live match, because a
+    // broadcaster lists it with the title the live match had. XMLTV's
+    // `previously-shown` is what says so, where a guide bothers to send it.
+    // So a real fixture still to come beats a repeat happening now: somebody
+    // whose team plays tonight wants tonight, not a rerun of September.
+    live.soonestFixture(team, allowRepeat = false)?.let { return TeamMatch(it, onNow = true, isFixture = true) }
+    upcoming.soonestFixture(team, allowRepeat = false)?.let { return TeamMatch(it, onNow = false, isFixture = true) }
+    live.soonestFixture(team)?.let { return TeamMatch(it, onNow = true, isFixture = true, repeat = true) }
+    upcoming.soonestFixture(team)?.let { return TeamMatch(it, onNow = false, isFixture = true, repeat = true) }
 
     // Nothing that reads as a fixture, so fall back to what there is: on now
     // first, because a feed dying during something is interrupting that.
@@ -74,8 +97,8 @@ fun teamMatch(showings: List<Showing>, nowSeconds: Long, team: String): TeamMatc
 }
 
 /** The soonest of these that reads as a fixture, or null if none does. */
-private fun List<Showing>.soonestFixture(team: String): Showing? =
-    filter { it.looksLikeFixtureFor(team) }.takeIf { it.isNotEmpty() }
+private fun List<Showing>.soonestFixture(team: String, allowRepeat: Boolean = true): Showing? =
+    filter { it.looksLikeFixtureFor(team) && (allowRepeat || !it.repeat) }.takeIf { it.isNotEmpty() }
         ?.atSoonestStart()?.best(team)
 
 /** Everything here that starts at the earliest moment any of them does. */

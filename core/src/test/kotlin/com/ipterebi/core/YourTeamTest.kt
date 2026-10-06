@@ -321,4 +321,99 @@ class YourTeamTest {
                 .startsWith("Tomorrow "),
         )
     }
+
+    // A repeat ranks below a real fixture. Found on the owner's box: Arsenal
+    // were not playing at all, and the row announced "Napoli vs. Arsenal, ON
+    // NOW" -- a first-matchday Champions League tie from three weeks before,
+    // replayed on a Chilean feed at eleven in the morning.
+
+    private fun fixture(
+        start: Long,
+        stop: Long,
+        title: String,
+        feeds: Int = 1,
+        repeat: Boolean = false,
+    ) = Showing(
+        title = title,
+        start = start,
+        stop = stop,
+        channels = (1..feeds).map { "ch$it.$title" },
+        repeat = repeat,
+    )
+
+    @Test
+    fun `a real fixture tonight beats a replay on now`() {
+        val match = teamMatch(
+            showings = listOf(
+                fixture(900, 1800, "Napoli vs. Arsenal", repeat = true),
+                fixture(5000, 7000, "Arsenal vs. Brighton"),
+            ),
+            nowSeconds = 1000,
+            team = "Arsenal",
+        )
+        assertNotNull(match)
+        assertEquals("Arsenal vs. Brighton", match.showing.title)
+        assertFalse(match.onNow)
+        assertFalse(match.repeat)
+    }
+
+    @Test
+    fun `a replay is still shown when there is nothing else, and says so`() {
+        // Better than an empty row: it is the team, and the viewer can see
+        // what it is rather than being told it is on now.
+        val match = teamMatch(
+            showings = listOf(fixture(900, 1800, "Napoli vs. Arsenal", repeat = true)),
+            nowSeconds = 1000,
+            team = "Arsenal",
+        )
+        assertNotNull(match)
+        assertTrue(match.onNow)
+        assertTrue(match.isFixture)
+        assertTrue(match.repeat)
+    }
+
+    @Test
+    fun `a live match on now still beats a fixture to come`() {
+        // The ordering this feature exists for, unchanged: a feed dying
+        // mid-match is interrupting the thing on now.
+        val match = teamMatch(
+            showings = listOf(
+                fixture(900, 1800, "Napoli vs. Arsenal"),
+                fixture(5000, 7000, "Arsenal vs. Brighton"),
+            ),
+            nowSeconds = 1000,
+            team = "Arsenal",
+        )
+        assertNotNull(match)
+        assertEquals("Napoli vs. Arsenal", match.showing.title)
+        assertTrue(match.onNow)
+        assertFalse(match.repeat)
+    }
+
+    @Test
+    fun `one channel carrying it live is enough to make it live`() {
+        // A fixture replayed on one channel and shown live on another is
+        // being played somewhere, and that is the one to switch to. Hence
+        // Showing.repeat being all of them rather than any.
+        val event = listOf(
+            XmltvProgramme("a", 900, 1800, "Napoli vs. Arsenal", "", repeat = true),
+            XmltvProgramme("b", 900, 1800, "Napoli vs. Arsenal", "", repeat = false),
+        ).showings().single()
+        assertFalse(event.repeat)
+    }
+
+    @Test
+    fun `a repeat beats a mere mention`() {
+        val match = teamMatch(
+            showings = listOf(
+                fixture(900, 1800, "Napoli vs. Arsenal", repeat = true),
+                fixture(900, 1800, "Premier League Legends: Arsenal"),
+            ),
+            nowSeconds = 1000,
+            team = "Arsenal",
+        )
+        assertNotNull(match)
+        assertEquals("Napoli vs. Arsenal", match.showing.title)
+        assertTrue(match.isFixture)
+    }
 }
