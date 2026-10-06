@@ -1,5 +1,11 @@
 package com.ipterebi.core
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.util.Locale
+
 /**
  * Your team, and the channels showing them.
  *
@@ -147,3 +153,47 @@ fun cleanTeamName(raw: String): String =
 
 /** As long a name as a row can show without the channels losing their space. */
 const val MAX_TEAM_NAME = 40
+
+/**
+ * When a match is on, in words: "Today 11:00 – 13:00", "Tomorrow 20:00 –
+ * 22:00", "Sat 11 Oct, 15:00 – 17:00".
+ *
+ * **The day is named, always, and that is the point.** The row used to show
+ * the clock alone for anything happening today and add a date only for
+ * another day, on the reasoning that today needs no saying. Against a
+ * fixture it does: "11:00 – 13:00" over a Champions League tie reads as a
+ * time somebody has to place, and the only thing placing it was the ON NOW
+ * tag beside the team's name — which is an inference, made at a glance, by
+ * someone who has just lost a picture. Naming the day costs five characters
+ * and removes the question.
+ *
+ * Near days get a word rather than a date because that is how people say
+ * them, and a word is quicker to read across a room than "Tue 6 Oct". Far
+ * ones get the weekday as well as the date, because "11 Oct" alone does not
+ * answer "is that the weekend".
+ *
+ * Yesterday is included for one real case: a match that began at 23:30 and
+ * is still on at half past midnight is on now, and started yesterday.
+ *
+ * [nowSeconds] is the moment to measure "today" from, so this can be tested
+ * on a clock that does not move.
+ */
+fun matchWhenLabel(
+    startSeconds: Long,
+    stopSeconds: Long,
+    nowSeconds: Long,
+    zone: ZoneId = ZoneId.systemDefault(),
+    locale: Locale = Locale.getDefault(),
+): String {
+    val from = Instant.ofEpochSecond(startSeconds).atZone(zone)
+    val to = Instant.ofEpochSecond(stopSeconds).atZone(zone)
+    val today = Instant.ofEpochSecond(nowSeconds).atZone(zone).toLocalDate()
+    val clock = DateTimeFormatter.ofPattern("HH:mm", locale)
+    val day = when (ChronoUnit.DAYS.between(today, from.toLocalDate())) {
+        0L -> "Today "
+        1L -> "Tomorrow "
+        -1L -> "Yesterday "
+        else -> DateTimeFormatter.ofPattern("EEE d MMM, ", locale).format(from)
+    }
+    return day + clock.format(from) + " – " + clock.format(to)
+}
