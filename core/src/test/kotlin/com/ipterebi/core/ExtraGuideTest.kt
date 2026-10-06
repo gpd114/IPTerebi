@@ -198,4 +198,92 @@ class ExtraGuideTest {
         assertTrue(worthKeepingBeyond(prog(0, 100), ours))
         assertTrue(worthKeepingBeyond(prog(300, 400), ours))
     }
+
+    // The sources themselves: what a viewer may type into the field.
+
+    @Test
+    fun `one per line`() {
+        val sources = cleanGuideSources(
+            "https://example.org/uk-sports.xml\nhttps://example.net/de.xml.gz"
+        )
+        assertEquals(
+            listOf("https://example.org/uk-sports.xml", "https://example.net/de.xml.gz"),
+            sources,
+        )
+    }
+
+    @Test
+    fun `pasted on one line is still two sources`() {
+        // Neither a space nor a comma can occur inside a URL, so splitting on
+        // them cannot break one.
+        assertEquals(2, cleanGuideSources("https://a.org/x.xml, https://b.org/y.xml").size)
+        assertEquals(2, cleanGuideSources("https://a.org/x.xml https://b.org/y.xml").size)
+    }
+
+    @Test
+    fun `a missing scheme is https, unlike a panel`() {
+        // The opposite way round from XtreamUrl, and deliberately: a public
+        // guide is an ordinary website, where a panel is plain HTTP on a high
+        // port.
+        assertEquals(listOf("https://example.org/uk.xml"), cleanGuideSources("example.org/uk.xml"))
+        // Already stated, and left alone.
+        assertEquals(
+            listOf("http://10.0.2.2:8080/epg.xml"),
+            cleanGuideSources("http://10.0.2.2:8080/epg.xml"),
+        )
+    }
+
+    @Test
+    fun `blank is how they are turned off`() {
+        assertTrue(cleanGuideSources("").isEmpty())
+        assertTrue(cleanGuideSources("  \n  \n ").isEmpty())
+    }
+
+    @Test
+    fun `what is not a URL is dropped rather than kept to fail later`() {
+        // A refresh happens in the background hours after the typing, so a
+        // failure there has nowhere to be seen.
+        assertTrue(cleanGuideSources("my tv guide").isEmpty())
+        assertTrue(cleanGuideSources("ftp://example.org/epg.xml").isEmpty())
+        // A host with a port and no dot is a real address, and is what a
+        // source beside a test panel looks like.
+        assertEquals(
+            listOf("http://localhost:8080/epg.xml"),
+            cleanGuideSources("http://localhost:8080/epg.xml"),
+        )
+    }
+
+    @Test
+    fun `the same source twice is one source`() {
+        assertEquals(
+            listOf("https://a.org/x.xml"),
+            cleanGuideSources("https://a.org/x.xml\nhttps://a.org/x.xml"),
+        )
+    }
+
+    @Test
+    fun `there is a ceiling`() {
+        val many = (1..10).joinToString("\n") { "https://example.org/" + it + ".xml" }
+        assertEquals(MAX_GUIDE_SOURCES, cleanGuideSources(many).size)
+    }
+
+    // Naming a source without naming anyone's token.
+
+    @Test
+    fun `a source is labelled by its host and its file`() {
+        assertEquals(
+            "example.org/uk-sports.xml",
+            guideSourceLabel("https://example.org/epg/uk-sports.xml"),
+        )
+        assertEquals("example.org", guideSourceLabel("https://example.org/"))
+    }
+
+    @Test
+    fun `a label drops the query, because some carry a token`() {
+        // The same mistake as a stream URL in a log, and avoided the same way.
+        assertEquals(
+            "example.org/epg.xml",
+            guideSourceLabel("https://example.org/epg.xml?key=s3cret&days=7"),
+        )
+    }
 }
