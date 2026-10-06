@@ -1243,9 +1243,18 @@ survived until something was pressed.
   emulator with `uiautomator dump`; nothing shows it under touch.
 - **A TV needs `android.hardware.touchscreen` required="false"**, or it counts
   as unable to run the app, plus `LEANBACK_LAUNCHER` and a banner to appear on
-  its home screen. Those three are in the manifest but have not been checked on
-  a real Android TV image — the emulator used is a TV-shaped phone image, which
-  tests the D-pad and the layout but not the TV launcher.
+  its home screen. All three are in the manifest, and the app has now been
+  looked at on the owner's own box — a Xiaomi running Google TV — rather than
+  only on the TV-shaped phone image the emulator provides. It is there, once,
+  under **Your apps**, drawing its own icon.
+
+  **The banner is not what that launcher uses.** Google TV's launcher draws a
+  round app icon in a row, the way a phone launcher does; the wide banner is
+  the older Android TV leanback launcher's idea, and nothing on this box asks
+  for it. It stays in the manifest because a box running that older launcher
+  would want it, and because its absence there is a blank tile rather than a
+  fallback — but do not go looking for it on a Google TV and conclude it is
+  broken.
 
 ## Working notes
 
@@ -1282,6 +1291,32 @@ had tapped, not the one an hour either side of it.
 That is one provider. The next one will differ, and
 the surprises will be in what it returns.
 
+
+**A recording and a reminder both survive a real reboot, and that had never
+been tried.** It was written down as unverified for good reason:
+`BOOT_COMPLETED` is a protected broadcast that cannot be faked from `adb
+shell`, so an emulator proves nothing about it. Driven on the owner's box on
+6 October: a recording set from the guide (*Escape to the Country*, 15:00) put
+an exact `RECORDING_DUE` alarm at 14:59:00; the box was rebooted; and with the
+app never launched its process started on its own and re-armed the identical
+alarm, same instant to the millisecond. The same reboot fired
+`ReminderAlarmReceiver` too.
+
+**Both receivers are `android:exported="false"`, and that does not stop it.**
+Worth writing down because it looks like a bug and was nearly "fixed" as one:
+the reasoning that a system broadcast cannot reach a non-exported receiver is
+wrong here, and the box says so. Leave them unexported — exporting them would
+let any app on the device send `RECORDING_DUE` and `REMINDER_DUE`.
+
+**The reminder lands five minutes early**, as `REMINDER_LEAD_SECONDS` says:
+a 21:00 kick-off armed `REMINDER_DUE` for 20:55:00. Pressing the pill again
+cancelled it, and the alarm went with it.
+
+**The one thing the box has that the emulator has not is a full disk.** The
+recordings store held a failure from 2 October — 548 MB of *The Celebrity
+Traitors: Uncloaked* written and then "The disk is full. What was recorded up
+to then is kept." That is the right behaviour, and it is also a warning: the
+box had about 1 GB free, which is a fraction of one programme.
 An emulator run is worth doing for any change to `app/` — the SDK on the dev
 machine has an emulator and a `phone34` AVD, and it caught a real bug (see
 `busy` in `LibraryUiState`) that no test could. Boot it headless with
