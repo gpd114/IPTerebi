@@ -177,4 +177,69 @@ class MultiViewTest {
         assertTrue(describePaneRefusal(458, playing = 0).contains("connection limit"))
         assertTrue(describePaneRefusal(458, playing = 1).contains("1 pane is"))
     }
+
+    // Changing what a pane shows. The remote this was built for has no
+    // number keys, so a pane is changed in place rather than tuned.
+
+    @Test
+    fun `a changed pane keeps its place and its sound`() {
+        // A grid that reshuffles when one pane changes is one nobody can
+        // point at, and changing what a pane shows is not a reason to start
+        // listening to a different one.
+        val panes = listOf(Pane(1), Pane(2), Pane(3)).withSoundOn(2)
+        val after = panes.withPaneChanged(2, 9)
+        assertEquals(listOf(1, 9, 3), after.map { it.streamId })
+        assertEquals(9, after.single { it.sound }.streamId)
+    }
+
+    @Test
+    fun `changing to something already up is refused`() {
+        // Two connections for one picture, and on a grid two identical
+        // pictures as well.
+        val panes = listOf(Pane(1, sound = true), Pane(2))
+        assertEquals(panes, panes.withPaneChanged(2, 1))
+    }
+
+    @Test
+    fun `changing a pane that is not there does nothing`() {
+        val panes = listOf(Pane(1, sound = true))
+        assertEquals(panes, panes.withPaneChanged(7, 9))
+    }
+
+    @Test
+    fun `changing a pane to what it already shows is allowed and harmless`() {
+        val panes = listOf(Pane(1, sound = true), Pane(2))
+        assertEquals(panes, panes.withPaneChanged(1, 1))
+    }
+
+    // Keeping an arrangement between visits.
+
+    @Test
+    fun `an arrangement survives being written down`() {
+        val panes = listOf(Pane(11), Pane(22), Pane(33)).withSoundOn(22)
+        val back = storedPanes(panes.asStored())
+        assertEquals(listOf(11, 22, 33), back.map { it.streamId })
+        // The sound is not stored; it lands on the first, which is where
+        // somebody who set the grid up would expect it.
+        assertEquals(11, back.single { it.sound }.streamId)
+    }
+
+    @Test
+    fun `rubbish in a stored arrangement costs only itself`() {
+        // Losing one pane of four to a stray character should not cost the
+        // other three: an arrangement is a convenience, not a document.
+        assertEquals(listOf(11, 33), storedPanes("11,,oops,33").map { it.streamId })
+    }
+
+    @Test
+    fun `nothing stored is nothing restored`() {
+        assertTrue(storedPanes("").isEmpty())
+        assertTrue(storedPanes("0").isEmpty())
+    }
+
+    @Test
+    fun `a stored arrangement cannot exceed the ceiling or repeat itself`() {
+        assertEquals(listOf(1, 2, 3, 4), storedPanes("1,2,3,4,5,6").map { it.streamId })
+        assertEquals(listOf(1, 2), storedPanes("1,2,1,2").map { it.streamId })
+    }
 }
