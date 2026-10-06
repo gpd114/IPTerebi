@@ -31,6 +31,8 @@ import com.ipterebi.app.AppContainer
 import com.ipterebi.app.ui.DpadTextField
 import com.ipterebi.app.ui.fieldColours
 import com.ipterebi.core.LiveStream
+import com.ipterebi.core.carriedOnLabel
+import com.ipterebi.core.spreadByChannel
 import com.ipterebi.app.ui.theme.tabular
 
 /**
@@ -153,14 +155,17 @@ fun TvSearchScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        "on ${on.channels.size} channel" + if (on.channels.size == 1) "" else "s",
+                        // The guide channels and the streams, which are
+                        // different numbers on a line that carries each
+                        // channel five ways. See carriedOnLabel.
+                        carriedOnLabel(on.showing.feeds, on.channels.size),
                         style = MaterialTheme.typography.bodySmall.tabular(),
                         color = TvInkSoft,
                     )
                     // Every feed carrying it, each one a row that tunes it.
                     // This is the list somebody wants when a picture has just
                     // gone, so it is not behind another press.
-                    on.channels.forEach { channel ->
+                    on.channels.spreadByChannel().forEach { channel ->
                         ChannelLine(channel) { onPlay(channel) }
                     }
                 }
