@@ -125,7 +125,11 @@ fun List<Pane>.withPaneRemoved(streamId: Int): List<Pane> {
  * it would send someone chasing the wrong thing.
  */
 fun describePaneRefusal(code: Int, playing: Int): String =
-    if (code == 401 || code == 403 || code in CONNECTION_LIMIT_CODES) {
+    if (code <= 0) {
+        // Not an HTTP answer at all: a timeout, a reset, a stream the box
+        // could not decode. There is no code to read anything into.
+        "This feed did not start."
+    } else if (code == 401 || code == 403 || code in CONNECTION_LIMIT_CODES) {
         if (playing <= 0) {
             describeStreamHttpError(code)
         } else {

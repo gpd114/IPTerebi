@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Settings
@@ -89,6 +90,10 @@ enum class TvDestination(val label: String) {
     Home("Home"),
     Films("Films"),
     Series("Series"),
+    // Four at once. Below the libraries rather than beside Live TV, because
+    // on a line that allows one stream it is a curiosity rather than a place
+    // anyone starts the evening.
+    Multi("Multi"),
     Settings("Settings"),
     ;
 
@@ -98,6 +103,7 @@ enum class TvDestination(val label: String) {
         Home -> painterResource(R.drawable.ic_nav_home)
         Films -> painterResource(R.drawable.ic_nav_films)
         Series -> painterResource(R.drawable.ic_nav_series)
+        Multi -> rememberVectorPainter(Icons.Filled.GridView)
         Settings -> rememberVectorPainter(Icons.Filled.Settings)
     }
 }
@@ -573,7 +579,7 @@ private fun GroupsPanel(
                 // Focus arrives on the section you are in, not at the top.
                 modifier = Modifier.focusRequester(railEntry),
             )
-            listOf(TvDestination.Films, TvDestination.Series).forEach { d ->
+            listOf(TvDestination.Films, TvDestination.Series, TvDestination.Multi).forEach { d ->
                 RailItem(d.painter(), d.label, selected = false, onClick = { onOpen(d) })
             }
             Spacer(Modifier.height(12.dp))

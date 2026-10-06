@@ -1162,11 +1162,31 @@ stacked, because stacked leaves half a television empty; three is a 2x2 with a
 cell spare rather than three columns, because a third of a 16:9 screen is a
 letterbox slot nobody can follow a ball across.
 
-**Untestable here, and knowingly so.** The owner's line is the only real one
-available and it is the case this cannot work on, so what has been proven is
-the arithmetic and the wording, not the experience. The fake panel can serve
-several streams at once, which tests the plumbing and tests nothing about a
-panel's patience.
+
+**It has now been seen working, on a panel made to behave like a real line.**
+The fake panel grew `FAKE_CONNECTIONS=1`: it counts open live streams and
+answers 458 to the rest. That needed the stream *paced* as well — unpaced, a
+live channel there hands over 25 MB in a seventh of a second and closes, so
+two never overlap and no limit could ever be reached. Both are behind the flag,
+so every other test keeps the burst it was written against.
+
+On the `googletv34` emulator with four favourites and that flag: **one pane
+played and three said "Your line will not give this a second stream: 1 pane is
+already using it"**, with the panel's own log showing `LIVE 101.ts` open and
+`458: 1 of 1 already open` for the other three. That is the screen doing
+exactly what it was built to do.
+
+**It also caught a real bug, which is why the run was worth it.** The sentence
+was being written at the moment a pane failed, so the first refusal of four
+counted the three that had not had their turn yet and announced "3 panes are
+already using it" while nothing was playing at all. The screen now keeps the
+*code* and words it at draw time from the live count, and all three settled on
+"1 pane". Anything else that explains one pane in terms of the others has to
+do the same.
+**What is still unproven is a real provider.** The owner's line is the only
+real one available and it is the case this cannot work on, so what has been
+shown is the screen behaving correctly against a panel that refuses — not a
+provider that allows three, which is the line this feature is actually for.
 ## Your team
 
 The thing this was asked for, in the owner's words: *"find out which

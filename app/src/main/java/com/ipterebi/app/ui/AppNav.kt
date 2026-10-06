@@ -82,6 +82,7 @@ import com.ipterebi.app.ui.tv.TvFilmsScreen
 import com.ipterebi.app.ui.tv.TvRecordingsScreen
 import com.ipterebi.app.ui.tv.TvSeriesScreen
 import com.ipterebi.app.ui.tv.TvLiveScreen
+import com.ipterebi.app.ui.tv.TvMultiScreen
 
 object Route {
     const val LOGIN = "login"
@@ -99,6 +100,9 @@ object Route {
 
     /** What has been kept, and what is waiting to be. TV only. */
     const val RECORDINGS = "recordings"
+
+    /** Several channels at once; the TV build only. See TvMultiScreen. */
+    const val TV_MULTI = "tv/multi"
 
     /**
      * Playing a recording back: a file on the box, not anything the panel
@@ -162,6 +166,11 @@ private enum class Section(
     FILMS(Route.FILMS, "Films", R.drawable.ic_nav_films),
     SERIES(Route.SERIES, "Series", R.drawable.ic_nav_series),
     RECORDINGS(Route.RECORDINGS, "Recordings", R.drawable.ic_nav_recordings),
+
+    // Last, and deliberately: on a line that allows one stream this is a
+    // curiosity rather than where anyone starts the evening. See
+    // core/MultiView.kt.
+    MULTI(Route.TV_MULTI, "Multi", R.drawable.ic_nav_multi),
 }
 
 @Composable
@@ -434,6 +443,7 @@ fun AppNav(container: AppContainer) {
                                             TvDestination.Home -> nav.switchSection(Route.HOME)
                                             TvDestination.Films -> nav.switchSection(Route.FILMS)
                                             TvDestination.Series -> nav.switchSection(Route.SERIES)
+                                            TvDestination.Multi -> nav.navigate(Route.TV_MULTI)
                                             TvDestination.Settings -> nav.navigate(Route.SETTINGS)
                                         }
                                     },
@@ -497,6 +507,16 @@ fun AppNav(container: AppContainer) {
                                     },
                                     onBack = { nav.popBackStack() },
                                 )
+                            }
+
+                            // Several channels at once. TV only, and see
+                            // core/MultiView.kt before touching it: every pane
+                            // is a connection, and a line usually allows one.
+                            composable(Route.TV_MULTI) {
+                                val signedIn = current as? AccountState.SignedIn
+                                if (signedIn != null) {
+                                    TvMultiScreen(container = container)
+                                }
                             }
 
                             // What has been kept, and what is waiting to be.
