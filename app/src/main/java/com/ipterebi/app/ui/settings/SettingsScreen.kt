@@ -171,7 +171,10 @@ fun SettingsScreen(
                         onValueChange = { guides = it },
                         label = { Text("XMLTV addresses, one per line") },
                         minLines = 2,
-                        maxLines = MAX_GUIDE_SOURCES,
+                        // Not MAX_GUIDE_SOURCES: eight lines of address is
+                        // most of a television screen, and the field is set
+                        // once and then left. Past four it scrolls.
+                        maxLines = 4,
                         colors = fieldColours(),
                         shape = MaterialTheme.shapes.large,
                         modifier = fieldModifier.fillMaxWidth(),
