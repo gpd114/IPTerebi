@@ -125,9 +125,15 @@ fun HomeScreen(
                         // film channel each came to look like the team's
                         // match. Shown, because seeing it beats seeing
                         // nothing — but not passed off as something it isn't.
+                        // And a repeat says so before anything else, because
+                        // "Napoli vs. Arsenal, ON NOW" three weeks after the
+                        // tie reads as a fault in the app rather than as a
+                        // sports channel filling a weekday morning.
                         tag = state.teamMatch?.let {
                             when {
                                 !it.isFixture -> "Mentioned"
+                                it.repeat && it.onNow -> "Repeat, on now"
+                                it.repeat -> "Repeat"
                                 it.onNow -> "On now"
                                 else -> "Next"
                             }

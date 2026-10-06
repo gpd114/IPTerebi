@@ -901,6 +901,41 @@ built first and taken back out; it is in the history if it is ever wanted.
   as the date, because "11 Oct" does not answer "is that the weekend".
   Yesterday is in there for one real case — a match that kicked off at 23:30
   and is still on at half past midnight is on now, and started yesterday.
+- **A repeat ranks below a real fixture**, and that was found on the box
+  rather than reasoned out. Arsenal were not playing at all that day, and the
+  row announced **"Napoli vs. Arsenal · ON NOW"** — a first-matchday Champions
+  League tie from three weeks before, being replayed at eleven in the morning
+  on `tntsport.cl`, the *Chilean* TNT Sports, which the line carries as
+  `CL: TNT SPORT`. The owner's verdict was the right one: "we already played
+  napoli ages ago, it must be way off."
+
+  **Nothing in the title can tell a replay from a live match**, because a
+  broadcaster lists it under the title the live match had. The same fixture
+  was in that guide four times that day at four unrelated times — 10:00
+  Chilean, 10:40 Swiss, 12:00 Serbian, 15:00 Croatian — which is the shape of
+  a repeat doing the rounds, where a live match is on many channels at *one*
+  time. Only one of them said so in words, and in Serbian: `snimak`.
+
+  XMLTV's `previously-shown` is the field that states it, and `readXmltv` used
+  to throw it away with everything else that is not a title, a description or
+  a time. It is now read, stored (`programme.repeat`, schema 2 — added as a
+  column rather than rebuilt, because 0 is what every row already there means
+  by it), carried on `Showing` and ranked on: a real fixture still to come
+  beats a repeat happening now, because somebody whose team plays tonight
+  wants tonight rather than a rerun of September. A repeat is still shown when
+  it is all there is — it is the team, after all — but the row says **Repeat**
+  rather than **On now**.
+
+  **`Showing.repeat` is all of its channels, not any.** A fixture replayed on
+  one channel and shown live on another is being played somewhere, and that is
+  the one worth switching to.
+
+  **How much it helps depends entirely on the guide.** Measured across the
+  owner's five public sources: US2 marks 68,623 programmes and CA2 53,802,
+  while UK1, IE1 and AU1 mark none at all. So `false` means "not stated", never
+  "live", and on a guide that says nothing this changes nothing. The entry that
+  caused all this came from the provider's own guide, which is exactly the one
+  that cannot be measured from here.
 
 Type the name the way the guide writes it. "Man Utd" and "Manchester
 United" are not the same thing to a provider, and nothing here second-

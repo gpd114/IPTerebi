@@ -5,6 +5,7 @@ import java.io.StringReader
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -127,5 +128,56 @@ class XmltvTest {
     @Test
     fun `entities are decoded and unknown ones left alone`() {
         assertEquals("a & b < c é é &nbsp; &", decodeEntities("a &amp; b &lt; c &#233; &#xE9; &nbsp; &"))
+    }
+
+    // previously-shown: the one thing in a guide that tells a replay from a
+    // live match. A sports channel filling a weekday morning with a
+    // three-week-old Champions League tie lists it under the title the live
+    // match had, so nothing else can.
+
+    @Test
+    fun `previously-shown marks a repeat`() {
+        val (_, programmes) = read(
+            """
+            <tv>
+              <programme start="20261006100000 +0000" stop="20261006120000 +0000" channel="a">
+                <title>Napoli vs. Arsenal</title>
+                <previously-shown start="20260916190000 +0000"/>
+              </programme>
+              <programme start="20261006120000 +0000" stop="20261006140000 +0000" channel="a">
+                <title>Arsenal vs. Brighton</title>
+              </programme>
+            </tv>
+            """.trimIndent()
+        )
+        assertEquals(2, programmes.size)
+        assertTrue(programmes[0].repeat)
+        // Not stated is not the same as live, and the flag does not carry
+        // over to the next programme.
+        assertFalse(programmes[1].repeat)
+    }
+
+    @Test
+    fun `a bare previously-shown with no date still counts`() {
+        // Most that send it send it empty; the date is optional in XMLTV and
+        // is not read here, because that it is there at all is the answer.
+        val (_, programmes) = read(
+            """
+            <tv>
+              <programme start="20261006100000 +0000" stop="20261006120000 +0000" channel="a">
+                <title>Repeat</title><previously-shown/>
+              </programme>
+            </tv>
+            """.trimIndent()
+        )
+        assertTrue(programmes.single().repeat)
+    }
+
+    @Test
+    fun `a guide that says nothing leaves every programme unflagged`() {
+        // Three of the five public guides measured send it on nothing at all,
+        // so this is the common case and must not read as "live".
+        val (_, programmes) = read(sample)
+        assertTrue(programmes.none { it.repeat })
     }
 }

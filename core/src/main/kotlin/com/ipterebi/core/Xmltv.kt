@@ -29,6 +29,18 @@ data class XmltvProgramme(
     val stop: Long,
     val title: String,
     val description: String,
+    /**
+     * XMLTV's `previously-shown`: the broadcaster saying this has been on
+     * before.
+     *
+     * It is how a replay can be told from a live match, which matters because
+     * nothing else can tell them apart: a sports channel filling a weekday
+     * morning with a three-week-old Champions League tie lists it with the
+     * same title the live match had. Optional, and most guides omit it — two
+     * of the five public ones measured carry it on most programmes and three
+     * carry it on none — so false means "not stated", never "live".
+     */
+    val repeat: Boolean = false,
 )
 
 /**
@@ -62,6 +74,7 @@ fun readXmltv(
     val name = StringBuilder()
     var collecting: StringBuilder? = null
     var gotTitle = false
+    var repeat = false
     var gotDesc = false
     var gotName = false
 
@@ -85,6 +98,7 @@ fun readXmltv(
                         start = event.attributes["start"]?.let(::parseXmltvTime)
                         stop = event.attributes["stop"]?.let(::parseXmltvTime)
                         title.clear(); desc.clear(); gotTitle = false; gotDesc = false
+                        repeat = false
                     }
                     event.name == "channel" -> {
                         inChannel = true
@@ -96,6 +110,9 @@ fun readXmltv(
                     // and one title is what a grid has room for.
                     inProgramme && event.name == "title" && !gotTitle -> collecting = title
                     inProgramme && event.name == "desc" && !gotDesc -> collecting = desc
+                    // Self-closing, like <icon/>, and carrying a date this
+                    // does not read: that it is there at all is the answer.
+                    inProgramme && event.name == "previously-shown" -> repeat = true
                     inChannel && event.name == "display-name" && !gotName -> collecting = name
                     inChannel && event.name == "icon" -> icon = event.attributes["src"].orEmpty()
                 }
@@ -112,7 +129,10 @@ fun readXmltv(
                     val to = stop
                     if (inProgramme && channel.isNotEmpty() && from != null && to != null && to > from) {
                         onProgramme(
-                            XmltvProgramme(channel, from, to, title.toString().trim(), desc.toString().trim())
+                            XmltvProgramme(
+                                channel, from, to,
+                                title.toString().trim(), desc.toString().trim(), repeat,
+                            )
                         )
                     }
                     inProgramme = false
