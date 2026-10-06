@@ -50,6 +50,15 @@ data class Showing(
      * answer than one listed once.
      */
     val channels: List<String>,
+    /**
+     * Every channel carrying it says it has been on before.
+     *
+     * All of them, not any: a fixture carried live by one channel and as a
+     * replay by another is still being played somewhere, and that is the one
+     * worth switching to. Most guides say nothing either way, so this is
+     * false far more often than a schedule is actually live.
+     */
+    val repeat: Boolean = false,
 ) {
     /** How many channels carry it, which is the whole point of the screen. */
     val feeds: Int get() = channels.size
@@ -184,6 +193,7 @@ fun List<XmltvProgramme>.showings(): List<Showing> {
                 start = event.start,
                 stop = event.members.maxOf { it.stop },
                 channels = event.members.map { it.channel.lowercase() }.distinct(),
+                repeat = event.members.all { it.repeat },
             )
         }
         .sortedWith(compareByDescending<Showing> { it.feeds }.thenBy { it.start })

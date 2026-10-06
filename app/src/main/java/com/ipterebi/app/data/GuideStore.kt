@@ -19,7 +19,7 @@ import com.ipterebi.core.XmltvProgramme
  * transaction, so readers never see half a guide and a download that fails
  * part-way leaves the old guide as it was.
  */
-class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext, "guide.db", null, 1) {
+class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext, "guide.db", null, 2) {
 
     init {
         // Readers keep reading the old generation while a refresh writes.
@@ -29,13 +29,21 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE programme (line TEXT NOT NULL, gen INTEGER NOT NULL, channel TEXT NOT NULL, " +
-                "start INTEGER NOT NULL, stop INTEGER NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL)"
+                "start INTEGER NOT NULL, stop INTEGER NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, " +
+                "repeat INTEGER NOT NULL DEFAULT 0)"
         )
         db.execSQL("CREATE INDEX programme_by_channel ON programme (line, gen, channel, start)")
         db.execSQL("CREATE TABLE guide (line TEXT PRIMARY KEY, gen INTEGER NOT NULL, fetched INTEGER NOT NULL)")
     }
 
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        // Added rather than rebuilt: the column defaults to 0, which is what
+        // every programme already here means by it — "not stated". The next
+        // refresh fills it in properly, and nobody loses a guide meanwhile.
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE programme ADD COLUMN repeat INTEGER NOT NULL DEFAULT 0")
+        }
+    }
 
     /** When [line]'s guide was last fetched, in epoch millis; null when never. */
     fun fetchedAt(line: String): Long? =
@@ -71,7 +79,8 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
             db.beginTransaction()
             try {
                 val insert = db.compileStatement(
-                    "INSERT INTO programme (line, gen, channel, start, stop, title, description) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                    "INSERT INTO programme (line, gen, channel, start, stop, title, description, repeat) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
                 )
                 for (p in batch) {
                     insert.clearBindings()
@@ -84,6 +93,7 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
                     // A guide's descriptions are most of its size, and a
                     // screen shows a few lines of one at most.
                     insert.bindString(7, p.description.take(MAX_DESCRIPTION))
+                    insert.bindLong(8, if (p.repeat) 1 else 0)
                     insert.executeInsert()
                 }
                 db.setTransactionSuccessful()
@@ -175,14 +185,19 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
      */
     fun programmes(line: String, channel: String, after: Long, limit: Int = 8): List<XmltvProgramme> =
         readableDatabase.rawQuery(
-            "SELECT p.start, p.stop, p.title, p.description FROM programme p JOIN guide g " +
+            "SELECT p.start, p.stop, p.title, p.description, p.repeat FROM programme p JOIN guide g " +
                 "ON p.line = g.line AND p.gen = g.gen " +
                 "WHERE p.line = ? AND p.channel = ? AND p.stop > ? ORDER BY p.start LIMIT ?",
             arrayOf(line, channel, after.toString(), limit.toString()),
         ).use { c ->
             buildList {
                 while (c.moveToNext()) {
-                    add(XmltvProgramme(channel, c.getLong(0), c.getLong(1), c.getString(2), c.getString(3)))
+                    add(
+                        XmltvProgramme(
+                            channel, c.getLong(0), c.getLong(1), c.getString(2), c.getString(3),
+                            c.getInt(4) != 0,
+                        ),
+                    )
                 }
             }
         }
@@ -193,14 +208,19 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
      */
     fun between(line: String, channel: String, from: Long, to: Long): List<XmltvProgramme> =
         readableDatabase.rawQuery(
-            "SELECT p.start, p.stop, p.title, p.description FROM programme p JOIN guide g " +
+            "SELECT p.start, p.stop, p.title, p.description, p.repeat FROM programme p JOIN guide g " +
                 "ON p.line = g.line AND p.gen = g.gen " +
                 "WHERE p.line = ? AND p.channel = ? AND p.stop > ? AND p.start < ? ORDER BY p.start",
             arrayOf(line, channel, from.toString(), to.toString()),
         ).use { c ->
             buildList {
                 while (c.moveToNext()) {
-                    add(XmltvProgramme(channel, c.getLong(0), c.getLong(1), c.getString(2), c.getString(3)))
+                    add(
+                        XmltvProgramme(
+                            channel, c.getLong(0), c.getLong(1), c.getString(2), c.getString(3),
+                            c.getInt(4) != 0,
+                        ),
+                    )
                 }
             }
         }
@@ -221,7 +241,7 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
      */
     fun inWindow(line: String, from: Long, to: Long, limit: Int = 40_000): List<XmltvProgramme> =
         readableDatabase.rawQuery(
-            "SELECT p.channel, p.start, p.stop, p.title, p.description FROM programme p " +
+            "SELECT p.channel, p.start, p.stop, p.title, p.description, p.repeat FROM programme p " +
                 "JOIN guide g ON p.line = g.line AND p.gen = g.gen " +
                 "WHERE p.line = ? AND p.stop > ? AND p.start < ? ORDER BY p.start LIMIT ?",
             arrayOf(line, from.toString(), to.toString(), limit.toString()),
@@ -231,6 +251,7 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
                     add(
                         XmltvProgramme(
                             c.getString(0), c.getLong(1), c.getLong(2), c.getString(3), c.getString(4),
+                            c.getInt(5) != 0,
                         ),
                     )
                 }
@@ -250,7 +271,7 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
      */
     fun startingNear(line: String, from: Long, to: Long, limit: Int = 8_000): List<XmltvProgramme> =
         readableDatabase.rawQuery(
-            "SELECT p.channel, p.start, p.stop, p.title, p.description FROM programme p " +
+            "SELECT p.channel, p.start, p.stop, p.title, p.description, p.repeat FROM programme p " +
                 "JOIN guide g ON p.line = g.line AND p.gen = g.gen " +
                 "WHERE p.line = ? AND p.start >= ? AND p.start <= ? ORDER BY p.start LIMIT ?",
             arrayOf(line, from.toString(), to.toString(), limit.toString()),
@@ -260,6 +281,7 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
                     add(
                         XmltvProgramme(
                             c.getString(0), c.getLong(1), c.getLong(2), c.getString(3), c.getString(4),
+                            c.getInt(5) != 0,
                         ),
                     )
                 }
@@ -292,7 +314,7 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
     ): List<XmltvProgramme> {
         val like = "%" + needle.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%"
         return readableDatabase.rawQuery(
-            "SELECT p.channel, p.start, p.stop, p.title, p.description FROM programme p " +
+            "SELECT p.channel, p.start, p.stop, p.title, p.description, p.repeat FROM programme p " +
                 "JOIN guide g ON p.line = g.line AND p.gen = g.gen " +
                 "WHERE p.line = ? AND p.stop > ? AND p.start < ? " +
                 "AND (p.title LIKE ? ESCAPE '!' OR p.description LIKE ? ESCAPE '!') " +
@@ -304,6 +326,7 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
                     add(
                         XmltvProgramme(
                             c.getString(0), c.getLong(1), c.getLong(2), c.getString(3), c.getString(4),
+                            c.getInt(5) != 0,
                         ),
                     )
                 }

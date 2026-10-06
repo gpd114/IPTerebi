@@ -297,6 +297,11 @@ public class FakePanel {
                     // than attached to one of them at random.
                     "{\"num\":16,\"name\":\"UK: ITV1 LONDON HD\",\"stream_id\":114,\"category_id\":\"1\",\"epg_channel_id\":\"itv1london.hd\"}," +
                     "{\"num\":17,\"name\":\"UK: ITV1 LONDON FHD\",\"stream_id\":115,\"category_id\":\"1\",\"epg_channel_id\":\"itv1london.fhd\"}," +
+                    // A replay of the big match, on now, which is what the
+                    // owner's box served up as "ON NOW" three weeks after the
+                    // tie. Its guide entry carries previously-shown, which is
+                    // the only thing that says so.
+                    "{\"num\":18,\"name\":\"Replays and classics\",\"stream_id\":116,\"category_id\":\"1\",\"epg_channel_id\":\"replay.test\"}," +
                     "{\"num\":6,\"name\":\"Drops every 20 s\",\"stream_id\":104,\"category_id\":\"1\"}," +
                     "{\"num\":7,\"name\":\"Drops, then off air\",\"stream_id\":105,\"category_id\":\"1\"}," +
                     "{\"num\":8,\"name\":\"Line busy for 15 s\",\"stream_id\":106,\"category_id\":\"1\"}," +
@@ -447,6 +452,16 @@ public class FakePanel {
             "<title>UEFA Nations League: Croatia v England</title></programme>\n" +
             "<programme start=\"" + t.apply(matchStart) + "\" stop=\"" + t.apply(matchStop) + "\" channel=\"other.test\">" +
             "<title>Antiques Roadshow</title><desc>Nothing to do with the football.</desc></programme>\n" +
+            // The same fixture, on now, as a repeat. Nothing in the title
+            // tells it from a live match -- a broadcaster lists a replay under
+            // the title the live match had -- so previously-shown is the whole
+            // of the evidence. The team row must still pick the live feeds
+            // above it, and must label this one when it is all there is. The
+            // owner's box in miniature: "Napoli vs. Arsenal, ON NOW", three
+            // weeks after the tie, on a Chilean feed at eleven in the morning.
+            "<programme start=\"" + t.apply(now - 20 * 60) + "\" stop=\"" + t.apply(now + 40 * 60) + "\" channel=\"replay.test\">" +
+            "<title>Croatia v England</title><desc>From the first matchday.</desc>" +
+            "<previously-shown start=\"" + t.apply(now - 21 * 24 * 3600) + "\"/></programme>\n" +
             "</tv>\n";
     }
 
