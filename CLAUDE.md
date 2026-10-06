@@ -845,6 +845,59 @@ cuts gained nothing, because the name is ambiguous; and the foreign source's
 programme overlapping what the UK one had just added was dropped while the
 later one was kept.
 
+
+## Several channels at once
+
+Asked for, cancelled, and asked for again — "I want to have the multi screen
+even if I cant test it". The rules are `core/MultiView.kt`, tested; the screen
+is the TV branch's, because a set-top box is where anyone wants this and
+`main` is phone first.
+
+**The limit is the line, not the box, and that is the whole design.** Every
+pane is its own player and so its own connection, and a line usually allows
+one. Everything else in this app is built around that: the TV screen reuses
+one player and stops the old stream before asking for the next, switching
+channel happens inside the player screen rather than by navigating, and a
+paused player is stopped because a paused one keeps the connection. Multiview
+is the single feature that asks for more than one on purpose, so on a
+one-connection line it will get a refusal for every pane after the first.
+
+That is not a reason to refuse to build it. A line that allows three is a line
+where this is lovely, and the viewer knows what they are paying for better
+than the app does. It is the reason every rule here is about **failing well**:
+
+- **Panes open one at a time, `PANE_OPEN_GAP_MS` apart.** Measured behaviour
+  rather than politeness: a real line answered 458 to every reconnect for
+  about fifteen seconds after a phone dropped off Wi-Fi, and the ordinary case
+  of leaving one channel for another is refused when it happens too quickly.
+  Asking for four streams in the same instant is the worst version of that,
+  and a pane refused in a burst would take the ones behind it down too.
+- **A refused pane blames the right thing.** `describePaneRefusal` says "your
+  line will not give this a second stream: 2 panes are already using it" when
+  others are playing, and falls back to the ordinary wording when none is —
+  because then nothing of ours is holding the line. A 404 stays a missing
+  channel: saying "close a pane" about it sends somebody chasing the wrong
+  fault.
+- **Exactly one pane has sound**, never none and never all. Four commentaries
+  is not a feature anyone has wanted, and silence everywhere reads as four
+  broken streams rather than as a choice.
+- **The same channel cannot be opened twice.** Two connections for one picture
+  is the most expensive mistake available on a line that allows two.
+- **`MAX_PANES` is four, and the ceiling is the box.** A 1080p box decoding
+  four streams is near the end of its hardware decoder, and the owner's is an
+  Android 11 Xiaomi that has been as low as 235 MB free. The line's own limit
+  will usually bite long before this does.
+
+The grid is decided by the screen being wide: two go side by side rather than
+stacked, because stacked leaves half a television empty; three is a 2x2 with a
+cell spare rather than three columns, because a third of a 16:9 screen is a
+letterbox slot nobody can follow a ball across.
+
+**Untestable here, and knowingly so.** The owner's line is the only real one
+available and it is the case this cannot work on, so what has been proven is
+the arithmetic and the wording, not the experience. The fake panel can serve
+several streams at once, which tests the plumbing and tests nothing about a
+panel's patience.
 ## Your team
 
 The thing this was asked for, in the owner's words: *"find out which
