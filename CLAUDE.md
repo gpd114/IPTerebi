@@ -770,6 +770,18 @@ fetching:
   random, because a guide on the wrong channel is worse than no guide: it is
   wrong with confidence, on a screen built to be trusted. The line really
   does carry ITV1 London twice.
+- **And each of ours is claimed once**, which is a different question and was
+  found on the owner's own line. A public guide carries the same channel
+  twice — the Irish source lists "Sky Sports Premier League" beside "Sky
+  Sports Premier League HD" — and both reduced to one name, so both were
+  matched to our single channel and both schedules were written: the box drew
+  every programme on it twice. That is **deduplicated rather than refused**,
+  and the difference is the whole point. Two of *ours* sharing a name is a
+  question nobody can answer, so it is dropped. Two of *theirs* is not
+  ambiguous at all — it is one channel listed twice, carrying the same
+  programmes — so the second claimant is ignored. Ids are matched in a pass of
+  their own before names, so a channel both sides agree on is not decided by
+  document order.
 - **What to keep.** Only where the provider said nothing: a channel it has no
   guide for at all, or a stretch beyond where its guide reaches — `GuideSpan`
   per channel, and `worthKeepingBeyond`. Never a hole inside the provider's

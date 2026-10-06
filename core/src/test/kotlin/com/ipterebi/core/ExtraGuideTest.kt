@@ -286,4 +286,61 @@ class ExtraGuideTest {
             guideSourceLabel("https://example.org/epg.xml?key=s3cret&days=7"),
         )
     }
+
+    // One of theirs per one of ours. Measured on the owner's line: the Irish
+    // source lists "Sky Sports Premier League" and "Sky Sports Premier League
+    // HD" as two channels, both matched our one, and the box drew every
+    // programme on it twice.
+
+    @Test
+    fun `the same channel listed twice by them claims ours once`() {
+        val matched = matchGuideChannels(
+            ours = listOf(ours(1, "UK: SKY SPORTS PREMIER LEAGUE UHD", "SkySportsPL.uk")),
+            theirs = listOf(
+                theirs("a", "Sky Sports Premier League"),
+                theirs("b", "Sky Sports Premier League HD"),
+            ),
+        )
+        // Not refused, because this is not ambiguous: it is one channel
+        // listed twice, carrying the same programmes. The second is ignored.
+        assertEquals(1, matched.size)
+        assertEquals("SkySportsPL.uk", matched["a"])
+        assertNull(matched["b"])
+    }
+
+    @Test
+    fun `an id match is not lost to a name that came first`() {
+        // Their "a" has the right name and arrives first; their "b" has our
+        // actual id. The id is the stronger claim and must win, or a channel
+        // both sides agree on is decided by document order.
+        val matched = matchGuideChannels(
+            ours = listOf(ours(1, "UK: BBC ONE LONDON HD", "BBCOneLondon.uk")),
+            theirs = listOf(
+                theirs("a", "BBC One London"),
+                theirs("BBCOneLondon.uk", "Something Else"),
+            ),
+        )
+        assertEquals("BBCOneLondon.uk", matched["BBCOneLondon.uk"])
+        assertNull(matched["a"])
+    }
+
+    @Test
+    fun `two of theirs for two of ours still match both`() {
+        // The dedup must not become first-come-first-served across unrelated
+        // channels.
+        val matched = matchGuideChannels(
+            ours = listOf(
+                ours(1, "UK: BBC ONE LONDON", "one.uk"),
+                ours(2, "UK: ITV1 LONDON", "itv.uk"),
+            ),
+            theirs = listOf(
+                theirs("a", "BBC One London"),
+                theirs("b", "BBC One London"),
+                theirs("c", "ITV1 London"),
+            ),
+        )
+        assertEquals(2, matched.size)
+        assertEquals("one.uk", matched["a"])
+        assertEquals("itv.uk", matched["c"])
+    }
 }
