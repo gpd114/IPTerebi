@@ -85,6 +85,11 @@ private val DECORATION = setOf(
  * Only unambiguous matches are returned. Where a reduced name belongs to more
  * than one of our guide ids, it is dropped: see the note at the top about
  * guessing.
+ *
+ * And each of ours is claimed once. A public guide carries the same channel
+ * twice -- an Irish source lists "Sky Sports Premier League" beside "Sky
+ * Sports Premier League HD" -- and mapping both onto our one channel wrote
+ * its evening twice.
  */
 fun matchGuideChannels(
     ours: List<LiveStream>,
@@ -100,20 +105,38 @@ fun matchGuideChannels(
         if (key.isNotBlank()) byKey.getOrPut(key) { mutableSetOf() }.add(epg)
     }
 
+    // One of theirs per one of ours, which is a different question from the
+    // one above and was found on a real line. A public guide carries the same
+    // channel twice -- the Irish source lists "Sky Sports Premier League" and
+    // "Sky Sports Premier League HD" as two channels -- and both reduce to the
+    // same name, so both were matched to our one channel and both schedules
+    // were written. The box showed every programme twice.
+    //
+    // Deduplicated rather than refused, and the difference matters. Two of
+    // *ours* sharing a name is a question nobody can answer: we do not know
+    // which channel the guide belongs to, so it is dropped. Two of *theirs*
+    // is not ambiguous at all -- it is one channel listed twice, carrying the
+    // same programmes -- so the second claimant is simply ignored.
     val matched = HashMap<String, String>()
+    val claimed = HashSet<String>()
+
+    // Ids first, as a pass of its own. An id match is the stronger of the
+    // two, so it must not lose our channel to something that merely had the
+    // right name and came earlier in the document.
     for (one in theirs) {
-        val sameId = byId[one.id.lowercase()]
-        if (sameId != null) {
-            matched[one.id] = sameId
-            continue
-        }
+        val sameId = byId[one.id.lowercase()] ?: continue
+        if (claimed.add(sameId)) matched[one.id] = sameId
+    }
+    for (one in theirs) {
+        if (one.id in matched) continue
         val key = guideKey(one.name)
-        val ours1 = byKey[key]
+        if (key.isBlank()) continue
         // Exactly one, or none. Two of ours reducing to the same name is the
         // case this refuses to decide.
-        if (key.isNotBlank() && ours1 != null && ours1.size == 1) {
-            matched[one.id] = ours1.first()
-        }
+        val ours1 = byKey[key] ?: continue
+        if (ours1.size != 1) continue
+        val mine = ours1.first()
+        if (claimed.add(mine)) matched[one.id] = mine
     }
     return matched
 }
