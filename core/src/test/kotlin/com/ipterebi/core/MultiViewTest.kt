@@ -158,4 +158,23 @@ class MultiViewTest {
         // "close a pane" about it is a wild goose chase.
         assertEquals(describeStreamHttpError(404), describePaneRefusal(404, playing = 3))
     }
+
+    @Test
+    fun `a failure with no HTTP answer reads as one`() {
+        // A timeout, a reset, a stream the box could not decode. There is no
+        // code to read anything into, and "(HTTP 0)" is not a sentence.
+        assertEquals("This feed did not start.", describePaneRefusal(0, playing = 2))
+        assertEquals("This feed did not start.", describePaneRefusal(-1, playing = 0))
+    }
+
+    @Test
+    fun `the count is the others, not this one`() {
+        // Found on the emulator: the sentence was written when a pane failed,
+        // so the first refusal of four counted the three that had not had
+        // their turn yet and announced "3 panes are already using it" while
+        // nothing was playing at all. The screen now words it from the live
+        // count, and this is the rule that makes that sayable.
+        assertTrue(describePaneRefusal(458, playing = 0).contains("connection limit"))
+        assertTrue(describePaneRefusal(458, playing = 1).contains("1 pane is"))
+    }
 }

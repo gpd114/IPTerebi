@@ -37,6 +37,25 @@ public class FakePanel {
 
     static Path media;
 
+    /**
+     * How many live streams this panel will serve at once, or 0 for no limit.
+     *
+     * Off by default, because every other thing this panel is used for wants
+     * one stream and would not notice. Set `FAKE_CONNECTIONS=1` and it behaves
+     * like a real line: the second concurrent stream is answered 458, which is
+     * what one real line actually sent, and is the only way to see multiview
+     * do the thing it was built to do -- one picture and the rest explaining
+     * themselves. `max_connections` in the sign-in body follows this when it
+     * is set, so the app and the panel agree.
+     */
+    static final int CONNECTION_LIMIT =
+        Integer.parseInt(System.getenv().getOrDefault("FAKE_CONNECTIONS", "0"));
+
+    /** Live streams open right now, for CONNECTION_LIMIT to count. */
+    static final java.util.concurrent.atomic.AtomicInteger LIVE_NOW =
+        new java.util.concurrent.atomic.AtomicInteger();
+
+
     public static void main(String[] args) throws IOException {
         media = Path.of(args.length > 0 ? args[0] : "media");
         int port = args.length > 1 ? Integer.parseInt(args[1]) : 8080;
@@ -142,25 +161,25 @@ public class FakePanel {
             } else if (path.startsWith("/live/")) {
                 String file = fileName(path);
                 log("LIVE " + file + "  ua=" + ua);
-                if (file.startsWith("103.")) {
-                    // A line at its connection limit.
-                    status(ex, 403);
-                } else if (file.startsWith("104.") || file.startsWith("105.")) {
-                    streamDropping(ex, file.substring(0, 3));
-                } else if (file.startsWith("108.")) {
-                    // 4:3, for the picture-shape setting to be judged against.
-                    streamLive(ex, "fourbythree.ts");
-                } else if (file.startsWith("107.")) {
-                    // Two audio tracks, English and Italian, named in the PMT.
-                    streamLive(ex, "multitrack.ts");
-                } else if (file.endsWith(".ts")) {
-                    streamLive(ex);
-                } else {
-                    // No HLS here: the Stream format setting's HLS option has
-                    // nothing to be served by this panel, which is itself a
-                    // realistic answer to test the 404 wording against.
-                    status(ex, 404);
+                // A real line counts what is open and refuses the rest. Off
+                // unless FAKE_CONNECTIONS says otherwise; see the field.
+                if (CONNECTION_LIMIT > 0) {
+                    int now = LIVE_NOW.incrementAndGet();
+                    if (now > CONNECTION_LIMIT) {
+                        LIVE_NOW.decrementAndGet();
+                        log("   (458: " + (now - 1) + " of " + CONNECTION_LIMIT + " already open)");
+                        status(ex, 458);
+                        return;
+                    }
+                    try {
+                        serveLive(ex, file);
+                    } finally {
+                        LIVE_NOW.decrementAndGet();
+                        log("   (closed; " + LIVE_NOW.get() + " of " + CONNECTION_LIMIT + " left open)");
+                    }
+                    return;
                 }
+                serveLive(ex, file);
             } else if (path.startsWith("/movie/")) {
                 String file = fileName(path);
                 log("FILM " + file + "  range=" + ex.getRequestHeaders().getFirst("Range"));
@@ -237,8 +256,12 @@ public class FakePanel {
                 // The password echoed back in clear, as real panels do: this is
                 // what String.withoutCredentialValues() exists to keep out of logs.
                 return "{\"user_info\":{\"username\":\"demo\",\"password\":\"demo\",\"auth\":1," +
-                    "\"status\":\"Active\",\"exp_date\":\"1893456000\",\"max_connections\":\"1\"," +
-                    "\"active_cons\":0,\"allowed_output_formats\":[\"m3u8\",\"ts\"]}," +
+                    "\"status\":\"Active\",\"exp_date\":\"1893456000\"," +
+                    // Says what it will actually do when FAKE_CONNECTIONS is
+                    // set, so the app and the panel do not disagree; a string
+                    // rather than a number because real panels send both.
+                    "\"max_connections\":\"" + (CONNECTION_LIMIT > 0 ? CONNECTION_LIMIT : 1) + "\"," +
+                    "\"active_cons\":" + LIVE_NOW.get() + ",\"allowed_output_formats\":[\"m3u8\",\"ts\"]}," +
                     "\"server_info\":{\"url\":\"" + base.replaceFirst("^http://", "").replaceFirst(":.*", "") + "\"," +
                     // A clock two hours ahead of UTC, written the way a real
                     // panel writes it: the wall clock as a string, the true
@@ -302,8 +325,9 @@ public class FakePanel {
                     "{\"num\":18,\"name\":\"Replays and classics\",\"stream_id\":116,\"category_id\":\"1\",\"epg_channel_id\":\"replay.test\"}," +
                     "{\"num\":6,\"name\":\"Drops every 20 s\",\"stream_id\":104,\"category_id\":\"1\"}," +
                     "{\"num\":7,\"name\":\"Drops, then off air\",\"stream_id\":105,\"category_id\":\"1\"}," +
-                    "{\"num\":8,\"name\":\"Two audio tracks\",\"stream_id\":107,\"category_id\":\"1\"}," +
-                    "{\"num\":9,\"name\":\"Old 4:3 channel\",\"stream_id\":108,\"category_id\":\"1\"}," +
+                    "{\"num\":8,\"name\":\"Line busy for 15 s\",\"stream_id\":106,\"category_id\":\"1\"}," +
+                    "{\"num\":9,\"name\":\"Two audio tracks\",\"stream_id\":107,\"category_id\":\"1\"}," +
+                    "{\"num\":10,\"name\":\"Old 4:3 channel\",\"stream_id\":108,\"category_id\":\"1\"}," +
                     "{\"num\":4,\"name\":\"No stream id A\",\"category_id\":\"1\"}," +
                     "{\"num\":5,\"name\":\"No stream id B\",\"category_id\":\"1\"}";
                 String sport = "{\"num\":\"1\",\"name\":\"Sport One\",\"stream_id\":\"201\",\"category_id\":\"2\",\"stream_icon\":null,\"epg_channel_id\":\"sport.test\"}";
@@ -400,6 +424,37 @@ public class FakePanel {
     /** Whether the guide includes what has already been on; see the README. */
     static final boolean SHOW_PAST = !"narrow".equals(System.getenv("FAKE_GUIDE"));
 
+
+    /**
+     * A live channel, with all the ways this panel refuses one.
+     *
+     * Pulled out of the handler so the connection limit can wrap it: holding
+     * a slot for as long as the body is being written is the only honest way
+     * to count what a real panel counts.
+     */
+    static void serveLive(HttpExchange ex, String file) throws IOException {
+        if (file.startsWith("103.")) {
+            // A line at its connection limit.
+            status(ex, 403);
+        } else if (file.startsWith("104.") || file.startsWith("105.")) {
+            streamDropping(ex, file.substring(0, 3));
+        } else if (file.startsWith("106.")) {
+            streamAfterHandover(ex);
+        } else if (file.startsWith("108.")) {
+            // 4:3, for the picture-shape setting to be judged against.
+            streamLive(ex, "fourbythree.ts");
+        } else if (file.startsWith("107.")) {
+            // Two audio tracks, English and Italian, named in the PMT.
+            streamLive(ex, "multitrack.ts");
+        } else if (file.endsWith(".ts")) {
+            streamLive(ex);
+        } else {
+            // No HLS here: the Stream format setting's HLS option has nothing
+            // to be served by this panel, which is itself a realistic answer
+            // to test the 404 wording against.
+            status(ex, 404);
+        }
+    }
     static String xmltv() {
         long now = Instant.now().getEpochSecond();
         long start = now - 20 * 60, mid = now + 40 * 60, end = mid + 30 * 60;
@@ -628,6 +683,27 @@ public class FakePanel {
         log("   (" + id + " hung up after 20 s, as planned)");
     }
 
+    /** When 106's line started being "still counted"; see streamAfterHandover. */
+    static volatile long busyFrom = 0;
+
+    /**
+     * A line another device has only just let go of: the first ask after a
+     * minute's quiet starts fifteen seconds of 458 — what a real line answered
+     * for about that long after a phone dropped off it — and then it plays.
+     * For the TV's "Waiting for your line", which should ride it out.
+     */
+    static void streamAfterHandover(HttpExchange ex) throws IOException {
+        long now = System.currentTimeMillis();
+        if (now - busyFrom > 60_000) busyFrom = now;
+        long left = busyFrom + 15_000 - now;
+        if (left > 0) {
+            log("   (106 refused: line still counted for " + (left + 999) / 1000 + " s more)");
+            status(ex, 458);
+            return;
+        }
+        streamLive(ex);
+    }
+
 
     /** How long ago a catch-up start is, in words, for the log. */
     static String describeCatchUpAge(String when) {
@@ -678,8 +754,46 @@ public class FakePanel {
         }
         ex.getResponseHeaders().set("Content-Type", "video/mp2t");
         ex.sendResponseHeaders(200, 0); // chunked: live has no length
+        if (CONNECTION_LIMIT > 0) {
+            // Paced, and only under the flag. Unpaced, this hands over 25 MB
+            // in a seventh of a second and closes, so two "live" streams
+            // never overlap and a connection limit could never be reached --
+            // which is fine for every other test here and useless for the
+            // one that needs a line to be busy. Every other test keeps the
+            // burst it was written against.
+            paceOut(ex, file);
+            return;
+        }
         try (OutputStream out = ex.getResponseBody()) {
             Files.copy(file, out);
+        }
+    }
+
+    /**
+     * The file written at roughly the rate it plays, looping, until the
+     * client goes away. A live channel that a viewer leaves open.
+     */
+    static void paceOut(HttpExchange ex, Path file) throws IOException {
+        long perSecond = Math.max(1, Files.size(file) / 30);
+        try (OutputStream out = ex.getResponseBody()) {
+            byte[] buf = new byte[16 * 1024];
+            long sent = 0;
+            long start = System.currentTimeMillis();
+            while (true) {
+                try (java.io.InputStream in = Files.newInputStream(file)) {
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        out.write(buf, 0, n);
+                        out.flush();
+                        sent += n;
+                        long due = start + (sent - 2 * perSecond) * 1000 / perSecond;
+                        long wait = due - System.currentTimeMillis();
+                        if (wait > 0) {
+                            try { Thread.sleep(wait); } catch (InterruptedException e) { return; }
+                        }
+                    }
+                }
+            }
         }
     }
 
