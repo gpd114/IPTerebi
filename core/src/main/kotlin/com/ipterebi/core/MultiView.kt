@@ -141,3 +141,45 @@ fun describePaneRefusal(code: Int, playing: Int): String =
     } else {
         describeStreamHttpError(code)
     }
+
+/**
+ * [streamId]'s pane shown on [to] instead, keeping its place and its sound.
+ *
+ * Its place, because a grid that reshuffles when one pane changes is one
+ * nobody can point at — the same reason a viewer's own list keeps the order
+ * things were added in. And its sound, because changing what a pane shows is
+ * not a reason to start listening to a different one.
+ *
+ * Refused where [to] is already up: two connections for one picture is the
+ * most expensive mistake available on a line that allows two, and on a grid
+ * it is also two identical pictures.
+ */
+fun List<Pane>.withPaneChanged(streamId: Int, to: Int): List<Pane> {
+    if (none { it.streamId == streamId }) return this
+    if (streamId != to && any { it.streamId == to }) return this
+    return map { if (it.streamId == streamId) Pane(to, it.sound) else it }
+}
+
+/**
+ * The panes as they are stored for a line, and read back.
+ *
+ * Ids alone, in order, because everything else about a channel is the
+ * provider's to change — it renames them constantly — and the grid only needs
+ * to know which ones to ask for. Anything unreadable is dropped rather than
+ * failing the lot: a stored arrangement is a convenience, and losing one pane
+ * of four to a stray character should not cost the other three.
+ *
+ * The sound is not stored. It lands on the first pane when a grid is reopened,
+ * which is where somebody who set the grid up would expect it, and it saves a
+ * second thing that can disagree with the first.
+ */
+fun List<Pane>.asStored(): String = joinToString(",") { it.streamId.toString() }
+
+fun storedPanes(stored: String): List<Pane> =
+    stored.split(',')
+        .mapNotNull { it.trim().toIntOrNull() }
+        .filter { it != 0 }
+        .distinct()
+        .take(MAX_PANES)
+        .map { Pane(it) }
+        .let { panes -> panes.withSoundOn(panes.firstOrNull()?.streamId ?: 0) }
