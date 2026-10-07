@@ -41,6 +41,15 @@ data class XmltvProgramme(
      * carry it on none — so false means "not stated", never "live".
      */
     val repeat: Boolean = false,
+    /**
+     * XMLTV's `category` elements, as the guide wrote them.
+     *
+     * Not stored: [GuideStore] keeps only what [isSport] made of them,
+     * because a guide is 17 MB on the device already and nothing asks what
+     * genre a programme is except this one question. A programme can carry
+     * several — "Sports" and "Football" together is ordinary.
+     */
+    val categories: List<String> = emptyList(),
 )
 
 /**
@@ -75,6 +84,9 @@ fun readXmltv(
     var collecting: StringBuilder? = null
     var gotTitle = false
     var repeat = false
+    val categories = mutableListOf<String>()
+    val category = StringBuilder()
+    var gotCategory = false
     var gotDesc = false
     var gotName = false
 
@@ -99,6 +111,7 @@ fun readXmltv(
                         stop = event.attributes["stop"]?.let(::parseXmltvTime)
                         title.clear(); desc.clear(); gotTitle = false; gotDesc = false
                         repeat = false
+                        categories.clear()
                     }
                     event.name == "channel" -> {
                         inChannel = true
@@ -113,6 +126,11 @@ fun readXmltv(
                     // Self-closing, like <icon/>, and carrying a date this
                     // does not read: that it is there at all is the answer.
                     inProgramme && event.name == "previously-shown" -> repeat = true
+                    // Every one, not the first: "Sports" and "Football"
+                    // together is ordinary, and either may be the useful one.
+                    inProgramme && event.name == "category" -> {
+                        category.clear(); gotCategory = false; collecting = category
+                    }
                     inChannel && event.name == "display-name" && !gotName -> collecting = name
                     inChannel && event.name == "icon" -> icon = event.attributes["src"].orEmpty()
                 }
@@ -123,6 +141,11 @@ fun readXmltv(
             is XmlEvent.End -> when (event.name) {
                 "title" -> if (collecting === title) { gotTitle = true; collecting = null }
                 "desc" -> if (collecting === desc) { gotDesc = true; collecting = null }
+                "category" -> if (collecting === category) {
+                    gotCategory = true
+                    collecting = null
+                    category.toString().trim().takeIf { it.isNotEmpty() }?.let(categories::add)
+                }
                 "display-name" -> if (collecting === name) { gotName = true; collecting = null }
                 "programme" -> {
                     val from = start
@@ -132,6 +155,7 @@ fun readXmltv(
                             XmltvProgramme(
                                 channel, from, to,
                                 title.toString().trim(), desc.toString().trim(), repeat,
+                                categories.toList(),
                             )
                         )
                     }

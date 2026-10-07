@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import com.ipterebi.core.XmltvProgramme
+import com.ipterebi.core.isSport
 
 /**
  * The full guide, kept on the device, per line.
@@ -19,7 +20,7 @@ import com.ipterebi.core.XmltvProgramme
  * transaction, so readers never see half a guide and a download that fails
  * part-way leaves the old guide as it was.
  */
-class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext, "guide.db", null, 2) {
+class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext, "guide.db", null, 3) {
 
     init {
         // Readers keep reading the old generation while a refresh writes.
@@ -30,7 +31,7 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
         db.execSQL(
             "CREATE TABLE programme (line TEXT NOT NULL, gen INTEGER NOT NULL, channel TEXT NOT NULL, " +
                 "start INTEGER NOT NULL, stop INTEGER NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL, " +
-                "repeat INTEGER NOT NULL DEFAULT 0)"
+                "repeat INTEGER NOT NULL DEFAULT 0, sport INTEGER NOT NULL DEFAULT 0)"
         )
         db.execSQL("CREATE INDEX programme_by_channel ON programme (line, gen, channel, start)")
         db.execSQL("CREATE TABLE guide (line TEXT PRIMARY KEY, gen INTEGER NOT NULL, fetched INTEGER NOT NULL)")
@@ -42,6 +43,13 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
         // refresh fills it in properly, and nobody loses a guide meanwhile.
         if (oldVersion < 2) {
             db.execSQL("ALTER TABLE programme ADD COLUMN repeat INTEGER NOT NULL DEFAULT 0")
+        }
+        // The flag rather than the categories: a guide is 17 MB on the
+        // device already and nothing asks what genre a programme is except
+        // "is it sport". The cost is that changing isSport needs a refresh,
+        // which happens twice a day anyway.
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE programme ADD COLUMN sport INTEGER NOT NULL DEFAULT 0")
         }
     }
 
@@ -79,8 +87,8 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
             db.beginTransaction()
             try {
                 val insert = db.compileStatement(
-                    "INSERT INTO programme (line, gen, channel, start, stop, title, description, repeat) " +
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+                    "INSERT INTO programme (line, gen, channel, start, stop, title, description, repeat, sport) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 )
                 for (p in batch) {
                     insert.clearBindings()
@@ -94,6 +102,7 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
                     // screen shows a few lines of one at most.
                     insert.bindString(7, p.description.take(MAX_DESCRIPTION))
                     insert.bindLong(8, if (p.repeat) 1 else 0)
+                    insert.bindLong(9, if (isSport(p.categories)) 1 else 0)
                     insert.executeInsert()
                 }
                 db.setTransactionSuccessful()
@@ -334,6 +343,37 @@ class GuideStore(context: Context) : SQLiteOpenHelper(context.applicationContext
         }
     }
 
+
+    /**
+     * Everything on [line] the guide calls sport, overlapping [from]..[to].
+     *
+     * Asked of the `sport` column rather than of the text, so it is an index
+     * scan over a few hundred rows instead of folding a window of tens of
+     * thousands — the lesson `mentioning` already learnt one layer up.
+     *
+     * Most of a provider's own guide carries no categories at all, so what
+     * this returns is largely the channels an extra XMLTV source filled in.
+     * That is the right half: those are the sports channels.
+     */
+    fun sportIn(line: String, from: Long, to: Long, limit: Int = 2_000): List<XmltvProgramme> =
+        readableDatabase.rawQuery(
+            "SELECT p.channel, p.start, p.stop, p.title, p.description, p.repeat FROM programme p " +
+                "JOIN guide g ON p.line = g.line AND p.gen = g.gen " +
+                "WHERE p.line = ? AND p.sport = 1 AND p.stop > ? AND p.start < ? " +
+                "ORDER BY p.start LIMIT ?",
+            arrayOf(line, from.toString(), to.toString(), limit.toString()),
+        ).use { c ->
+            buildList {
+                while (c.moveToNext()) {
+                    add(
+                        XmltvProgramme(
+                            c.getString(0), c.getLong(1), c.getLong(2), c.getString(3), c.getString(4),
+                            c.getInt(5) != 0,
+                        ),
+                    )
+                }
+            }
+        }
     /** Forgets [line]'s guide, when it is signed out of. */
     fun clear(line: String) {
         val db = writableDatabase
