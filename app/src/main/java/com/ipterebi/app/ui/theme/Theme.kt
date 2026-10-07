@@ -117,12 +117,27 @@ val Light = Palette(
  * card is mostly lamp. Nothing in the app can turn that off; the only thing it
  * can do is stop asking for peak.
  *
- * So the page drops from 90% luminance to 68% and the cards from 100% to 79%,
- * and [Light]'s white `veil` and `field` become a pale blue-grey. The ink goes
- * *down* to keep up: measured, ink on the page is 11.2:1 and on a card 12.9:1,
- * which is more than [Light] has, because a dimmer page can afford a darker ink
- * without either end touching the limits. Nothing here is a guess — every pair
- * was computed before it was written.
+ * So the page drops from 90% luminance to **43%** and the cards from 100% to
+ * **56%**, and [Light]'s white `veil` and `field` become a mid blue-grey. The
+ * ink goes *down* to keep up: measured, ink on the page is 8.4:1 and on a card
+ * 10.7:1. Nothing here is a guess — every pair was computed before it was
+ * written.
+ *
+ * **It was 68% and 79% first, and that was still too bright**, which is worth
+ * recording because the second guess was no more a guess than the first: the
+ * owner looked at it on the box and said so. The step from 90% to 68% sounds
+ * large and was not enough, because what HDR does to a large pale area is not
+ * proportional to the number.
+ *
+ * **43% is close to the floor, and the floor is not arbitrary.** Work back from
+ * [Modifier.focusFill], which paints its fill *under* text the caller has
+ * already coloured — on Home that text is [Palette.ink], dark. So the focus
+ * fill cannot go below about 21% luminance or a focused card becomes
+ * unreadable; a quiet pill has to sit clear above the focus fill; and a card
+ * has to sit clear above the pill. That chain puts the card at about 56% and
+ * the page just under it. Dimmer than this is not a palette change, it is
+ * [Dark], which is one press away and is the right answer for anyone who wants
+ * the screen darker still.
  *
  * Only on a television, and chosen by [Appearance.lightFor] rather than by a
  * setting: a phone is held at arm's length in a lit room and wants [Light]'s
@@ -130,14 +145,14 @@ val Light = Palette(
  */
 val LightTv = Palette(
     dark = false,
-    ground = Color(0xFFD2D7E1), veil = Color(0xFFE2E6EE), edge = Color(0xFFBAC1D2),
-    hairline = Color(0xFFC6CDDB), quiet = Color(0xFFC4CCDC), quietText = Color(0xFF2A3450),
-    glass = Color(0xFFC9D1E0), glassIcon = Color(0xFF1B3478), field = Color(0xFFE2E6EE),
-    cobalt = Color(0xFF1B3478), accent = Color(0xFF1B3478),
-    chosen = Color(0xFF1B3478), onChosen = Color(0xFFE2E6EE),
-    ink = Color(0xFF1A2032), inkSoft = Color(0xFF4E587A),
-    pink = Color(0xFF9E2F55), badge = Color(0xB3142A66),
-    focus = Color(0xFF6B89C4),
+    ground = Color(0xFFA7AFC1), veil = Color(0xFFBEC5D2), edge = Color(0xFF8D96AC),
+    hairline = Color(0xFF9BA3B7), quiet = Color(0xFFB4BBCA), quietText = Color(0xFF181E2D),
+    glass = Color(0xFFB4BBCA), glassIcon = Color(0xFF13224F), field = Color(0xFFBEC5D2),
+    cobalt = Color(0xFF13224F), accent = Color(0xFF13224F),
+    chosen = Color(0xFF13224F), onChosen = Color(0xFFBEC5D2),
+    ink = Color(0xFF0F1320), inkSoft = Color(0xFF313A52),
+    pink = Color(0xFF741A36), badge = Color(0xB3142A66),
+    focus = Color(0xFF6482BE),
 )
 
 /**
