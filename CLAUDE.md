@@ -270,6 +270,12 @@ focus shows as a frame around the picture rather than not at all. One place is
 still a line: a text field cannot be filled behind its own well, so
 `DpadTextField` outlines in the same colour.
 
+**And a fill is only visible against what it covers** — which is not a detail,
+it is how focus came to be invisible in Settings. Use `rememberFocusFill`
+rather than `focusFill()` anywhere the element's own background can be the
+accent, or anywhere its content was coloured for the background being
+replaced. See "Focus cannot show up on itself" below.
+
 **Chosen is not focus, and they must not be the same colour.** `Palette.chosen`
 is what is picked among peers — the section the rail is on, the chip you are
 browsing — with `onChosen` on it. On Light it is the same dark blue as
@@ -287,7 +293,7 @@ looked like any other; they are transparent while focused now. Anything that
 fills itself and sits inside a `TvRow` needs the same.
 
 Flat throughout: no gradients, glows, rims or sheen, and each role one colour.
-Colours are roles in a `Palette` (`Light`, `Dark`), read through `Night.*`,
+Colours are roles in a `Palette` (`Light`, `LightTv`, `Dark`), read through `Night.*`,
 which holds the current palette as state — switching recolours everything that
 read one. What you press is told apart by fill: quiet pills for choices not
 chosen, the accent solid for the one chosen and for the main button, glass for
@@ -1202,6 +1208,79 @@ Proved on the `googletv34` emulator with the theme forced to Light: Home pale
 with white cards, and the guide pale with white cells, dark ink, the focused
 row lifted in the pale-blue focus fill, pink favourite stars and the red now
 line. The two screens read as one app, which was the whole complaint.
+
+**Then it was looked at on the box, and it was too bright** — *"a bit too
+bright and in your face"* — and the owner named the cause themselves: **HDR is
+on on that television and cannot be turned off.** With HDR on, the panel maps
+SDR white towards its *peak* brightness rather than towards paper, so
+`#FFFFFF` on a card is not a page, it is a lamp, and a screen that is mostly
+card is mostly lamp. Nothing in the app can turn that off. The only thing it
+can do is stop asking for peak.
+
+So there is a third palette, `LightTv`, and it is **Light with no white
+anywhere**: the page drops from 90% luminance to 68% and the cards from 100%
+to 79%, with `veil` and `field` — both pure white on Light — becoming a pale
+blue-grey. The ink goes *down* to match, which is the part that is not
+obvious: measured, ink on the page is **11.2:1** and on a card **12.9:1**,
+which is *more* than Light has, because a dimmer page can afford a darker ink
+without either end running into its limit. Every pair was computed before it
+was written; none of it was chosen by eye.
+
+**It is not a third setting.** There is one choice, Dark or Light, and
+`Appearance.lightFor` decides what Light *means* on the hardware in front of
+it: `LightTv` on a television, `Light` on everything else, because a phone is
+held at arm's length in a lit room and the owner asked to keep its brightness.
+Nobody should have to understand their television's tone mapping to find a
+screen they can look at.
+
+## Focus cannot show up on itself
+
+The owner's next report on that screen was that **focus is hardly visible in
+Settings**, and the number says it better than the sentence does: on Dark,
+`focus` and `cobalt` are both `#2F5FE0`, so a chip that was already chosen
+gained focus and the contrast between before and after was **1.00**. Not
+faint — the same colour. Settings is where it bites hardest because Settings
+is almost nothing but `ChoiceRow`, and the remote lands on the chip that is
+already chosen.
+
+There was a second, smaller fault beside it: Light's focus fill was
+`#C3D2F2` against a `#E6EBF7` quiet pill, which is **1.27**. Measurably there,
+practically not. It is `#7F9CD8` now, which is 2.30 against the same pill and
+still pale enough for the dark ink the caller already chose — and that
+constraint is why it cannot simply be made dark. `focusFill` paints *under*
+content somebody else coloured.
+
+Two things carry the fix, both in `Theme.kt`:
+
+- **`Night.focusOver(under)`** answers `focus` normally, and where `under` is
+  near enough to vanish into, lifts it clear — towards the ink on Dark,
+  towards the page on Light. Over a cobalt button on Dark that is a pale blue
+  at 3.2:1 against it. Derived from `focus` rather than stored beside it, so
+  there is no second colour to fall out of step with the first.
+- **`Night.inkOn(fill)`** answers white or the theme's darkest ink by the
+  fill's luminance, not by which theme is on. That is what makes the lift
+  usable: a lifted fill is pale *on Dark*, where everything else takes white,
+  and a white label on it would be 1.1:1.
+
+`rememberFocusFill(under)` in `ui/Dpad.kt` is how a component uses both. It
+hands back the fill it chose and an `ink()` that follows it, which is needed
+wherever the content was coloured for the background being replaced —
+`ChoiceRow`'s white label, `PrimaryButton`'s, `SecondaryButton`'s accent one
+(2.74 on the accent before this), `SquareIconButton`'s icon, and the category
+chips. Plain `focusFill()` is still right everywhere the content reads on
+either fill, which is most of the app: a channel name is the theme's ink and
+is legible on both.
+
+The category chips changed for a second reason as well. Material draws a
+`FilterChip`'s container *inside* the chip, over anything the modifier put
+down, so the focus fill was covered as well as being the same colour. Telling
+the container what to be answers both at once, and is less fragile than the
+transparent-while-focused trick the TV chips use.
+
+**The rule to take from this:** a focus fill is only visible against what it
+covers. Anything new whose own background can be the accent — a chosen pill, a
+main button — must go through `rememberFocusFill`, not `focusFill`.
+
 ## Searching on the television
 
 The TV build had none. This file said so — "the TV guide has no search box

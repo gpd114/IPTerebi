@@ -90,18 +90,22 @@ fun PrimaryButton(
     content: @Composable RowScope.() -> Unit,
 ) {
     val shape = Corners.control
+    // The fill is the accent, which is also the focus colour on Dark — so focus
+    // has to be worked out from what it covers rather than painted over it.
+    val focus = rememberFocusFill(if (enabled) fill else Night.quiet)
     Row(
         modifier
             .height(height)
             .clip(shape)
-            .background(if (enabled) fill else Night.quiet)
-            .focusFill(shape)
+            .background(focus.fill)
+            .then(focus.watch)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        CompositionLocalProvider(LocalContentColor provides if (enabled) Color.White else Night.inkSoft) {
+        val ink = if (enabled) focus.ink(Color.White) else Night.inkSoft
+        CompositionLocalProvider(LocalContentColor provides ink) {
             content()
         }
     }
@@ -121,12 +125,15 @@ fun SecondaryButton(
     colour: Color = Night.accent,
 ) {
     val shape = Corners.control
+    // Glass is nothing like the focus colour, so the fill shows; the label is
+    // the accent, which on the accent read at 2.7:1, so it follows the fill.
+    val focus = rememberFocusFill(Night.glass)
     Box(
         modifier
             .height(height)
             .clip(shape)
-            .background(Night.glass)
-            .focusFill(shape)
+            .background(focus.fill)
+            .then(focus.watch)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,
@@ -134,7 +141,7 @@ fun SecondaryButton(
         Text(
             text,
             style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp),
-            color = if (enabled) colour else Night.inkSoft,
+            color = if (enabled) focus.ink(colour) else Night.inkSoft,
         )
     }
 }
@@ -149,16 +156,22 @@ fun SquareIconButton(
     size: Dp = 42.dp,
 ) {
     val shape = Corners.control
+    val focus = rememberFocusFill(Night.glass)
     Box(
         modifier
             .size(size)
             .clip(shape)
-            .background(Night.glass)
-            .focusFill(shape)
+            .background(focus.fill)
+            .then(focus.watch)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = Night.glassIcon, modifier = Modifier.size(21.dp))
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = focus.ink(Night.glassIcon),
+            modifier = Modifier.size(21.dp),
+        )
     }
 }
 
@@ -191,20 +204,25 @@ fun <T> ChoiceRow(
         options.forEach { (value, label) ->
             val on = isSelected(value)
             val shape = Corners.control
+            // The chip the remote lands on is the chosen one, and the chosen one
+            // is already the accent: on Dark that is the same colour as focus,
+            // so filling it showed nothing at all. This is the whole of why
+            // focus was reported as invisible in Settings.
+            val focus = rememberFocusFill(if (on) Night.cobalt else Night.quiet)
             Box(
                 Modifier
                     .weight(1f)
                     .height(42.dp)
                     .clip(shape)
-                    .background(if (on) Night.cobalt else Night.quiet)
-                    .focusFill(shape)
+                    .background(focus.fill)
+                    .then(focus.watch)
                     .clickable { onSelect(value) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     label,
                     style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
-                    color = if (on) Color.White else Night.quietText,
+                    color = focus.ink(if (on) Color.White else Night.quietText),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

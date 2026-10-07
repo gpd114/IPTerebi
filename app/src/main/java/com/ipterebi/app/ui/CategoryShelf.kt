@@ -130,13 +130,19 @@ fun CategoryShelf(chips: List<ShelfChip>, modifier: Modifier = Modifier) {
 @Composable
 private fun Chip(chip: ShelfChip) {
     val bringIntoView = remember { BringIntoViewRequester() }
+    // Focus is given to the chip as a *colour* rather than painted behind it.
+    // Material draws the container itself, inside the chip, so a fill put down
+    // by the modifier is covered by it — and on the chip you are in, which is
+    // already the accent, the fill was the same colour anyway. Both go away if
+    // the container is simply told what to be.
+    val focus = rememberFocusFill(if (chip.selected) Night.cobalt else Night.quiet)
     // Debritsu's pattern: quiet white-tinted pills on the flat page, the one
     // you are in solid cobalt, like the tab you are on. The app's own shelves
     // are named in pink.
     FilterChip(
         modifier = Modifier
             .bringIntoViewRequester(bringIntoView)
-            .focusFill(ChipShape),
+            .then(focus.watch),
         selected = chip.selected,
         onClick = chip.onClick,
         label = {
@@ -149,10 +155,10 @@ private fun Chip(chip: ShelfChip) {
         },
         shape = ChipShape,
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = Night.quiet,
-            labelColor = if (chip.special) Night.pink else Night.quietText,
-            selectedContainerColor = Night.cobalt,
-            selectedLabelColor = Color.White,
+            containerColor = focus.fill,
+            labelColor = focus.ink(if (chip.special) Night.pink else Night.quietText),
+            selectedContainerColor = focus.fill,
+            selectedLabelColor = focus.ink(Color.White),
         ),
         border = null,
         elevation = FilterChipDefaults.filterChipElevation(elevation = 0.dp),
