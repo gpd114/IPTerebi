@@ -33,6 +33,27 @@ android {
             ?: "0.1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            // **The key is never in the repository.** Four environment
+            // variables, set by CI from repository secrets, and nothing to
+            // leak if this file is read by anyone. The same shape as the
+            // owner's other app; see ../Debritsu.
+            //
+            // Absent, the block stays empty and the release falls back to the
+            // debug key below, so the project still builds on any machine and
+            // in any fork without a keystore. A build that cannot be made
+            // without a secret is a build nobody else can check.
+            val storePath = System.getenv("KEYSTORE_PATH")
+            if (storePath != null) {
+                storeFile = file(storePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             // R8 had never run over this code until now, which is the whole
@@ -42,10 +63,13 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Unsigned on purpose. A release key is the owner's to make and
-            // keep; this build is tested by signing it with the local debug
-            // key by hand, which is good enough to prove R8 and useless for
-            // distribution -- exactly the right way round.
+            // Signed with the release key where CI has one, and with the
+            // debug key otherwise. The fallback is what keeps this build
+            // checkable by anyone: R8 is the thing worth proving here, and
+            // proving it must not need a secret.
+            signingConfig =
+                if (System.getenv("KEYSTORE_PATH") != null) signingConfigs.getByName("release")
+                else signingConfigs.getByName("debug")
         }
     }
 

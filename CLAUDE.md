@@ -383,13 +383,31 @@ report to find anywhere else.
 It is worth doing for its own sake too: **4.4 MB against 23.9 MB**, which is
 most of a fifth, and the box has had as little as 235 MB free.
 
-**Still unsigned, deliberately.** A release key is the owner's to make and
-keep. The build was proved by signing it with the local debug key by hand and
+**Signable, and not yet signed.** A release key is the owner's to make and
+keep, so nothing here holds one. The build was proved by signing it with the local debug key by hand and
 driving it on the `googletv34` emulator: it signed in, fetched and parsed
 `get_live_streams`, downloaded `xmltv.php`, opened a stream and asked for
 `get_short_epg` — the whole decode path, under R8, with the debug logging
 gone. That is the test that matters; distribution is a separate question and
 nothing is tagged yet.
+
+The wiring is here and the key is not, which is the same shape as the owner's
+other app (`../Debritsu`). `signingConfigs` reads four environment variables
+— `KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` — and CI
+sets them by decoding a `KEYSTORE_BASE64` secret into the *runner's temporary
+directory*, never into the workspace, which is what gets uploaded. Absent
+those, the release falls back to the debug key: a build that cannot be made
+without a secret is a build nobody else can check, and R8 is precisely the
+thing worth checking. `.github/workflows/make-keystore.yml` makes the key
+once, by hand from the Actions tab, and hands it back as an artifact to be
+copied into secrets and then deleted.
+
+One consequence worth knowing: the release output is now
+`app-release.apk` rather than `app-release-unsigned.apk`, so it installs
+directly. Signed with the debug key it is still only good for proving R8 —
+and **losing the real key is not recoverable**, because Android identifies an
+app by its signature and an update signed with a different one is a different
+app.
 
 **CI builds both branches, and tries every change against the TV one.** A
 change can be green on main and break the box: they share `core/` and nearly
