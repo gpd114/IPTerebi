@@ -13,6 +13,16 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # Set only where the secrets exist, which is this repository. A fork, or
+    # this repository before the key is made, gets empty strings -- the
+    # restore step below is skipped and the release is signed with the debug
+    # key instead. A build nobody else can run is a build nobody else can
+    # check, and R8 is the thing worth checking here.
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ipterebi
+
     steps:
       - uses: actions/checkout@v4
 
@@ -49,13 +59,25 @@ jobs:
       # silently: a stripped serializer fails at the first panel response and
       # nothing in a debug build would ever show it. Cheap to keep honest
       # here, expensive to find out from a user.
+      # Rebuilds the keystore from the secret into the runner's temporary
+      # directory and tells Gradle where it is. Never into the workspace,
+      # which is what gets uploaded as an artifact.
+      - name: Restore signing keystore
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/ipterebi.jks"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/ipterebi.jks" >> "$GITHUB_ENV"
+          echo "KEY_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+
       - name: Build release APK, so R8 is exercised
         run: gradle assembleRelease --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ipterebi-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: ipterebi-apk
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
 
   # What this change does to the TV branch, before it lands rather than after.
   #
