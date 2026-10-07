@@ -147,6 +147,19 @@ object Night {
     val inkSoft get() = palette.inkSoft
     val pink get() = palette.pink
     val badge get() = palette.badge
+
+    /** The block of colour behind whatever the remote is on. */
+    val focus get() = palette.focus
+
+    /**
+     * Ink on a [focus] fill.
+     *
+     * Not a palette role because it follows from one: the focus fill is
+     * cobalt on Dark, where near-white reads on it, and a pale blue on Light,
+     * where the dark ink does. A second stored colour would only be a second
+     * thing to get out of step with the first.
+     */
+    val onFocus get() = if (palette.dark) Color.White else palette.ink
 }
 
 /**
@@ -175,7 +188,7 @@ object Appearance {
     private const val KEY = "theme.guide"
 
     /** Whether Settings offers Light as well. The TV app sets this false. */
-    const val SWITCHABLE = false
+    const val SWITCHABLE = true
 
     fun load(context: Context) {
         Night.palette = if (SWITCHABLE && prefs(context).getString(KEY, null) == "light") Light else Dark

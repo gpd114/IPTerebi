@@ -252,7 +252,9 @@ TV guide's colours, near-black with its dark cells for cards and the soft blue
 as the accent, because the owner asked for the whole app to look like the
 guide — and **Light**, a pale page, white cards, the dark blue for what is
 selected and the main button, kept as an option on the phone at their word.
-The TV app has Dark alone (`Appearance.SWITCHABLE` is false there). The player
+The TV app has both now too — see "A light television" below; it had Dark
+alone until the owner asked, and the reason it could not simply be switched
+on is worth reading before adding a colour anywhere. The player
 is dark in both (`OverVideo`); it frames video.
 
 **Focus is a fill, and the fill is the accent.** It was a two-pixel white ring
@@ -1158,6 +1160,48 @@ later one was kept.
 
 
 
+
+## A light television
+
+Asked for, and the reason it was not simply a matter of flipping
+`Appearance.SWITCHABLE` is the interesting part. The owner had seen it before:
+*"last time it just looked disjointed and not the same app as it was not the
+same colour."*
+
+**There were three palettes, and only one of them was the palette.** Home,
+Settings, Films and Series drew from `Night.*`. The screens that make this a
+television — the channel list, the banner, the recordings — drew from a second
+set of constants in `TvParts.kt`. The guide drew from a third in `TvGuide.kt`.
+The second and third happened to hold the same values as the dark palette, so
+nothing looked wrong while there was only one theme. Turn it over and half the
+app followed and half did not, which is exactly what they saw.
+
+So they are names for parts of the palette now: `TvInk` is `Night.ink`,
+`TvFocusFill` is `Night.focus`, `TvGround` is `Night.ground`, `CellFill` is
+`Night.veil`, the cell for what is on now is `Night.quiet`. Nothing about
+*why* each colour is what it is has changed; it is said in terms of a role
+instead of a hex value. **Anything new on a TV screen must do the same** — a
+literal colour there is a light theme broken again, and it will not show up
+until somebody switches over.
+
+**The guide is a page, not an overlay, and that is the call that mattered.**
+It sits over the player, which is the usual reason something stays dark in
+both themes (`OverVideo`, the player's own controls, the multiview grid behind
+four pictures). But it covers the screen with the picture shrunk into a
+corner, so it reads as a page, and the owner asked for the EPG light along
+with everything else. Two things were fixed on that basis: the horizontal
+gradient that fades the page out over the corner picture, which was a
+hardcoded near-black drawing a dark band across a pale screen, and two
+progress tracks that were white at a fifth — invisible on a light page, now
+`Night.edge`.
+
+What stays dark in both: the player, anything `OverVideo` paints, the black
+behind the multiview panes, and the scrims that dim a screen behind a panel.
+
+Proved on the `googletv34` emulator with the theme forced to Light: Home pale
+with white cards, and the guide pale with white cells, dark ink, the focused
+row lifted in the pale-blue focus fill, pink favourite stars and the red now
+line. The two screens read as one app, which was the whole complaint.
 ## Searching on the television
 
 The TV build had none. This file said so — "the TV guide has no search box

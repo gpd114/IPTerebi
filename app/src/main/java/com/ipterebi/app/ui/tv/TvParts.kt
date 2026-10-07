@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import com.ipterebi.app.ui.theme.Night
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,35 +38,54 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
 /*
- * What the TV screens are drawn with. Everything here sits over live video, so
- * it is dark whichever theme is chosen — the same reasoning as OverVideo.
+ * What the TV screens are drawn with.
+ *
+ * **These read the palette rather than holding colours of their own**, and
+ * that is the whole of why a light theme used to look like two apps stitched
+ * together. Home, Settings, Films and Series were drawn from `Night.*`; the
+ * screens that make this a television — the channel list, the guide, the
+ * recordings — were drawn from a second set of constants that happened to be
+ * copies of the dark palette's values. Turn the theme over and half the app
+ * followed and half did not. The owner's words: "it just looked disjointed
+ * and not the same app as it was not the same colour."
+ *
+ * So there is one palette now and these are names for parts of it. What was
+ * written here about *why* each colour is what it is still holds; it is just
+ * said in terms of a role instead of a hex value.
+ *
+ * The exception is anything genuinely over moving video, which stays dark in
+ * both themes because the picture is dark and a white panel over it glares —
+ * see [OverVideo], and the multiview grid, which is black behind four
+ * pictures. The guide is *not* that exception: it covers the screen with the
+ * player shrunk into a corner, so it is a page, and the owner asked for it
+ * light along with everything else.
  *
  * Focus is the loudest thing on screen, as in Debritsu's TV app: whatever the
- * remote is on becomes a near-white pill with dark text. From across a room an
- * accent-coloured highlight on a dark panel is not enough.
+ * remote is on becomes a block of the accent with ink that reads on it. From
+ * across a room an outline is not enough.
  */
 
-/** The panel behind lists and banners: near-black, a little of the picture through it. */
-internal val TvPanel = Color(0xE60B0C11)
-internal val TvInk = Color(0xFFF1F3F8)
-internal val TvInkSoft = Color(0xFFA3A8B8)
+/** The panel behind lists and banners: the page, with a little of the picture through it. */
+internal val TvPanel: Color get() = Night.ground.copy(alpha = 0.9f)
+internal val TvInk: Color get() = Night.ink
+internal val TvInkSoft: Color get() = Night.inkSoft
 /** Where something is, rather than what is focused: the playing channel, the group being zapped. */
-internal val TvAccent = Color(0xFF9DB5FF)
-internal val TvCobalt = Color(0xFF2F5FE0)
-/** Ink on an [TvAccent] fill: the page, so the chosen thing reads as a block. */
-internal val TvOnAccent = Color(0xFF0B0C11)
-internal val TvPink = Color(0xFFFF8FA3)
+internal val TvAccent: Color get() = Night.accent
+internal val TvCobalt: Color get() = Night.cobalt
+/** Ink on a [TvAccent] fill: the page, so the chosen thing reads as a block. */
+internal val TvOnAccent: Color get() = Night.onChosen
+internal val TvPink: Color get() = Night.pink
 // Focus is the accent, the same block the phone screens fill with: the owner's
 // word on the white one it used to be was that it is ugly, and white was two
 // things at once anyway — the focus pill here and the ring over there.
 //
-// So cobalt answers one question and one only: where is the remote. What is
-// chosen — the section you are in, the group you are zapping — is the
+// So the focus colour answers one question and one only: where is the remote.
+// What is chosen — the section you are in, the group you are zapping — is the
 // accent instead, as a fill with [TvOnAccent] on it or as ink where there is
 // no fill. They used to share cobalt, and on the rail that put two identical
 // blue blocks on the screen at once with nothing to say which was which.
-internal val TvFocusFill = TvCobalt
-internal val TvFocusInk = Color.White
+internal val TvFocusFill: Color get() = Night.focus
+internal val TvFocusInk: Color get() = Night.onFocus
 
 /**
  * A row in a list the remote moves through: transparent until focused, then

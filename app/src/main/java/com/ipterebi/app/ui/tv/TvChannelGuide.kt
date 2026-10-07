@@ -46,6 +46,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.ipterebi.app.ui.theme.Night
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.painterResource
@@ -551,7 +552,16 @@ private fun GroupsPanel(
     Row(
         modifier
             .fillMaxHeight()
-            .background(Brush.horizontalGradient(0f to Color(0xF80B0C11), 0.85f to Color(0xF00B0C11), 1f to Color.Transparent))
+            // The page fading out over the picture in the corner. Was a
+            // hardcoded near-black, which on a light theme drew a dark band
+            // across a pale screen.
+            .background(
+                Brush.horizontalGradient(
+                    0f to Night.ground.copy(alpha = 0.97f),
+                    0.85f to Night.ground.copy(alpha = 0.94f),
+                    1f to Color.Transparent,
+                )
+            )
             .padding(start = 20.dp, end = 36.dp),
     ) {
         Column(

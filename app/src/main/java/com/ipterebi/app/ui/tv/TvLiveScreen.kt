@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import com.ipterebi.app.ui.theme.Night
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -1036,7 +1037,8 @@ private fun InfoBanner(
                     progress = { p },
                     modifier = Modifier.padding(start = 52.dp).fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
                     color = TvAccent,
-                    trackColor = Color(0x33FFFFFF),
+                    // Was white at a fifth, invisible on a light page.
+                    trackColor = Night.edge,
                 )
             }
             guide.next?.let { next ->

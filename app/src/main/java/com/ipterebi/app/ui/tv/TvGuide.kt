@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import com.ipterebi.app.ui.theme.Night
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -78,11 +79,17 @@ internal val GuidePreviewHeight = 189.dp
 internal val GuideTopHeight = 213.dp
 
 
-/** Behind the guide: the same near-black as the panels, but solid — it is a page, not an overlay. */
-internal val TvGround = Color(0xFF0B0C11)
+// **The guide is a page, so it follows the theme like one.** These were
+// hardcoded near-blacks, which is why turning the app light left the EPG
+// behind looking like a different application. It overlays the player, but it
+// covers the screen with the picture shrunk into a corner -- it is not the
+// thin band over moving video that OverVideo exists for.
+
+/** Behind the guide: the page itself, and solid — it is a page, not an overlay. */
+internal val TvGround: Color get() = Night.ground
 /** The flat fill behind a guide cell, a poster tile, a chip: the page lifted once. */
-internal val CellFill = Color(0xFF191B23)
-private val CellNowFill = Color(0xFF20263A)
+internal val CellFill: Color get() = Night.veil
+private val CellNowFill: Color get() = Night.quiet
 
 @Composable
 internal fun ProgrammeDetails(
@@ -125,7 +132,9 @@ internal fun ProgrammeDetails(
                     progress = { ((now - slot.start).toFloat() / (slot.stop - slot.start)).coerceIn(0f, 1f) },
                     modifier = Modifier.padding(top = 8.dp).width(260.dp).height(4.dp).clip(RoundedCornerShape(2.dp)),
                     color = TvAccent,
-                    trackColor = Color(0x33FFFFFF),
+                    // The unfilled part of the bar. Was white at a fifth,
+                    // which is invisible on a light page.
+                    trackColor = Night.edge,
                 )
             }
         }
