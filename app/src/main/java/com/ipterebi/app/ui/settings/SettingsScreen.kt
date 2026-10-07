@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.ipterebi.app.playback.ActivePlayback
 import com.ipterebi.app.ui.home.HomeChannels
+import com.ipterebi.app.ui.tv.SearchOpensOn
 import com.ipterebi.app.ui.theme.Appearance
 import com.ipterebi.app.ui.theme.Night
 import com.ipterebi.core.MAX_GUIDE_SOURCES
@@ -123,6 +124,21 @@ fun SettingsScreen(
                 Hint(
                     "Which channels the home screen's Live TV row shows. Favourites " +
                         "is the list you starred; Recent is where you have just been.",
+                )
+            }
+
+            Panel {
+                SectionTitle("Search")
+                ChoiceRow(
+                    options = SearchOpensOn.Choice.entries.map { it to it.label },
+                    isSelected = { it == SearchOpensOn.choice },
+                    onSelect = { choice -> SearchOpensOn.set(context, choice) },
+                )
+                Hint(
+                    "What the search screen shows before you type. Sport on now lists " +
+                        "the matches the guide has on, each with every channel carrying " +
+                        "it. Not everyone watches sport, so this turns it off \u2014 the " +
+                        "search itself is unchanged either way.",
                 )
             }
 

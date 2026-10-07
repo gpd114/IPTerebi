@@ -167,6 +167,9 @@ class TvSearchViewModel(private val container: AppContainer) : ViewModel() {
      * list that empties the moment one finishes is a list nobody trusts.
      */
     private suspend fun showSport() {
+        // Not even asked for when it is off: the query is local and cheap,
+        // but a list nobody will see is work nobody asked for.
+        if (SearchOpensOn.choice != SearchOpensOn.Choice.SPORT) return
         val account = account ?: return
         val now = System.currentTimeMillis() / 1000
         val hidden = container.channelLists.hidden(account).first().hiddenIds()

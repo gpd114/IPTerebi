@@ -1342,6 +1342,20 @@ anyway.
 channels an extra XMLTV source filled in — which are the sports channels. On a
 line with no extra sources it will find little, and it says nothing rather
 than guessing.
+
+**It is off by default, and that is the owner's call rather than a hedge.**
+Their words: "it should be optional as not everyone watches sport". A search
+screen that opens on a list of matches presumes something about whoever is
+holding the remote, and the person who asked for the feature is not the only
+person who will ever use the app. Settings → Search chooses between **Sport on
+now** and **Nothing**, which puts back the prompt that was there before; the
+search itself is untouched either way, and when it is off the lookup is not
+made at all rather than made and thrown away.
+
+That it defaults off is worth noticing against the rest of this file: almost
+nothing else here is a setting, because a setting is usually a decision nobody
+wanted to make. This one earns it — the answer genuinely differs per person,
+and it costs one press.
 ## Your team
 
 The thing this was asked for, in the owner's words: *"find out which

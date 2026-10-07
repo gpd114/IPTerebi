@@ -119,7 +119,7 @@ fun TvSearchScreen(
             // for anyway. The guide's own category decides what counts: see
             // isSport, and the measurement that ruled out "widest-carried",
             // which answered Best Medicine on 43 channels and NCIS on 40.
-            if (state.sport.isNotEmpty()) {
+            if (state.sport.isNotEmpty() && SearchOpensOn.choice == SearchOpensOn.Choice.SPORT) {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     item {
                         Text(
