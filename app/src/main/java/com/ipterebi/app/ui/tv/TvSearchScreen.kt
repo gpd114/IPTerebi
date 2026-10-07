@@ -112,6 +112,28 @@ fun TvSearchScreen(
         }
 
         if (state.query.isBlank()) {
+            // **The empty state answers rather than asks.** A search screen
+            // that opens on a prompt makes somebody type before it is any
+            // use, and on a D-pad the typing is the expensive part -- so the
+            // sport on now goes here, which is what they were going to look
+            // for anyway. The guide's own category decides what counts: see
+            // isSport, and the measurement that ruled out "widest-carried",
+            // which answered Best Medicine on 43 channels and NCIS on 40.
+            if (state.sport.isNotEmpty()) {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        Text(
+                            "SPORT ON NOW",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TvAccent,
+                        )
+                    }
+                    items(state.sport, key = { it.showing.title + it.showing.start }) { on ->
+                        ShowingRows(on, onPlay)
+                    }
+                }
+                return@Column
+            }
             Text(
                 "Type a channel name, or the name of a team. A team is worth setting " +
                     "in Settings instead — the row on Home then finds their match for " +
@@ -146,29 +168,7 @@ fun TvSearchScreen(
                 }
             }
             items(state.showings, key = { it.showing.title + it.showing.start }) { on ->
-                Column(Modifier.padding(bottom = 4.dp)) {
-                    Text(
-                        on.showing.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TvInk,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        // The guide channels and the streams, which are
-                        // different numbers on a line that carries each
-                        // channel five ways. See carriedOnLabel.
-                        carriedOnLabel(on.showing.feeds, on.channels.size),
-                        style = MaterialTheme.typography.bodySmall.tabular(),
-                        color = TvInkSoft,
-                    )
-                    // Every feed carrying it, each one a row that tunes it.
-                    // This is the list somebody wants when a picture has just
-                    // gone, so it is not behind another press.
-                    on.channels.spreadByChannel().forEach { channel ->
-                        ChannelLine(channel) { onPlay(channel) }
-                    }
-                }
+                ShowingRows(on, onPlay)
             }
 
             if (state.channels.isNotEmpty()) {
@@ -209,6 +209,41 @@ private fun ChannelLine(channel: LiveStream, onPlay: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+/**
+ * One event: what it is, what is carrying it, and every feed as a row.
+ *
+ * Shared by the search results and by the sport on now, because they are the
+ * same thing asked two ways and a viewer should not have to learn two
+ * layouts for it.
+ */
+@Composable
+private fun ShowingRows(on: TvShowingOn, onPlay: (LiveStream) -> Unit) {
+    Column(Modifier.padding(bottom = 4.dp)) {
+        Text(
+            on.showing.title,
+            style = MaterialTheme.typography.titleMedium,
+            color = TvInk,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            // The guide channels and the streams, which are different numbers
+            // on a line that carries each channel five ways. See
+            // carriedOnLabel.
+            carriedOnLabel(on.showing.feeds, on.channels.size),
+            style = MaterialTheme.typography.bodySmall.tabular(),
+            color = TvInkSoft,
+        )
+        // Every feed carrying it, each one a row that tunes it. This is the
+        // list somebody wants when a picture has just gone, so it is not
+        // behind another press. One of each channel before any second cut of
+        // the same one: see spreadByChannel.
+        on.channels.spreadByChannel().forEach { channel ->
+            ChannelLine(channel) { onPlay(channel) }
         }
     }
 }

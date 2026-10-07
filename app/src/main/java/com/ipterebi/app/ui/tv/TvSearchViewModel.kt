@@ -37,6 +37,14 @@ data class TvSearchUiState(
     val channels: List<LiveStream> = emptyList(),
     /** The whole line is being fetched, which is the one slow part. */
     val preparing: Boolean = false,
+    /**
+     * The sport on now, shown before anything is typed.
+     *
+     * A search screen that opens on nothing is a screen that asks a question
+     * when it could answer one — and on a D-pad the typing is the expensive
+     * part, so the answer somebody wanted is often already here.
+     */
+    val sport: List<TvShowingOn> = emptyList(),
     val note: String? = null,
 ) {
     val empty: Boolean get() = showings.isEmpty() && channels.isEmpty()
@@ -133,6 +141,7 @@ class TvSearchViewModel(private val container: AppContainer) : ViewModel() {
                 val now = System.currentTimeMillis() / 1000
                 whatsOn = container.guide.whatsOn(account, now, now + WHATS_ON_WINDOW_SECONDS)
                 _state.update { it.copy(preparing = false) }
+                showSport()
                 _state.value.query.takeIf { it.isNotBlank() }?.let { run(it) }
             } catch (e: CancellationException) {
                 throw e
@@ -149,6 +158,26 @@ class TvSearchViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+
+    /**
+     * What is on now that the guide calls sport, for the screen to open on.
+     *
+     * Three hours rather than this instant: a match that starts in twenty
+     * minutes is the thing somebody opening this at ten to three wants, and a
+     * list that empties the moment one finishes is a list nobody trusts.
+     */
+    private suspend fun showSport() {
+        val account = account ?: return
+        val now = System.currentTimeMillis() / 1000
+        val hidden = container.channelLists.hidden(account).first().hiddenIds()
+        val visible = line.withoutHidden(hidden)
+        val on = container.guide.sportOn(account, now, now + SPORT_WINDOW_SECONDS)
+            .map { it to it.streams(visible) }
+            .filter { (_, streams) -> streams.isNotEmpty() }
+            .take(MAX_SHOWINGS)
+            .map { (showing, streams) -> TvShowingOn(showing, streams) }
+        _state.update { it.copy(sport = on) }
+    }
     companion object {
         fun factory(container: AppContainer) = viewModelFactory {
             initializer { TvSearchViewModel(container) }
@@ -173,3 +202,12 @@ private const val WHATS_ON_WINDOW_SECONDS = 24L * 3600
  * seventh row is below the fold anyway.
  */
 private const val MAX_SHOWINGS = 6
+
+/**
+ * How far ahead "sport on now" looks.
+ *
+ * Three hours. A match starting in twenty minutes is what somebody opening
+ * this at ten to three wants, and a list that empties the moment one finishes
+ * is a list nobody trusts.
+ */
+private const val SPORT_WINDOW_SECONDS = 3L * 3600
