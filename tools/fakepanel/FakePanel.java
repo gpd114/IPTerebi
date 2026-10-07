@@ -497,13 +497,13 @@ public class FakePanel {
             // Croatia v England was on seven feeds and five of them said only
             // "Nations League" — and this is that case in miniature.
             "<programme start=\"" + t.apply(matchStart) + "\" stop=\"" + t.apply(matchStop) + "\" channel=\"bigmatch.a\">" +
-            "<title>Nations League</title><desc>Croatia v England from Zagreb.</desc></programme>\n" +
+            "<title>Nations League</title><desc>Croatia v England from Zagreb.</desc><category>Sports</category><category>Football</category></programme>\n" +
             "<programme start=\"" + t.apply(matchStart) + "\" stop=\"" + t.apply(matchStop) + "\" channel=\"BigMatch.B\">" +
-            "<title>Nations League</title><desc>Croatia v England from Zagreb.</desc></programme>\n" +
+            "<title>Nations League</title><desc>Croatia v England from Zagreb.</desc><category>Sports</category><category>Football</category></programme>\n" +
             "<programme start=\"" + t.apply(matchStart) + "\" stop=\"" + t.apply(matchStop) + "\" channel=\"bigmatch.c\">" +
-            "<title>UEFA Nations League: Croatia v England</title></programme>\n" +
+            "<title>UEFA Nations League: Croatia v England</title><category>Sports</category></programme>\n" +
             "<programme start=\"" + t.apply(matchStart) + "\" stop=\"" + t.apply(matchStop) + "\" channel=\"other.test\">" +
-            "<title>Antiques Roadshow</title><desc>Nothing to do with the football.</desc></programme>\n" +
+            "<title>Antiques Roadshow</title><desc>Nothing to do with the football.</desc><category>Entertainment</category><category>Transport</category></programme>\n" +
             // The same fixture, on now, as a repeat. Nothing in the title
             // tells it from a live match -- a broadcaster lists a replay under
             // the title the live match had -- so previously-shown is the whole
