@@ -386,6 +386,22 @@ class Guide(
             .showings()
     }
 
+
+    /**
+     * The sport on between [from] and [to], grouped and widest-carried first.
+     *
+     * **Why this is not just "what is on now".** Asked for the widest-carried
+     * programmes on the owner's line at a moment, the guide answered *Best
+     * Medicine* on 43 channels, *NCIS* on 40, then *Channel No Longer
+     * Available*, *Sendepause*, *End of Transmission* and *Shop on TV*. Breadth
+     * finds filler, because filler is what a provider puts everywhere. The
+     * guide's own category is the only thing that separates a match from a
+     * sitcom, and [isSport] is asked of that.
+     */
+    suspend fun sportOn(account: XtreamAccount, from: Long, to: Long): List<Showing> =
+        withContext(Dispatchers.IO) {
+            store.sportIn(account.lineKey, from, to).showings()
+        }
     /** When [account]'s full guide was last fetched, in epoch millis; null when it never has been. */
     suspend fun fetchedAt(account: XtreamAccount): Long? = withContext(Dispatchers.IO) { store.fetchedAt(account.lineKey) }
 

@@ -941,6 +941,49 @@ do the same.
 real one available and it is the case this cannot work on, so what has been
 shown is the screen behaving correctly against a panel that refuses — not a
 provider that allows three, which is the line this feature is actually for.
+
+## What the guide calls sport
+
+"Sport on now" sounds like it should fall out of what is already here, and the
+first two ways of getting it both failed on measurement:
+
+- **The widest-carried programmes on now are not sport.** Asked of the owner's
+  own guide at a moment, that gives *Best Medicine* on 43 channels, *NCIS* on
+  40, then *Channel No Longer Available* on 16, *Sendepause*, *End of
+  Transmission* and *Shop on TV*. Breadth finds filler, because filler is what
+  a provider puts on everything at once. The rule that ranks a fixture above a
+  documentary works *within* a search for a team; on its own it finds the
+  schedule's wallpaper.
+- **Titles do not say either.** The same fixture is "Nations League", "Kick
+  Off - Croatia v England" or "Live: College Football" depending on who wrote
+  it, and no list of words tells those from a programme about the same team.
+  That is the finding `WhatsOn.kt` already rests on, met from the other end.
+
+What does say is **XMLTV's own `category`**, which `readXmltv` used to throw
+away with everything else that is not a title, a time or a description.
+Measured across the five public sources the owner uses, every one of them
+sends it in bulk — UK1 alone tags **2,351** programmes `Sports`, beside
+`Football`, `American Football`, `Motor Sports` and `Sports Show`.
+
+`isSport` is asked of those, and matches **whole words, because "Transport"
+contains "sport"** — a real category in that guide, as is "Shopping". A
+substring test is a screen full of freight documentaries. The word list is
+taken from what those guides actually send rather than from XMLTV's advisory
+genre list, which nobody follows, and is kept narrow: a word that is sometimes
+sport and sometimes not costs more in wrong answers than it wins in right
+ones.
+
+**The flag is stored, not the categories** (`programme.sport`, schema 3, a
+column added rather than the table rebuilt). A guide is 17 MB on the device
+already and nothing asks what genre a programme is except this one question.
+The cost is that changing the rule needs a refresh, which happens twice a day
+anyway.
+
+**What it covers is the half that matters.** Most of a provider's own
+`xmltv.php` carries no categories at all, so this largely answers for the
+channels an extra XMLTV source filled in — which are the sports channels. On a
+line with no extra sources it will find little, and it says nothing rather
+than guessing.
 ## Your team
 
 The thing this was asked for, in the owner's words: *"find out which

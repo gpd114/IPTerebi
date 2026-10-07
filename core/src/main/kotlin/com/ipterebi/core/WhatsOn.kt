@@ -345,3 +345,42 @@ fun carriedOnLabel(guideChannels: Int, feeds: Int): String {
     val channels = "on $guideChannels channel" + if (guideChannels == 1) "" else "s"
     return if (feeds > guideChannels) "$channels · $feeds feeds" else channels
 }
+
+/**
+ * Whether a guide's own categories call this sport.
+ *
+ * **Asked of the categories, never of the title.** A fixture is listed as
+ * "Nations League", "Kick Off - Croatia v England" or just "Live: College
+ * Football" depending on who wrote it, and no list of words separates those
+ * from a documentary about the same team. The guide, where it bothers, simply
+ * says: measured across the owner's five public sources, UK1 alone tags 2,351
+ * programmes `Sports`, beside `Football`, `American Football`, `Motor Sports`
+ * and `Sports Show`.
+ *
+ * **Whole words, because "Transport" contains "sport".** It is a real
+ * category in that guide — so is "Shopping", which contains nothing useful
+ * but would have been caught by a looser rule next time one was written. A
+ * substring test here is a screen full of freight documentaries.
+ *
+ * What it will not do is guess from a title, and it says nothing at all about
+ * a guide that omits categories: most of a provider's own `xmltv.php` does,
+ * and for those channels this answers false rather than pretending.
+ */
+fun isSport(categories: List<String>): Boolean = categories.any { one ->
+    normaliseForSearch(one).split(' ').any { it in SPORT_WORDS }
+}
+
+/**
+ * The words a guide uses for sport, folded.
+ *
+ * Taken from what five public guides actually send rather than from a
+ * standard: XMLTV's own genre list is advisory and nobody follows it. Kept
+ * narrow on purpose — a word that is sometimes sport and sometimes not
+ * ("racing" on a shopping channel, "match" in a dating show) costs more in
+ * wrong answers than it wins in right ones.
+ */
+private val SPORT_WORDS = setOf(
+    "sport", "sports", "football", "soccer", "rugby", "cricket", "tennis",
+    "golf", "boxing", "basketball", "baseball", "hockey", "athletics",
+    "motorsport", "motorsports", "wrestling", "snooker", "darts", "cycling",
+)
