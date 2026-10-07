@@ -2,6 +2,7 @@ package com.ipterebi.core
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -424,5 +425,52 @@ class WhatsOnTest {
     fun `one number is enough when they agree`() {
         assertEquals("on 4 channels", carriedOnLabel(guideChannels = 4, feeds = 4))
         assertEquals("on 1 channel", carriedOnLabel(guideChannels = 1, feeds = 1))
+    }
+
+    // What the guide calls sport. Asked of the categories, never of the
+    // title: a fixture is listed as "Nations League" or "Kick Off - Croatia v
+    // England" depending on who wrote it, and no list of words separates
+    // those from a documentary about the same team.
+
+    @Test
+    fun `the guide's own word for it is taken`() {
+        // Measured across the owner's five sources: UK1 alone tags 2,351
+        // programmes Sports, beside Football and Motor Sports.
+        assertTrue(isSport(listOf("Sports")))
+        assertTrue(isSport(listOf("Football")))
+        assertTrue(isSport(listOf("American Football")))
+        assertTrue(isSport(listOf("Motor Sports")))
+        assertTrue(isSport(listOf("Sports Show")))
+    }
+
+    @Test
+    fun `Transport is not sport`() {
+        // A real category in that guide, and the reason this matches whole
+        // words rather than substrings. A looser rule is a screen full of
+        // freight documentaries.
+        assertFalse(isSport(listOf("Transport")))
+    }
+
+    @Test
+    fun `any one category is enough`() {
+        // "Sports" and "Football" together is ordinary, and a programme
+        // tagged with both a genre and sport is still sport.
+        assertTrue(isSport(listOf("Entertainment", "Football")))
+    }
+
+    @Test
+    fun `a guide that says nothing is not guessed at`() {
+        // Most of a provider's own xmltv.php omits categories, and for those
+        // channels this answers false rather than pretending.
+        assertFalse(isSport(emptyList()))
+        assertFalse(isSport(listOf("")))
+        assertFalse(isSport(listOf("Entertainment", "Drama", "Shopping")))
+    }
+
+    @Test
+    fun `case and punctuation do not matter`() {
+        assertTrue(isSport(listOf("SPORTS")))
+        assertTrue(isSport(listOf("sport")))
+        assertTrue(isSport(listOf("Sport/Leisure")))
     }
 }
