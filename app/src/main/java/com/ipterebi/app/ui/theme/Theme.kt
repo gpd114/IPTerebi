@@ -11,6 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
@@ -18,6 +20,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ipterebi.app.R
+import com.ipterebi.app.ui.isTelevision
+import kotlin.math.abs
 
 /**
  * Everything a theme colours, by role, on the pattern of the owner's other app,
@@ -98,7 +102,57 @@ val Light = Palette(
     chosen = Color(0xFF1B3478), onChosen = Color(0xFFFFFFFF),
     ink = Color(0xFF141A30), inkSoft = Color(0xFF6A7494),
     pink = Color(0xFFC2456B), badge = Color(0xB3142A66),
-    focus = Color(0xFFC3D2F2),
+    focus = Color(0xFF7F9CD8),
+)
+
+/**
+ * [Light] for a television: the same colours, dimmed, and with no pure white
+ * anywhere.
+ *
+ * **The reason is the box's HDR, which is on and cannot be turned off.** The
+ * owner's verdict on the light theme there was that it is "a bit too bright and
+ * in your face", and they named the cause themselves. With HDR on, the panel
+ * maps SDR white towards its *peak* brightness rather than towards paper — so
+ * `#FFFFFF` on a card is not a page, it is a lamp, and a screen that is mostly
+ * card is mostly lamp. Nothing in the app can turn that off; the only thing it
+ * can do is stop asking for peak.
+ *
+ * So the page drops from 90% luminance to **43%** and the cards from 100% to
+ * **56%**, and [Light]'s white `veil` and `field` become a mid blue-grey. The
+ * ink goes *down* to keep up: measured, ink on the page is 8.4:1 and on a card
+ * 10.7:1. Nothing here is a guess — every pair was computed before it was
+ * written.
+ *
+ * **It was 68% and 79% first, and that was still too bright**, which is worth
+ * recording because the second guess was no more a guess than the first: the
+ * owner looked at it on the box and said so. The step from 90% to 68% sounds
+ * large and was not enough, because what HDR does to a large pale area is not
+ * proportional to the number.
+ *
+ * **43% is close to the floor, and the floor is not arbitrary.** Work back from
+ * [Modifier.focusFill], which paints its fill *under* text the caller has
+ * already coloured — on Home that text is [Palette.ink], dark. So the focus
+ * fill cannot go below about 21% luminance or a focused card becomes
+ * unreadable; a quiet pill has to sit clear above the focus fill; and a card
+ * has to sit clear above the pill. That chain puts the card at about 56% and
+ * the page just under it. Dimmer than this is not a palette change, it is
+ * [Dark], which is one press away and is the right answer for anyone who wants
+ * the screen darker still.
+ *
+ * Only on a television, and chosen by [Appearance.lightFor] rather than by a
+ * setting: a phone is held at arm's length in a lit room and wants [Light]'s
+ * brightness, which the owner asked to keep.
+ */
+val LightTv = Palette(
+    dark = false,
+    ground = Color(0xFFA7AFC1), veil = Color(0xFFBEC5D2), edge = Color(0xFF8D96AC),
+    hairline = Color(0xFF9BA3B7), quiet = Color(0xFFB4BBCA), quietText = Color(0xFF181E2D),
+    glass = Color(0xFFB4BBCA), glassIcon = Color(0xFF13224F), field = Color(0xFFBEC5D2),
+    cobalt = Color(0xFF13224F), accent = Color(0xFF13224F),
+    chosen = Color(0xFF13224F), onChosen = Color(0xFFBEC5D2),
+    ink = Color(0xFF0F1320), inkSoft = Color(0xFF313A52),
+    pink = Color(0xFF741A36), badge = Color(0xB3142A66),
+    focus = Color(0xFF6482BE),
 )
 
 /**
@@ -154,12 +208,58 @@ object Night {
     /**
      * Ink on a [focus] fill.
      *
-     * Not a palette role because it follows from one: the focus fill is
-     * cobalt on Dark, where near-white reads on it, and a pale blue on Light,
-     * where the dark ink does. A second stored colour would only be a second
-     * thing to get out of step with the first.
+     * Not a palette role because it follows from one, and now it is worked out
+     * rather than assumed: it used to be white on Dark and the ink on Light,
+     * which was right only because the focus fill was the one colour per theme.
+     * [focusOver] can hand back a lifted fill, and white on a pale blue is not
+     * readable, so the ink follows the fill it is going on.
      */
-    val onFocus get() = if (palette.dark) Color.White else palette.ink
+    val onFocus get() = inkOn(palette.focus)
+
+    /**
+     * The focus fill to paint over [under], which is not always [focus].
+     *
+     * **Because the accent cannot show up on itself.** Measured on Dark:
+     * `focus` and `cobalt` are the same `#2F5FE0`, so a chip that is already
+     * chosen, or the main button, gained focus and *nothing changed* — a
+     * contrast of **1.00**. That is the owner's report that focus is hardly
+     * visible in Settings, and Settings is the screen it bites hardest on,
+     * because it is almost nothing but chosen chips and the remote lands on
+     * the chosen one.
+     *
+     * Where the fill underneath is a different colour this answers [focus] and
+     * nothing changes. Where it is near enough to vanish into, the fill is
+     * lifted clear — towards the ink on Dark, towards the page on Light — which
+     * on Dark turns the block over a cobalt button into a pale blue at 3.2:1
+     * against it. Derived from [focus] rather than stored beside it, so there
+     * is no second colour to fall out of step with the first.
+     *
+     * Only the few components whose own background can *be* the accent need to
+     * say what they are painting over; everything else leaves it alone.
+     */
+    fun focusOver(under: Color?): Color {
+        val fill = palette.focus
+        if (under == null || !near(under, fill)) return fill
+        return lerp(fill, if (palette.dark) palette.ink else palette.ground, 0.62f)
+    }
+
+    /**
+     * White or the theme's darkest ink, whichever reads on [fill].
+     *
+     * By luminance rather than by theme, so a lifted focus fill gets dark ink
+     * on Dark — where everything else gets white — without the caller having to
+     * know which fill it ended up with.
+     */
+    fun inkOn(fill: Color): Color =
+        if (fill.luminance() > 0.4f) (if (palette.dark) palette.ground else palette.ink) else Color.White
+
+    /**
+     * Whether two fills are close enough that one painted over the other would
+     * not be seen. Channel-wise rather than by luminance, which would call two
+     * colours of the same weight and different hue the same thing.
+     */
+    private fun near(a: Color, b: Color) =
+        abs(a.red - b.red) + abs(a.green - b.green) + abs(a.blue - b.blue) < 0.35f
 }
 
 /**
@@ -191,13 +291,25 @@ object Appearance {
     const val SWITCHABLE = true
 
     fun load(context: Context) {
-        Night.palette = if (SWITCHABLE && prefs(context).getString(KEY, null) == "light") Light else Dark
+        val light = SWITCHABLE && prefs(context).getString(KEY, null) == "light"
+        Night.palette = if (light) lightFor(context) else Dark
     }
 
     fun set(context: Context, dark: Boolean) {
         prefs(context).edit().putString(KEY, if (dark) "dark" else "light").apply()
-        Night.palette = if (dark) Dark else Light
+        Night.palette = if (dark) Dark else lightFor(context)
     }
+
+    /**
+     * Which light palette: [LightTv] on a television, [Light] anywhere else.
+     *
+     * Not a third setting. There is one choice, Dark or Light, and this decides
+     * what Light *means* on the box — where HDR is on and cannot be turned off,
+     * so a white card reads as a lamp rather than as paper. See [LightTv]. A
+     * viewer should not have to understand their television's tone mapping to
+     * find a screen they can look at.
+     */
+    private fun lightFor(context: Context) = if (isTelevision(context)) LightTv else Light
 
     private fun prefs(context: Context) = context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 }

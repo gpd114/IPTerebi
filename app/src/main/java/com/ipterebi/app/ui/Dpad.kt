@@ -19,6 +19,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.key.Key
@@ -63,12 +64,55 @@ private val activateKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter
  * Place it *before* `clickable` in the chain, so that it observes the focus of
  * the element it fills, and *after* that element's own `background`, so it is
  * the one seen.
+ *
+ * [under] is that background, where the element has one that could be the
+ * accent itself — a chosen chip, the main button. Give it and the fill is
+ * lifted clear instead of painting the accent over the accent, which showed
+ * nothing at all; see [Night.focusOver]. Everything whose background is a card
+ * or a quiet fill can leave it out.
  */
-fun Modifier.focusFill(shape: Shape = Corners.control): Modifier = composed {
+fun Modifier.focusFill(shape: Shape = Corners.control, under: Color? = null): Modifier = composed {
     var focused by remember { mutableStateOf(false) }
     this
         .onFocusChanged { focused = it.isFocused }
-        .then(if (focused) Modifier.background(Night.palette.focus, shape) else Modifier)
+        .then(if (focused) Modifier.background(Night.focusOver(under), shape) else Modifier)
+}
+
+/**
+ * Focus as a fill, for an element that has to recolour its *content* with it.
+ *
+ * [focusFill] is enough wherever the content reads on the fill whatever
+ * happens — a channel name is the theme's ink and reads on both. It is not
+ * enough where the content was coloured for the background it is replacing, and
+ * Settings is made almost entirely of those: a chosen chip's label is white
+ * because cobalt is under it, and when focus lifts that to a pale blue the
+ * white goes with it and the label disappears. Measured on Dark, white on the
+ * lifted fill is 1.1:1.
+ *
+ * So this hands back the fill it chose and lets the caller ask [Night.inkOn]
+ * what goes on it. Paint [fill], chain [watch] before `clickable`, and colour
+ * content with [ink].
+ */
+class FocusFill internal constructor(
+    /** What to paint: the colour given, or the focus fill while focused. */
+    val fill: Color,
+    val focused: Boolean,
+    /** Chain this before `clickable`, so it sees that element's focus. */
+    val watch: Modifier,
+) {
+    /** [unfocused] normally; whatever reads on [fill] while focused. */
+    fun ink(unfocused: Color): Color = if (focused) Night.inkOn(fill) else unfocused
+}
+
+/** @see FocusFill */
+@Composable
+fun rememberFocusFill(under: Color): FocusFill {
+    var focused by remember { mutableStateOf(false) }
+    return FocusFill(
+        fill = if (focused) Night.focusOver(under) else under,
+        focused = focused,
+        watch = Modifier.onFocusChanged { focused = it.isFocused },
+    )
 }
 
 /**
