@@ -164,9 +164,19 @@ private enum class Section(
     @DrawableRes val icon: Int,
     /** What to navigate to, which differs when the route takes an argument. */
     val go: String = route,
+    /**
+     * Whether coming back to this section restores the state it was left in.
+     * True for the libraries, where it is what keeps the open category and the
+     * scroll position. False for live television, which works out its own
+     * channel from the recents — a more reliable answer than a restored one,
+     * and restoring it caused two faults: a channel named by a card on Home
+     * was ignored in favour of the saved one, and the rail could come back to
+     * an older channel than the last one actually watched.
+     */
+    val restores: Boolean = true,
 ) {
     HOME(Route.HOME, "Home", R.drawable.ic_nav_home),
-    LIVE(Route.TV_LIVE, "Live TV", R.drawable.ic_nav_live, go = Route.tvLive()),
+    LIVE(Route.TV_LIVE, "Live TV", R.drawable.ic_nav_live, go = Route.tvLive(), restores = false),
     FILMS(Route.FILMS, "Films", R.drawable.ic_nav_films),
     SERIES(Route.SERIES, "Series", R.drawable.ic_nav_series),
     RECORDINGS(Route.RECORDINGS, "Recordings", R.drawable.ic_nav_recordings),
@@ -228,7 +238,7 @@ fun AppNav(container: AppContainer) {
                     modifier = Modifier.background(Night.ground),
                     bottomBar = {
                         if (section != null && !wide) {
-                            FloatingTabBar(current = section, onSelect = { nav.switchSection(it.go) })
+                            FloatingTabBar(current = section, onSelect = { nav.switchSection(it.go, it.restores) })
                         }
                     },
                 ) { padding ->
@@ -276,7 +286,7 @@ fun AppNav(container: AppContainer) {
                                     var focused by remember { mutableStateOf(false) }
                                     NavigationRailItem(
                                         selected = item == section,
-                                        onClick = { nav.switchSection(item.go) },
+                                        onClick = { nav.switchSection(item.go, item.restores) },
                                         icon = { Icon(painterResource(item.icon), contentDescription = null) },
                                         label = { Text(item.label) },
                                         colors = NavigationRailItemDefaults.colors(
@@ -353,11 +363,13 @@ fun AppNav(container: AppContainer) {
                                 HomeScreen(
                                     container = container,
                                     onSettings = { nav.navigate(Route.SETTINGS) },
-                                    onChannels = { nav.switchSection(Route.tvLive()) },
+                                    onChannels = { nav.switchSection(Route.tvLive(), restore = false) },
                                     onFilms = { nav.switchSection(Route.FILMS) },
                                     onSeries = { nav.switchSection(Route.SERIES) },
+                                    // A named channel, so the live screen must
+                                    // not be restored over it; see switchSection.
                                     onPlayChannel = { channel ->
-                                        nav.switchSection(Route.tvLive(channel.streamId))
+                                        nav.switchSection(Route.tvLive(channel.streamId), restore = false)
                                     },
                                     // Out of one of the viewer's own lists. Same
                                     // bargain as a resume: publish what was
@@ -723,12 +735,18 @@ private fun FloatingTabBar(current: Section, onSelect: (Section) -> Unit) {
  * would push another screen on top. Home is always the root of the signed-in
  * stack. Saving and restoring state is what keeps the film library's loaded
  * category and scroll position when switching away and back.
+ *
+ * [restore] is that last part, and it has to be off whenever the route names
+ * something to open. Restoring a section's saved state and handing it a fresh
+ * argument are opposite instructions: a card on Home that names a channel was
+ * answered with whatever the live screen was on last time. So a section
+ * switch restores, and a switch that asks for something does not.
  */
-private fun NavController.switchSection(route: String) {
+private fun NavController.switchSection(route: String, restore: Boolean = true) {
     navigate(route) {
         popUpTo(Route.HOME) { saveState = true }
         launchSingleTop = true
-        restoreState = true
+        restoreState = restore
     }
 }
 
