@@ -1705,6 +1705,43 @@ cog → Live TV → the first channel card → Films → Series, and Up retraces
 OK on a card tunes the TV's own screen: the log shows `tv open channel 106`,
 which is the stream behind the card numbered 8.
 
+**Restoring a section's state and naming a channel are opposite
+instructions**, and for a while the restoring won. The owner reported it of
+the team row — *"when clicking on one of the suggestions of the team match
+list, it just opens the previously viewed channel"* — but it was every card on
+Home, the Live TV row included.
+
+`switchSection` navigates with `restoreState = true`, which is what keeps the
+film library's open category and scroll position. Applied to live television
+it restores the *saved composition state* as well, and `tunedId` in
+`TvLiveScreen` is `rememberSaveable` — so it came back holding the channel
+that screen was last on, the effect that picks a channel returned early on
+`tunedId != 0`, and the route's `startOn` was never read.
+
+**It only bites after Live TV has been left through the rail**, which is why
+it survived: Back pops the screen without saving anything, so Home → card →
+Back → card works perfectly and that is how it kept being tested. State is
+saved only by `popUpTo(Route.HOME) { saveState = true }` — a *section* switch.
+Press Home on the rail while watching, and every card on Home is answered with
+the match you were already on.
+
+Two things fix it, and both were wanted:
+
+- **Live TV does not restore** (`Section.restores`, false only for it). It
+  works its own channel out from the recents, which is a better answer than a
+  restored one — the stale state was also making the rail's own Live TV come
+  back to an *older* channel than the last one watched, measured as returning
+  to 106 after 102 had been playing.
+- **A named channel is honoured even on a screen that was restored.** The
+  effect keys on `startOn` and tracks what it has acted on in a plain
+  `remember`, deliberately not `rememberSaveable`: it must be empty on every
+  entry to the screen, so asking for the same channel twice is a fresh request
+  and not one already answered. Once honoured, zapping away is left alone.
+
+Driven on `googletv34` against the fake panel, before and after. Before: the
+third card opened 106, the channel the screen had been on. After: it opens
+102, and the rail's Live TV comes back to 102 rather than 106.
+
 **Back takes one press now.** It used to take two — "Press Back again to
 leave" — because live television was the bottom of the stack and Back ended
 the evening. Home is under it now, so Back goes there, and a warning about

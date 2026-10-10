@@ -215,14 +215,45 @@ private fun TvLive(
         showBanner()
     }
 
-    // The channel to open on: the one the home screen asked for, else the last
-    // one watched, else the top of the list.
+    // A channel named in the route has been acted on. Deliberately *not*
+    // saveable, unlike [tunedId]: it must start empty every time the screen is
+    // entered, so that asking for the same channel a second time is a fresh
+    // request rather than one already answered.
+    var asked by remember { mutableIntStateOf(0) }
+
+    // The channel to open on: the one that was asked for, else the last one
+    // watched, else the top of the list.
+    //
+    // **A channel in the route is a request, and it wins over what the screen
+    // was on.** It did not, and that is what "clicking a team match just opens
+    // the previously viewed channel" was: the rail and the home screen reach
+    // this screen through `switchSection`, which restores its saved state, and
+    // [tunedId] is `rememberSaveable` — so it came back holding last night's
+    // channel and the test below returned before [startOn] was ever read. It
+    // only ever worked on the first visit of a launch, which is why it was not
+    // caught. Restoring is right for the rail's own Live TV, where coming back
+    // to what was playing is the point; it is wrong when a card has named
+    // something.
+    //
     // Waits for recents to be read — an empty list before then means "not read
     // yet", and the first channel would be opened over last night's.
-    LaunchedEffect(state.recentsRead, state.lineup) {
+    LaunchedEffect(startOn, state.recentsRead, state.lineup) {
+        if (startOn != 0 && startOn != asked) {
+            val wanted = state.find(startOn)
+            if (wanted != null) {
+                asked = startOn
+                tune(wanted)
+                return@LaunchedEffect
+            }
+            // Not found yet. While the line is still loading that means "wait"
+            // rather than "no such channel", and this runs again when it
+            // arrives; once it has loaded and the channel still is not there,
+            // give up on it and open something rather than nothing.
+            if (state.lineup == null) return@LaunchedEffect
+            asked = startOn
+        }
         if (tunedId != 0 || !state.recentsRead) return@LaunchedEffect
-        val start = state.find(startOn)
-            ?: state.recents.firstOrNull()
+        val start = state.recents.firstOrNull()
             ?: state.savedGroup?.let { state.channelsIn(it).firstOrNull() }
             ?: state.lineup?.all?.firstOrNull()
         if (start != null) {
