@@ -1,10 +1,13 @@
 package com.ipterebi.app.ui.home
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.ipterebi.app.AppContainer
+import com.ipterebi.app.BuildConfig
+import com.ipterebi.app.TAG_API
 import com.ipterebi.app.data.AccountState
 import com.ipterebi.core.LiveStream
 import com.ipterebi.core.hiddenIds
@@ -114,6 +117,14 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                 return@launch
             }
             _state.update { it.copy(team = team, teamLooking = true) }
+            // Said out loud, because this row had no voice at all. On the
+            // owner's box it announced "nothing for Arsenal in the guide" on a
+            // night Arsenal were playing, and there was no way to tell from
+            // outside whether the guide had missed it, the grouping had, or
+            // the channel list this needs had simply failed — runCatching
+            // turns every one of those into the same empty row. The guide had
+            // it: 102 programmes matched. Whatever happens next, the log now
+            // says which of the three it was.
             val found = runCatching {
                 val now = System.currentTimeMillis() / 1000
                 // Sieved in the database before anything is folded. Reading
@@ -125,10 +136,26 @@ class HomeViewModel(private val container: AppContainer) : ViewModel() {
                     now,
                     now + TEAM_WINDOW_SECONDS,
                 )
-                val match = teamMatch(showings, now, team) ?: return@runCatching null
+                val match = teamMatch(showings, now, team)
+                if (match == null) {
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG_API, "team $team: ${showings.size} showings in the guide, none chosen")
+                    }
+                    return@runCatching null
+                }
                 val line = container.lineChannels.all(account)
                     .withoutHidden(container.channelLists.hidden(account).first().hiddenIds())
-                match to match.showing.streams(line)
+                val streams = match.showing.streams(line)
+                if (BuildConfig.DEBUG) {
+                    Log.d(
+                        TAG_API,
+                        "team $team: \"${match.showing.title}\" on ${match.showing.feeds} guide channels " +
+                            "${match.showing.channels}, ${streams.size} playable of ${line.size} on the line",
+                    )
+                }
+                match to streams
+            }.onFailure {
+                if (BuildConfig.DEBUG) Log.d(TAG_API, "team $team: lookup failed: ${it.message}")
             }.getOrNull()
             // Whether one is already set, read back with the match. Without
             // this the pill says "Remind me" again every time the screen is

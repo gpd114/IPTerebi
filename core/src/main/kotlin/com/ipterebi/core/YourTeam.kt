@@ -65,6 +65,9 @@ fun teamMatch(showings: List<Showing>, nowSeconds: Long, team: String): TeamMatc
     val live = showings.filter { nowSeconds >= it.start && nowSeconds < it.stop }
     val upcoming = showings.filter { it.start > nowSeconds }
 
+    fun found(showing: Showing, onNow: Boolean, isFixture: Boolean, repeat: Boolean = false) =
+        TeamMatch(showing.carriedAlsoBy(showings), onNow, isFixture, repeat)
+
     // A fixture outranks a mention whether it is on or not, and that ordering
     // was the other way round at first. "France" found France24's sports
     // bulletin and a motocross championnat on now, both of which merely say
@@ -84,16 +87,59 @@ fun teamMatch(showings: List<Showing>, nowSeconds: Long, team: String): TeamMatc
     // `previously-shown` is what says so, where a guide bothers to send it.
     // So a real fixture still to come beats a repeat happening now: somebody
     // whose team plays tonight wants tonight, not a rerun of September.
-    live.soonestFixture(team, allowRepeat = false)?.let { return TeamMatch(it, onNow = true, isFixture = true) }
-    upcoming.soonestFixture(team, allowRepeat = false)?.let { return TeamMatch(it, onNow = false, isFixture = true) }
-    live.soonestFixture(team)?.let { return TeamMatch(it, onNow = true, isFixture = true, repeat = true) }
-    upcoming.soonestFixture(team)?.let { return TeamMatch(it, onNow = false, isFixture = true, repeat = true) }
+    live.soonestFixture(team, allowRepeat = false)?.let { return found(it, onNow = true, isFixture = true) }
+    upcoming.soonestFixture(team, allowRepeat = false)?.let { return found(it, onNow = false, isFixture = true) }
+    live.soonestFixture(team)?.let { return found(it, onNow = true, isFixture = true, repeat = true) }
+    upcoming.soonestFixture(team)?.let { return found(it, onNow = false, isFixture = true, repeat = true) }
 
     // Nothing that reads as a fixture, so fall back to what there is: on now
     // first, because a feed dying during something is interrupting that.
-    if (live.isNotEmpty()) return TeamMatch(live.best(team), onNow = true, isFixture = false)
+    if (live.isNotEmpty()) return found(live.best(team), onNow = true, isFixture = false)
     if (upcoming.isEmpty()) return null
-    return TeamMatch(upcoming.atSoonestStart().best(team), onNow = false, isFixture = false)
+    return found(upcoming.atSoonestStart().best(team), onNow = false, isFixture = false)
+}
+
+/**
+ * The same event, with every other channel showing it at that hour folded in.
+ *
+ * **A fixture is not one programme, it is an evening**, and [showings] splits
+ * it because it groups on titles and close starts. Measured on the owner's box
+ * on 13 October 2026, Arsenal v Lille in the Champions League: nine feeds
+ * carried it and the grouping made **five separate events** of them, because
+ * the broadcasters wrap the match in build-up of different lengths — 18:00,
+ * 18:30, 18:45, 18:55 and 19:00 — and title it however they like. The row then
+ * picked the widest of the five and announced the match on *Virgin Media Two*
+ * and *beIN Sports 3 Singapore*, which is not where anybody in England was
+ * going to watch it.
+ *
+ * Worse, the one feed that mattered could never join: TNT Sports titles it
+ * "Live UEFA Champions League" and names the sides only in the description,
+ * and [showings] compares titles. That is the lesson this file already carries
+ * for *matching* — five of the seven feeds of Croatia v England said only
+ * "Nations League" — met again in the grouping, which is the third time the
+ * same thing has been missed one layer down.
+ *
+ * So for this row the binding fact is not the title. Every showing here came
+ * from a search for the team, so each one already mentions them; any that
+ * overlaps the chosen match in time is that match on another channel, and the
+ * viewer wants it in the list. Title, start and the fixture ranking are
+ * untouched — only the channel list grows — so what the row *says* is still
+ * the most specific name anybody gave it.
+ *
+ * Left alone deliberately: [showings] itself, which the error card and the
+ * sport list depend on and which was measured against a different question.
+ */
+private fun Showing.carriedAlsoBy(all: List<Showing>): Showing {
+    val overlapping = all.filter { it.start < stop && start < it.stop }
+    if (overlapping.size <= 1) return this
+    val everywhere = (channels + overlapping.flatMap { it.channels }).distinct()
+    return copy(
+        channels = everywhere,
+        stop = maxOf(stop, overlapping.maxOf { it.stop }),
+        // All of them, as Showing documents: one live feed means it is being
+        // played somewhere, and that is the one worth switching to.
+        repeat = repeat && overlapping.all { it.repeat },
+    )
 }
 
 /** The soonest of these that reads as a fixture, or null if none does. */
