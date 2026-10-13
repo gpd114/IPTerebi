@@ -37,6 +37,12 @@ data class SettingsUiState(
     val recordingVolumes: List<RecordingVolume> = emptyList(),
     /** Channels hidden from every list, newest first, so they can be brought back. */
     val hiddenChannels: List<LiveStream> = emptyList(),
+    /** A guide download is under way, whoever started it. */
+    val guideDownloading: Boolean = false,
+    /** When the full guide last arrived, in epoch millis; null when it never has. */
+    val guideFetchedAt: Long? = null,
+    /** The channel list has been asked for again and not yet come back. */
+    val channelsRefreshing: Boolean = false,
 ) {
     val userAgentChanged: Boolean
         get() = account != null && userAgentDraft.trim() != account.userAgent
@@ -76,7 +82,35 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
                             },
                         )
                     }
+                    // Here as well as on the guide's own signals, because those
+                    // fire first: a StateFlow hands over its current value the
+                    // moment it is collected, which is before the account has
+                    // arrived, and the age is read per line. Without this the
+                    // panel said "the guide has not arrived yet" on a box
+                    // holding 88,057 programmes — seen on the owner's own.
+                    refreshGuideAge()
                 }
+        }
+        // The guide's own progress, so the Refresh panel can say "fetching"
+        // for the download rather than pretending it finished with the
+        // channel list. It is shared, so this also lights up when the
+        // background refresh runs on its own.
+        viewModelScope.launch {
+            container.guide.downloading.collect { busy ->
+                _state.update { it.copy(guideDownloading = busy) }
+                if (!busy) refreshGuideAge()
+            }
+        }
+        viewModelScope.launch {
+            container.guide.version.collect { refreshGuideAge() }
+        }
+    }
+
+    private fun refreshGuideAge() {
+        val account = _state.value.account ?: return
+        viewModelScope.launch {
+            val at = runCatching { container.guide.fetchedAt(account) }.getOrNull()
+            _state.update { it.copy(guideFetchedAt = at) }
         }
     }
 
@@ -153,6 +187,56 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     fun refreshGuideNow() {
         val account = _state.value.account ?: return
         container.guide.refreshNow(account)
+    }
+
+    /**
+     * Fetches the channel list and the guide again, now.
+     *
+     * **Asked for, and the reason is the provider rather than the app.** A
+     * line's channels move: feeds are added, renamed and dropped, and a guide
+     * is only as good as the download it came from. Until this, the only way
+     * to see any of that was to wait — the guide refreshes at most every
+     * twelve hours, and the channel list is fetched once and held for the
+     * life of the process — or to force-stop the app, which is not something
+     * anybody should have to know.
+     *
+     * Both halves together, because "refresh" means one thing to the person
+     * pressing it. The guide half is [Guide.refreshNow]: whatever the network,
+     * however recent the last one, whatever the last failure. The channel half
+     * empties the shared cache and bumps its version, which is what makes the
+     * screen the viewer came from go back for its own copy.
+     *
+     * The guide is the slow half — a minute or so on the box with five extra
+     * sources — so nothing waits on it: it reports itself through
+     * [Guide.downloading] and the screen says so.
+     *
+     * **One channel-list request, not two**, which the first version got
+     * wrong and the box's own log showed: `get_live_streams` is 7.8 MB on this
+     * line, and asking the guide to refresh while separately fetching the line
+     * sent two of them at the same moment. The guide takes the channels when
+     * it is given them — it needs them anyway, to know which entries to keep
+     * and which channels hold a recording — so the fetch happens once and its
+     * answer is handed on.
+     */
+    fun refreshEverything() {
+        val account = _state.value.account ?: return
+        _state.update { it.copy(channelsRefreshing = true, error = null) }
+        container.lineChannels.refresh()
+        viewModelScope.launch {
+            // Asked for here as well as by the screen that will redraw, so the
+            // panel can stop saying "fetching" when the line is actually back
+            // — and so a line that refuses says so here rather than nowhere.
+            val outcome = runCatching { container.lineChannels.all(account) }
+            _state.update {
+                it.copy(
+                    channelsRefreshing = false,
+                    error = outcome.exceptionOrNull()?.message ?: it.error,
+                )
+            }
+            // Even when the line failed: the guide is worth having on its own,
+            // and it will fetch the channels itself if it has to.
+            container.guide.refreshNow(account, outcome.getOrNull())
+        }
     }
 
     /** Brings a hidden channel back into every list it was taken out of. */
