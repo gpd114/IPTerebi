@@ -117,11 +117,18 @@ val Light = Palette(
  * card is mostly lamp. Nothing in the app can turn that off; the only thing it
  * can do is stop asking for peak.
  *
- * So the page drops from 90% luminance to **43%** and the cards from 100% to
- * **56%**, and [Light]'s white `veil` and `field` become a mid blue-grey. The
- * ink goes *down* to keep up: measured, ink on the page is 8.4:1 and on a card
- * 10.7:1. Nothing here is a guess — every pair was computed before it was
+ * So the page drops from 90% luminance to **50%** and the cards from 100% to
+ * **60%**, and [Light]'s white `veil` and `field` become a mid blue-grey. The
+ * ink goes *down* to keep up: measured, ink on the page is 9.6:1 and on a card
+ * 11.5:1. Nothing here is a guess — every pair was computed before it was
  * written.
+ *
+ * **It took three goes, and each figure came from the owner looking at it.**
+ * 68% was "a bit too bright and in your face"; 43% answered that and was then
+ * a shade too far — "can you make it a smidge brighter". 50% is that smidge,
+ * about a quarter of the way back. Writing all three down because the useful
+ * part is the range: this is a judgement about one television, and the next
+ * one will want its own number.
  *
  * **It was 68% and 79% first, and that was still too bright**, which is worth
  * recording because the second guess was no more a guess than the first: the
@@ -145,11 +152,11 @@ val Light = Palette(
  */
 val LightTv = Palette(
     dark = false,
-    ground = Color(0xFFA7AFC1), veil = Color(0xFFBEC5D2), edge = Color(0xFF8D96AC),
-    hairline = Color(0xFF9BA3B7), quiet = Color(0xFFB4BBCA), quietText = Color(0xFF181E2D),
-    glass = Color(0xFFB4BBCA), glassIcon = Color(0xFF13224F), field = Color(0xFFBEC5D2),
+    ground = Color(0xFFB4BBCA), veil = Color(0xFFC6CCD8), edge = Color(0xFF99A2B5),
+    hairline = Color(0xFFA7AFC0), quiet = Color(0xFFBEC5D2), quietText = Color(0xFF181E2D),
+    glass = Color(0xFFBEC5D2), glassIcon = Color(0xFF13224F), field = Color(0xFFC6CCD8),
     cobalt = Color(0xFF13224F), accent = Color(0xFF13224F),
-    chosen = Color(0xFF13224F), onChosen = Color(0xFFBEC5D2),
+    chosen = Color(0xFF13224F), onChosen = Color(0xFFC6CCD8),
     ink = Color(0xFF0F1320), inkSoft = Color(0xFF313A52),
     pink = Color(0xFF741A36), badge = Color(0xB3142A66),
     focus = Color(0xFF6482BE),

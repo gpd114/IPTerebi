@@ -1264,26 +1264,31 @@ card is mostly lamp. Nothing in the app can turn that off. The only thing it
 can do is stop asking for peak.
 
 So there is a third palette, `LightTv`, and it is **Light with no white
-anywhere**: the page drops from 90% luminance to **43%** and the cards from
-100% to **56%**, with `veil` and `field` — both pure white on Light —
+anywhere**: the page drops from 90% luminance to **50%** and the cards from
+100% to **60%**, with `veil` and `field` — both pure white on Light —
 becoming a mid blue-grey. The ink goes *down* to match: measured, ink on the
-page is **8.4:1** and on a card **10.7:1**. Every pair was computed before it
+page is **9.6:1** and on a card **11.5:1**. Every pair was computed before it
 was written; none of it was chosen by eye.
 
-**It was 68% and 79% first, and that was still too bright.** Worth recording,
-because the second number was no more a guess than the first — the owner
-looked at the first attempt on the box and said so. A step from 90% to 68%
-sounds large and was not enough: what HDR does to a large pale area is not
-proportional to the figure.
+**It took three goes, and every figure came from the owner looking at it.**
+68% and 79% first — "a bit too bright and in your face". Then 43% and 56%,
+which answered that and overshot: "can you make it a smidge brighter". 50% is
+that smidge, about a quarter of the way back up. All three are written down
+because the useful part is the *range*: this is a judgement about one
+television with HDR it cannot turn off, and the next one will want its own
+number. A step from 90% to 68% sounds large and was not enough, which is the
+thing to remember — what HDR does to a large pale area is not proportional to
+the figure.
 
-**43% is near the floor, and the floor is not arbitrary.** Work back from
-`focusFill`, which paints its fill *under* text the caller has already
-coloured — on Home that text is `Night.ink`, dark. So the focus fill cannot go
-below about 21% luminance or a focused card stops being readable; a quiet pill
-has to sit clear above the focus fill; and a card has to sit clear above the
-pill. That chain puts the card at about 56% and the page just under it. Dimmer
-than this is not a palette change, it is `Dark` — one press away, and the right
-answer for anyone who wants the screen darker still.
+**There is a floor, and it is not arbitrary.** Work back from `focusFill`,
+which paints its fill *under* text the caller has already coloured — on Home
+that text is `Night.ink`, dark. So the focus fill cannot go below about 21%
+luminance or a focused card stops being readable; a quiet pill has to sit
+clear above the focus fill; and a card has to sit clear above the pill. That
+chain puts the card at about 56% and the page just under it, which is where
+the second attempt sat. Dimmer than that is not a palette change, it is
+`Dark` — one press away, and the right answer for anyone who wants the screen
+darker still.
 
 One thing the palette does not reach: a channel with no logo gets a tile in a
 colour generated from its name, and on a page this dim those are now the
