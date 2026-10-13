@@ -517,6 +517,38 @@ Driven on the box: one press, one `get_live_streams` (21,076 channels), then
 kept: 88,159 programmes for 1,569 channels`. About three minutes in all, with
 the button reading "Fetching the guide…" throughout.
 
+**Hold Up to come back to the top**, which the owner asked for in the words
+*"if you scroll down the settings, you can never fully get back to the top"*.
+
+Measuring it on their box said something different from the report, and the
+difference is the whole fix: **nothing is stuck**. Six rapid presses of Up and
+six slow ones landed on exactly the same element, so no key is being dropped
+and no focus trap exists. Settings on the TV build is simply **25-odd
+focusable stops** deep — the chips, the fields, the buttons, the hidden
+channels — so walking back up it is twenty-five presses, and nobody is willing
+to press twenty-five times. It is distance, not a fault.
+
+So it borrows the gesture the guide already uses for the same problem, where a
+hold of right "returns to now in one go rather than a press per programme
+walked back". A hold of Up scrolls to 0 and puts focus on the first thing on
+the screen.
+
+Two things about how, both of them lessons this file already carries:
+
+- **It is timed, not counted** — the box's arrow keys send no repeat at all,
+  however long they are held — **and it also acts on a repeat** where one does
+  arrive. The second half is not only for other remotes: `input keyevent
+  --longpress` sends a repeat and releases within milliseconds, so a purely
+  timed hold can never be driven from `adb`. The first version was timed only
+  and looked broken on the box for exactly that reason.
+- **It is previewed**, so it is seen before the focused child takes the key —
+  a `DpadTextField` would otherwise swallow it — and only a long press is
+  taken, so the ordinary Up that leaves a field still leaves it.
+
+The hint sits at the *foot* of the screen rather than the head, because that
+is where somebody who has walked the length of it is standing when they want
+it, and only on a television, because a finger scrolls.
+
 There is also a "check the line" button that re-runs the sign-in call and shows
 what the panel says: status, expiry, connections in use, and which output
 formats it admits to. That last one is worth reading before concluding the app
