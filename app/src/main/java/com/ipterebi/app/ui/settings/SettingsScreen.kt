@@ -35,11 +35,21 @@ import com.ipterebi.app.ui.PrimaryButton
 import com.ipterebi.app.ui.ScreenTopBar
 import com.ipterebi.app.ui.SecondaryButton
 import com.ipterebi.app.ui.fieldColours
+import com.ipterebi.app.ui.isTelevision
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import kotlinx.coroutines.launch
 import com.ipterebi.app.playback.ActivePlayback
 import com.ipterebi.app.ui.home.HomeChannels
 import com.ipterebi.app.ui.tv.SearchOpensOn
@@ -73,6 +83,12 @@ fun SettingsScreen(
     // DpadTextField ends editing when focus leaves.
     val focusManager = LocalFocusManager.current
 
+    // Coming back to the top of a long screen; see the hold below.
+    val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val topOfSettings = remember { FocusRequester() }
+    val upHeldFrom = remember { longArrayOf(0L) }
+
     LaunchedEffect(state.signedOut) {
         if (state.signedOut) onSignedOut()
     }
@@ -85,7 +101,59 @@ fun SettingsScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                // Hold Up to come back to the top, which is the same bargain
+                // the guide makes with a hold of right: a long way in one go
+                // rather than a press per thing passed. Settings is **25-odd
+                // focusable stops** on the TV build, so walking back up it is
+                // twenty-five presses — the owner's report was that you "can
+                // never fully get back to the top", and measuring it on their
+                // box showed nothing stuck at all. Six rapid presses and six
+                // slow ones landed in exactly the same place; it is simply
+                // further than anybody is willing to press.
+                //
+                // Timed rather than counted, for the reason written against
+                // the guide's own holds: that box's arrow keys send no repeat
+                // at all, however long they are held. Previewed, so it is seen
+                // before the focused child takes the key — a text field would
+                // otherwise swallow it — and only a *long* press is taken, so
+                // the ordinary Up that leaves a field still leaves it.
+                .onPreviewKeyEvent { e ->
+                    if (e.key != Key.DirectionUp) return@onPreviewKeyEvent false
+
+                    fun toTheTop(): Boolean {
+                        scope.launch { scroll.animateScrollTo(0) }
+                        runCatching { topOfSettings.requestFocus() }
+                        return true
+                    }
+
+                    when (e.type) {
+                        KeyEventType.KeyDown -> when {
+                            // A remote that repeats says "held" itself, and the
+                            // first repeat is the earliest that can be known.
+                            // Acting here is also what makes this testable:
+                            // `input keyevent --longpress` sends a repeat and
+                            // releases within milliseconds, so a purely timed
+                            // hold never sees one.
+                            e.nativeKeyEvent.repeatCount > 0 -> {
+                                upHeldFrom[0] = 0L
+                                toTheTop()
+                            }
+                            else -> {
+                                upHeldFrom[0] = e.nativeKeyEvent.eventTime
+                                false
+                            }
+                        }
+                        KeyEventType.KeyUp -> {
+                            val from = upHeldFrom[0]
+                            upHeldFrom[0] = 0L
+                            // Nothing to time: the repeat above already acted.
+                            if (from == 0L) return@onPreviewKeyEvent false
+                            if (e.nativeKeyEvent.eventTime - from >= TOP_HOLD_MS) toTheTop() else false
+                        }
+                        else -> false
+                    }
+                }
+                .verticalScroll(scroll)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
@@ -108,6 +176,9 @@ fun SettingsScreen(
                 PrimaryButton(
                     onClick = { viewModel.refreshEverything() },
                     enabled = !state.channelsRefreshing && !state.guideDownloading,
+                    // Where a hold of Up lands, being the first thing on the
+                    // screen that can take focus.
+                    modifier = Modifier.focusRequester(topOfSettings),
                 ) {
                     Text(
                         when {
@@ -473,6 +544,11 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
 
+            // Said at the foot rather than the head, because this is where
+            // somebody who has walked the length of the screen is standing
+            // when they want it. Only on a television: a finger scrolls.
+            if (isTelevision(context)) Hint("Hold Up to come back to the top.")
+
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -488,6 +564,14 @@ private fun SectionTitle(text: String) {
 private fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = Night.inkSoft)
 }
+
+/**
+ * How long Up must be held to mean "back to the top".
+ *
+ * The same 400 ms the guide uses, because it is the same gesture and a viewer
+ * should not have to learn two.
+ */
+private const val TOP_HOLD_MS = 400L
 
 /**
  * How long ago [millis] was, in words.
