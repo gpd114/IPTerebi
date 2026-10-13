@@ -19,6 +19,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
@@ -135,6 +136,15 @@ class TvLiveViewModel(private val container: AppContainer, context: Context) : V
         viewModelScope.launch {
             signedIn.flatMapLatest { container.channelLists.recents(it.account) }
                 .collect { recents -> _state.update { it.copy(recents = recents, recentsRead = true) } }
+        }
+        // Someone asked Settings for the line again. This screen keeps its own
+        // Lineup — it needs the categories with the channels — so emptying the
+        // shared cache would not reach it, and the channel list the viewer is
+        // actually looking at is the half they would notice had not changed.
+        // `drop(1)` because a StateFlow hands over its current value on
+        // collection, which is not somebody asking.
+        viewModelScope.launch {
+            container.lineChannels.version.drop(1).collect { if (_state.value.account != null) load() }
         }
     }
 

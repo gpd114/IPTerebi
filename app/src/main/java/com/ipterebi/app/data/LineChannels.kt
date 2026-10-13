@@ -4,6 +4,9 @@ import com.ipterebi.core.LiveStream
 import com.ipterebi.core.XtreamAccount
 import com.ipterebi.core.XtreamClient
 import com.ipterebi.core.lineKey
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -52,5 +55,33 @@ class LineChannels(private val xtream: XtreamClient) {
     fun forget() {
         line = null
         channels = emptyList()
+    }
+
+    private val _version = MutableStateFlow(0)
+
+    /**
+     * Moves each time someone asks for the line to be fetched again, so a
+     * screen holding its own copy knows to go back for it.
+     *
+     * The same shape as `Guide.version`, and for the same reason: the channel
+     * list is held in more than one place. This holds it for the search, the
+     * team row and the error card; `TvLiveViewModel` keeps its own `Lineup`
+     * because it needs the categories with it. A refresh that emptied only
+     * this one would leave the screen the viewer is looking at showing
+     * yesterday's channels, which is the half they would actually notice.
+     */
+    val version: StateFlow<Int> = _version.asStateFlow()
+
+    /**
+     * Throw away what is held and tell anyone listening.
+     *
+     * Not [forget]: that is sign-out, where the next line's ids are not these
+     * and nothing should go looking for them again. This is the viewer saying
+     * the provider has changed something.
+     */
+    fun refresh() {
+        line = null
+        channels = emptyList()
+        _version.value++
     }
 }

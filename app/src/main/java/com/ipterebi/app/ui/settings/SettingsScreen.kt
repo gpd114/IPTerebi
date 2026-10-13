@@ -98,7 +98,43 @@ fun SettingsScreen(
             // offers one when the phone has no guide yet.
             val fetchingGuide by container.guide.downloading.collectAsStateWithLifecycle()
 
-            // First, as in Debritsu: the one setting that changes everything
+            // First on the screen, because it is the one thing here that is an
+            // *action* rather than a preference, and the owner asked for it to
+            // be quick: "there should be a quick way to refresh the playlist/
+            // epg". Everything below is set once and left; this is the one
+            // people come back to.
+            Panel {
+                SectionTitle("Refresh")
+                PrimaryButton(
+                    onClick = { viewModel.refreshEverything() },
+                    enabled = !state.channelsRefreshing && !state.guideDownloading,
+                ) {
+                    Text(
+                        when {
+                            state.channelsRefreshing -> "Fetching the channels…"
+                            state.guideDownloading -> "Fetching the guide…"
+                            else -> "Refresh channels and guide"
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
+                Hint(
+                    buildString {
+                        append("Asks your provider for the channel list and the whole guide again. ")
+                        append(
+                            state.guideFetchedAt?.let { "The guide last arrived ${ageOf(it)}. " }
+                                ?: "The guide has not arrived yet. ",
+                        )
+                        append(
+                            "It also happens on its own when you open the app, if what it has " +
+                                "is more than twelve hours old. This is for when your provider " +
+                                "has just changed something.",
+                        )
+                    },
+                )
+            }
+
+            // Then, as in Debritsu: the one setting that changes everything
             // else on the screen as it is pressed.
             // Not on the TV, which has the one look.
             if (Appearance.SWITCHABLE) Panel {
@@ -451,6 +487,26 @@ private fun SectionTitle(text: String) {
 @Composable
 private fun Hint(text: String) {
     Text(text, style = MaterialTheme.typography.bodySmall, color = Night.inkSoft)
+}
+
+/**
+ * How long ago [millis] was, in words.
+ *
+ * Words rather than a timestamp, because the question this answers is "is it
+ * worth pressing the button" and nobody converts a date to an age in their
+ * head to decide that. Rounded down and deliberately coarse: a guide that
+ * arrived 100 minutes ago is "an hour ago" for this purpose, and the
+ * difference between 100 and 110 minutes changes nothing.
+ */
+private fun ageOf(millis: Long): String {
+    val minutes = (System.currentTimeMillis() - millis) / 60_000
+    return when {
+        minutes < 2 -> "just now"
+        minutes < 60 -> "$minutes minutes ago"
+        minutes < 120 -> "an hour ago"
+        minutes < 48 * 60 -> "${minutes / 60} hours ago"
+        else -> "${minutes / (24 * 60)} days ago"
+    }
 }
 
 @Composable

@@ -471,6 +471,52 @@ to be wrong, live:
 - **User agent** — presets for VLC, ffmpeg, ExoPlayer and an honest one, or type
   your own.
 
+**Refresh**, at the top of the screen, asks the provider for the channel list
+and the whole guide again. Asked for — *"there should be a quick way to refresh
+the playlist/epg"* — and the reason is the provider rather than the app: a
+line's channels move, feeds are added and dropped, and a guide is only as good
+as the download it came from. Until this the only ways to see any of that were
+to wait, or to force-stop the app, which is not something anybody should have
+to know.
+
+**"Every twelve hours" is a floor, not a schedule**, and the wording in the app
+said otherwise until the owner questioned it: *"devices arent on 24/7 so they
+wont always get this supposed 12 hour refresh"*. Nothing here runs on a timer.
+`refreshIfStale` is called when the live screen loads — so on every launch —
+and fetches if what is stored is more than `STALE_AFTER_MS` old. A box switched
+on once a day therefore refreshes once a day, when it is switched on; twelve
+hours is how *rarely* it will do it, not how often it needs the device awake to
+try. The hint says so now, because a sentence that sounds like a cron job
+invites exactly that doubt.
+
+It is first on the screen because it is the only thing in Settings that is an
+*action* rather than a preference: everything below is set once and left. Three
+things it has to get right:
+
+- **Both halves, because "refresh" means one thing to the person pressing it.**
+  The guide half is `Guide.refreshNow`; the channel half is
+  `LineChannels.refresh`, which empties the shared cache *and bumps a version*.
+  The version is what makes `TvLiveViewModel` go back for its own `Lineup` —
+  it keeps one because it needs the categories with the channels, so emptying
+  only the shared cache would leave the channel list the viewer is looking at
+  showing yesterday's channels, which is the half they would actually notice.
+- **One channel-list request, not two**, and the box's own log is what showed
+  it: `get_live_streams` is **7.8 MB** on this line, and the first version
+  asked the guide to refresh while separately fetching the line, so two went
+  out in the same instant. The guide takes the channels when it is given them
+  — it needs them anyway, to know which entries to keep and which channels
+  hold a recording — so it is fetched once and handed on.
+- **The age is read when the account arrives**, not only on the guide's own
+  signals. A `StateFlow` hands over its current value the moment it is
+  collected, which is before the account is known, and the age is per line — so
+  the panel said "the guide has not arrived yet" on a box holding 88,057
+  programmes. Seen on the owner's own before it was fixed.
+
+Driven on the box: one press, one `get_live_streams` (21,076 channels), then
+`xmltv.php` — 68 MB in 45 s — then the five extra sources, ending in `guide
+kept: 88,159 programmes for 1,569 channels`. About three minutes in all, with
+the button reading "Fetching the guide…" throughout.
+
 There is also a "check the line" button that re-runs the sign-in call and shows
 what the panel says: status, expiry, connections in use, and which output
 formats it admits to. That last one is worth reading before concluding the app

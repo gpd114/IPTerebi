@@ -86,7 +86,8 @@ class Guide(
      * Fetches [account]'s full guide now, because someone asked: whatever the
      * network, however recent the last one, and whatever the last failure.
      */
-    fun refreshNow(account: XtreamAccount) = refresh(account, null, onMetered = true, asked = true)
+    fun refreshNow(account: XtreamAccount, channels: Collection<LiveStream>? = null) =
+        refresh(account, channels, onMetered = true, asked = true)
 
     private val _downloading = MutableStateFlow(false)
 
