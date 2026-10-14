@@ -279,12 +279,24 @@ fun SectionTopBar(
                 bottom = 8.dp,
             ),
     ) {
-        Image(
-            painter = painterResource(R.drawable.ic_mascot),
-            contentDescription = null,
-            modifier = Modifier.size(34.dp),
-        )
-        Spacer(Modifier.width(12.dp))
+        // Terebi-kun, on the phone only.
+        //
+        // **Because on a television he appears exactly once.** The phone puts
+        // this bar on Home, Live TV, Films and Series, so the mascot is the
+        // app's signature across the whole of it. The TV build gives all three
+        // of those screens their own — the channel list with its guide, the
+        // sofa-shaped libraries — and this bar survives on Home alone, where a
+        // face nothing else on the box carries reads as a stray. The owner's
+        // words: "remove the logo on Home as it doesnt exist anywhere else,
+        // its out of place." The rail is the TV's signature instead.
+        if (!isTelevision(LocalContext.current)) {
+            Image(
+                painter = painterResource(R.drawable.ic_mascot),
+                contentDescription = null,
+                modifier = Modifier.size(34.dp),
+            )
+            Spacer(Modifier.width(12.dp))
+        }
         Text(
             title,
             style = MaterialTheme.typography.displaySmall,
