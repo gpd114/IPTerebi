@@ -1334,6 +1334,45 @@ held at arm's length in a lit room and the owner asked to keep its brightness.
 Nobody should have to understand their television's tone mapping to find a
 screen they can look at.
 
+### And the dark one had the same fault, from the other end
+
+With the light theme tuned the owner looked at the pair: *"the light version
+looks nice, but the dark just looks rubbish in comparison and I cant put my
+finger on it."*
+
+Measured side by side, the structure was not it — cards stand off the page at
+1.14 against Light's 1.20, and the pills and edges match. One number did not:
+
+|                | Dark  | LightTv |
+|----------------|-------|---------|
+| page luminance | 0.4%  | 49.5%   |
+| ink on page    | 17.6  | 9.6     |
+
+**Near-white text on a near-black page, at 17.6:1.** That is the same HDR that
+made white cards read as lamps, only here it is the *text* being mapped
+towards peak brightness, on a page giving it nothing to sit against. Light was
+fixed by taking the white out of the background; dark is fixed by taking it
+out of the ink.
+
+So `DarkTv`: the page lifted to **1.1%** and the ink down to `#CCD1DD`, which
+is **11.2:1** on the page and 9.6 on a card — the same range the light palette
+sits in, which is the whole point. The two themes should read as one app seen
+twice, and the owner's ask was exactly that: "do both so they are in line with
+each other". Every other role moved with them to keep the relationship it had;
+muted text was the one that needed watching, since dropping the ink takes it
+with it (4.7 on a card before it was lifted to `#A0A6B8`, against Light's
+7.0).
+
+`Appearance.darkFor` chooses it, the pair to `lightFor`, and for the same
+reason: the phone's `Dark` is the app's default on a screen held at arm's
+length with no HDR doing this to it.
+
+Verified on the box by sampling the screenshot rather than looking at it —
+page `#181B24`, cards `#242834`, pills `#2E3448`, exactly as written. Worth
+doing: a near-black page and a slightly-less-near-black page are not
+distinguishable by eye in a photograph of a television, and "it is applied" is
+precisely the thing that would otherwise be assumed.
+
 ## Focus cannot show up on itself
 
 The owner's next report on that screen was that **focus is hardly visible in

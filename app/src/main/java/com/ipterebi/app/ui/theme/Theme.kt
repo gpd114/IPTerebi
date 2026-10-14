@@ -184,6 +184,49 @@ val Dark = Palette(
 )
 
 /**
+ * [Dark] for a television: the page lifted off black and the ink brought down
+ * off white.
+ *
+ * **The same fault as [LightTv], found from the other end.** With the light
+ * theme tuned three times the owner looked at the pair and said the light one
+ * "looks nice, but the dark just looks rubbish in comparison and I cant put my
+ * finger on it". Measured side by side, the structure was not the problem —
+ * cards stand off the page at 1.14 against Light's 1.20, the pills and edges
+ * match. One number did not:
+ *
+ * |                | Dark | LightTv |
+ * |----------------|------|---------|
+ * | page luminance | 0.4% | 49.5%   |
+ * | ink on page    | 17.6 | 9.6     |
+ *
+ * Near-white text on a near-black page, at **17.6:1**. That is the television's
+ * HDR again — the thing that made white cards read as lamps — only here it is
+ * the *text* being mapped towards peak brightness, on a page giving it nothing
+ * to sit against. Light was fixed by taking the white out of the background;
+ * dark is fixed by taking it out of the ink.
+ *
+ * So the page goes to 1.1% and the ink to `#CCD1DD`, which is **11.2:1** on the
+ * page and 9.6 on a card — the same range the light palette sits in, which is
+ * the whole point: the two themes should read as one app seen twice. Every
+ * other role moved with them to keep the relationships it had.
+ *
+ * Only on a television, by [Appearance.darkFor], because the phone's [Dark] is
+ * also the app's default on a screen held at arm's length with no HDR doing
+ * this to it, and nobody asked for that to change.
+ */
+val DarkTv = Palette(
+    dark = true,
+    ground = Color(0xFF181B24), veil = Color(0xFF242834), edge = Color(0xFF3A3F4C),
+    hairline = Color(0x14FFFFFF), quiet = Color(0xFF2E3448), quietText = Color(0xFFDADDE6),
+    glass = Color(0xFF2E3448), glassIcon = Color(0xFFE6E9F2), field = Color(0xFF1C1F28),
+    cobalt = Color(0xFF2F5FE0), accent = Color(0xFF9DB5FF),
+    chosen = Color(0xFF9DB5FF), onChosen = Color(0xFF181B24),
+    ink = Color(0xFFCCD1DD), inkSoft = Color(0xFFA0A6B8),
+    pink = Color(0xFFFF8FA3), badge = Color(0xB31F3C8C),
+    focus = Color(0xFF2F5FE0),
+)
+
+/**
  * The colours in use, read from the current [Palette], which is held as state:
  * switching theme recolours everything that has read one, without any screen
  * having to pass a palette about. Named `Night` from when the app had only one.
@@ -299,13 +342,22 @@ object Appearance {
 
     fun load(context: Context) {
         val light = SWITCHABLE && prefs(context).getString(KEY, null) == "light"
-        Night.palette = if (light) lightFor(context) else Dark
+        Night.palette = if (light) lightFor(context) else darkFor(context)
     }
 
     fun set(context: Context, dark: Boolean) {
         prefs(context).edit().putString(KEY, if (dark) "dark" else "light").apply()
-        Night.palette = if (dark) Dark else lightFor(context)
+        Night.palette = if (dark) darkFor(context) else lightFor(context)
     }
+
+    /**
+     * Which dark palette: [DarkTv] on a television, [Dark] anywhere else.
+     *
+     * The pair to [lightFor], and for the same reason — a television's HDR
+     * pushes whatever is nearest white towards peak brightness, which on a
+     * dark page is the text. See [DarkTv].
+     */
+    private fun darkFor(context: Context) = if (isTelevision(context)) DarkTv else Dark
 
     /**
      * Which light palette: [LightTv] on a television, [Light] anywhere else.
