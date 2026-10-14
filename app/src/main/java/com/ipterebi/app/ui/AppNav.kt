@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -83,7 +85,10 @@ import com.ipterebi.app.ui.tv.TvRecordingsScreen
 import com.ipterebi.app.ui.tv.TvSeriesScreen
 import com.ipterebi.app.ui.tv.TvLiveScreen
 import com.ipterebi.app.ui.tv.TvMultiScreen
+import com.ipterebi.app.ui.tv.RailItem
 import com.ipterebi.app.ui.tv.TvSearchScreen
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalContext
 
 object Route {
     const val LOGIN = "login"
@@ -224,6 +229,8 @@ fun AppNav(container: AppContainer) {
                 // Material's own line between compact and medium, so a tablet,
                 // or a phone turned sideways, gets the rail too.
                 val wide = railShowing()
+                // Which rail item to draw; see the note where they are used.
+                val onTelevision = isTelevision(LocalContext.current)
 
                 Scaffold(
                     // The bar is shown on the section screens only. The screens
@@ -268,7 +275,51 @@ fun AppNav(container: AppContainer) {
 
                             // first label to lose a letter on a real television.
 
-                            NavigationRail(
+                            // On a television the rail is its own column rather
+                            // than Material's, for the same reason the items
+                            // are: the guide's rail is built this way, and two
+                            // constructions of one thing is what made them look
+                            // different. It also has to *fit*. There are eight
+                            // items here against the guide's six, and handing
+                            // them to NavigationRail put them 138px apart on a
+                            // 1080p box — 1104px of rail in 1080px of screen,
+                            // which cut the word "Settings" off the bottom
+                            // edge. Measured, after it had been introduced by
+                            // this very change. Spaced and centred like the
+                            // guide's, they fit with room over.
+                            if (onTelevision) Column(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .padding(start = overscanInset().first, end = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                // Eight items against the guide's six, so the
+                                // square shrinks on a short screen. Measured on
+                                // a 1080p box, which is every television this
+                                // is aimed at: at 48dp the column came to
+                                // 1,136px and the last label was off the edge.
+                                val side = if (short) 40.dp else 48.dp
+                                Section.entries.forEach { item ->
+                                    RailItem(
+                                        icon = painterResource(item.icon),
+                                        label = item.label,
+                                        selected = item == section,
+                                        onClick = { nav.switchSection(item.go, item.restores) },
+                                        size = side,
+                                    )
+                                }
+                                Spacer(Modifier.height(8.dp))
+                                RailItem(
+                                    icon = rememberVectorPainter(Icons.Filled.Settings),
+                                    label = "Settings",
+                                    selected = route == Route.SETTINGS,
+                                    onClick = { nav.navigate(Route.SETTINGS) },
+                                    size = side,
+                                )
+                            }
+
+                            if (!onTelevision) NavigationRail(
 
                                 containerColor = Color.Transparent,
 

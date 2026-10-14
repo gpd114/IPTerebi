@@ -5,10 +5,13 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import com.ipterebi.app.ui.theme.Night
 import androidx.compose.material3.Text
@@ -23,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -205,4 +209,67 @@ internal fun rememberClock(): String {
         }
     }
     return now.format(format)
+}
+
+/**
+ * One item on the rail: the icon in a square that the focus fill colours, and
+ * the name under it.
+ *
+ * **Here rather than on one screen, because having two of them is what the
+ * owner noticed.** The guide's own rail was drawn this way and every other
+ * screen used Material's `NavigationRailItem`, which draws a pill of its own
+ * geometry around the icon and leaves `focusFill` to wrap the whole item —
+ * icon, label and all. Their words: focus "is nice when on live tv but if you
+ * are on the other tabs the focus is different and doesnt look as decent, its
+ * fills around the icon". Two components answering one question is the same
+ * mistake as the three palettes, one layer up.
+ *
+ * Named under the icon, small, as the phone's rail is: an icon alone is a
+ * guess, and a name that appears only on focus is one found by pressing.
+ */
+@Composable
+internal fun RailItem(
+    icon: Painter,
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    /**
+     * The square's side. 48dp suits the guide's rail, which carries six
+     * items; the sections rail carries eight and has to shrink to fit a
+     * 1080p screen — at 48dp it was 1,136px of rail in 1,080px of television
+     * and the word "Settings" fell off the bottom.
+     */
+    size: Dp = 48.dp,
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        var focusedHere by remember { mutableStateOf(false) }
+        TvRow(
+            onClick = onClick,
+            onFocusChange = { focusedHere = it },
+            modifier = modifier.size(size),
+            radius = size / 3,
+        ) { focused ->
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(if (selected && !focused) TvAccent else Color.Transparent),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = if (focused) TvFocusInk else if (selected) TvOnAccent else TvInkSoft,
+                    modifier = Modifier.size(size / 2),
+                )
+            }
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (focusedHere) TvInk else if (selected) TvAccent else TvInkSoft,
+            maxLines = 1,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+    }
 }
