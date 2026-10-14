@@ -2238,6 +2238,30 @@ survived until something was pressed.
   `NavigationRail`, one press of left from anywhere. The `NavHost` must stay the
   same call in the same place whichever bar is showing, or it is recreated and
   every screen's state goes with it.
+- **Two rails is one too many.** The guide drew its own and every other screen
+  used Material's `NavigationRailItem`, and the owner saw it before anybody
+  thought to look: focus "is nice when on live tv but if you are on the other
+  tabs the focus is different and doesnt look as decent, its fills around the
+  icon". Exactly right — Material draws a pill of its own geometry around the
+  icon, and `focusFill` then wraps the *whole* item, label and all, so the
+  focus block is a different shape and size on one screen than the next. The
+  same mistake as the three palettes, one layer up: two components answering
+  one question.
+
+  `RailItem` in `ui/tv/TvParts.kt` is now the only one — a square the focus
+  fill colours, the icon on it, the name beneath and outside the fill — and
+  both rails use it. **On a television only**: this screen is the tablet's
+  too, and nobody asked for that to change.
+
+  It has to *fit*, which is the part that bit. The sections rail carries
+  **eight** items against the guide's six, and handing them to
+  `NavigationRail` put them 142px apart on a 1080p box — 1,136px of rail in
+  1,080px of screen, with the word "Settings" off the bottom edge. Introduced
+  by the change that fixed the focus, and caught by dumping the bounds rather
+  than by looking at a screenshot, where the cog was visible and the missing
+  label was not. So the square takes a size and shrinks to 40dp under
+  `SHORT_SCREEN_HEIGHT`, the same line the category shelf uses. Measured
+  after: Home at y 132 and Settings at 1010, with room over.
 - **A wrapped shelf eats a television.** Categories wrap in a `CategoryShelf`
   four rows tall — asked for, because a single sideways row was tedious by
   touch on a real line's dozens of categories. On a 1080p box, which is 540dp

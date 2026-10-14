@@ -658,41 +658,6 @@ private fun GroupsPanel(
     }
 }
 
-@Composable
-private fun RailItem(icon: Painter, label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    // Named under the icon, small, as the phone's rail is: an icon alone is a
-    // guess, and a name only on focus is found by pressing.
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        var focusedHere by remember { mutableStateOf(false) }
-        TvRow(
-            onClick = onClick,
-            onFocusChange = { focusedHere = it },
-            modifier = modifier.size(48.dp),
-            radius = 16.dp,
-        ) { focused ->
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(if (selected && !focused) TvAccent else Color.Transparent),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = if (focused) TvFocusInk else if (selected) TvOnAccent else TvInkSoft,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-        }
-        Text(
-            label,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (focusedHere) TvInk else if (selected) TvAccent else TvInkSoft,
-            maxLines = 1,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-    }
-}
 
 /** Why the lineup is not there yet, below the groups that do not need it. */
 @Composable
