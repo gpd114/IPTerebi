@@ -2,6 +2,7 @@ package com.ipterebi.app.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,9 +53,31 @@ import com.ipterebi.app.ui.theme.tabular
  * roles. Anything pressable here is focusable and ringed, for a remote.
  */
 
-/** A card: a channel row, the carry-on card. Flat, one step up from the page. */
+/**
+ * A card: a channel row, the carry-on card. Flat, one step up from the page,
+ * with the faintest rim around it.
+ *
+ * **The rim is what was missing**, and the owner felt it before it could be
+ * named: the dark theme "feel[s] like there is something missing like
+ * translucency or something like that". A card stands off the page by the same
+ * ratio in both themes — 1.17 on dark against 1.20 on light — and that is the
+ * trap, because a ratio is not a perception. Down at the dark end both colours
+ * are within a few points of black, so on a television in a lit room the step
+ * is swallowed by the screen's own reflection and the card has no edge at all.
+ * On the light theme the same ratio sits in the middle of the scale, where the
+ * eye reads it easily.
+ *
+ * So the edge is drawn rather than implied. [Palette.hairline] already existed
+ * for exactly this — "a poster's edge against the page" — and was already on
+ * the posters, the series artwork and the bar; it simply had never been put on
+ * the thing most of the app is made of. On dark it is white at 8%, which is
+ * the translucency that was being asked for, and on light a soft grey.
+ *
+ * Still flat: a one-pixel rim is not a gradient, a glow or a sheen, and the
+ * rule those words come from was about buttons reading as blue on blue.
+ */
 fun Modifier.nightCard(shape: Shape = Corners.card, colour: Color = Night.veil): Modifier =
-    clip(shape).background(colour)
+    clip(shape).background(colour).border(1.dp, Night.hairline, shape)
 
 /**
  * A panel that groups related things — a settings section, a message over the
@@ -72,6 +95,8 @@ fun Panel(
             .fillMaxWidth()
             .clip(Corners.panel)
             .background(Night.veil)
+            // The same rim as a card, and for the same reason; see nightCard.
+            .border(1.dp, Night.hairline, Corners.panel)
             .padding(padding),
         verticalArrangement = Arrangement.spacedBy(spacing),
         content = content,

@@ -323,7 +323,27 @@ is said at full strength rather than in a colour.
 `FAVOURITES` tags — rather than a block, and nothing was said about it. The
 phone's `Dark` and `Light` are untouched.
 
-Flat throughout: no gradients, glows, rims or sheen, and each role one colour.
+**Cards and panels carry a one-pixel rim**, and that is the one qualification
+to the rule below. The owner felt it before it could be named: after the dark
+palette was brought in line, *"its better, but feel like there is something
+missing like translucency or something like that"*.
+
+What was missing was an edge. A card stands off the page by the same ratio in
+both themes — **1.17 on dark against 1.20 on light** — and that is the trap,
+because a ratio is not a perception. Down at the dark end both colours are
+within a few points of black, so on a television in a lit room the step is
+swallowed by the screen's own reflection and the card has no edge at all; on
+the light theme the same ratio sits in the middle of the scale where the eye
+reads it easily. So the edge is drawn rather than implied.
+
+`Palette.hairline` already existed for exactly this — "a poster's edge against
+the page" — and was already on the posters, the series artwork and the bar. It
+had simply never been put on the thing most of the app is made of. On dark it
+is **white at 8%**, which is the translucency that was being asked for;
+measured on the box, a panel's edge composites to `#353944` over a `#242834`
+card on a `#181B24` page.
+
+Flat throughout: no gradients, glows or sheen, and each role one colour.
 Colours are roles in a `Palette` (`Light`, `LightTv`, `Dark`), read through `Night.*`,
 which holds the current palette as state — switching recolours everything that
 read one. What you press is told apart by fill: quiet pills for choices not
