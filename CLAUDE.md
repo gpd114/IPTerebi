@@ -323,6 +323,38 @@ is said at full strength rather than in a colour.
 `FAVOURITES` tags — rather than a block, and nothing was said about it. The
 phone's `Dark` and `Light` are untouched.
 
+**And then grey was too much of a good thing**: *"now it looks too bland and
+needs contrast."* Fair, and the trade had not been flagged when it was made —
+taking the blue out took the app's only colour with it, and nothing was left
+coloured on a screen except the channel logos.
+
+Two ways out were tried on the box before the right one was found, and the
+first is worth keeping because it closes a door:
+
+- **Pushing the greys further apart does not work.** Widening the ladder put
+  the chosen block at `#99A1B3`, and the labels washed out — a **mid** grey is
+  the one tone where neither white nor black sits on it, so `inkOn` flips at
+  exactly the wrong moment. A grey block has to be clearly dark or clearly
+  light, never in between.
+- Colour in the *marks* rather than the blocks — the tags in the icon's pink —
+  is honest but reaches only two words on the screen.
+
+The answer was the owner's: *"maybe a lighter blue, i wasnt a fan of the one it
+was on originally."* So the blue comes back **in the shape the grey taught**,
+which is the part that matters. The old cobalt was a mid-dark saturated block;
+the new one is pale — `#A9C2F5` on dark, with the page's own near-black as its
+ink — and measures **6.89** against the pill it covers where the old blue
+managed 2.25. The light palette mirrors it at `#55709F`. `chosen` and `cobalt`
+go to a deeper, quieter blue than the original, `#4E6494` and `#2E3F66`.
+
+So the sequence was: a blue that was too much, grey that was too little, and a
+lighter blue in the inverted shape that grey proved was the loud one. Three
+reports, and none of the three was wrong.
+
+One fix survives from the grey experiment regardless: `PrimaryButton` and
+`ChoiceRow` used to colour their labels `Color.White` whatever the fill, which
+is why the mid grey washed out. They ask `Night.inkOn` now.
+
 **Cards and panels carry a one-pixel rim**, and that is the one qualification
 to the rule below. The owner felt it before it could be named: after the dark
 palette was brought in line, *"its better, but feel like there is something
