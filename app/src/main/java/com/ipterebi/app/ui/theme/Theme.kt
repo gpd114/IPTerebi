@@ -155,11 +155,11 @@ val LightTv = Palette(
     ground = Color(0xFFB4BBCA), veil = Color(0xFFC6CCD8), edge = Color(0xFF99A2B5),
     hairline = Color(0xFFA7AFC0), quiet = Color(0xFFBEC5D2), quietText = Color(0xFF181E2D),
     glass = Color(0xFFBEC5D2), glassIcon = Color(0xFF13224F), field = Color(0xFFC6CCD8),
-    cobalt = Color(0xFF13224F), accent = Color(0xFF13224F),
-    chosen = Color(0xFF13224F), onChosen = Color(0xFFC6CCD8),
+    cobalt = Color(0xFF3B404C), accent = Color(0xFF13224F),
+    chosen = Color(0xFF3B404C), onChosen = Color(0xFFC6CCD8),
     ink = Color(0xFF0F1320), inkSoft = Color(0xFF313A52),
     pink = Color(0xFF741A36), badge = Color(0xB3142A66),
-    focus = Color(0xFF6482BE),
+    focus = Color(0xFF6E7586),
 )
 
 /**
@@ -219,11 +219,11 @@ val DarkTv = Palette(
     ground = Color(0xFF181B24), veil = Color(0xFF242834), edge = Color(0xFF3A3F4C),
     hairline = Color(0x14FFFFFF), quiet = Color(0xFF2E3448), quietText = Color(0xFFDADDE6),
     glass = Color(0xFF2E3448), glassIcon = Color(0xFFE6E9F2), field = Color(0xFF1C1F28),
-    cobalt = Color(0xFF2F5FE0), accent = Color(0xFF9DB5FF),
-    chosen = Color(0xFF9DB5FF), onChosen = Color(0xFF181B24),
+    cobalt = Color(0xFF5A6276), accent = Color(0xFF9DB5FF),
+    chosen = Color(0xFF5A6276), onChosen = Color(0xFFE6E9F2),
     ink = Color(0xFFCCD1DD), inkSoft = Color(0xFFA0A6B8),
     pink = Color(0xFFFF8FA3), badge = Color(0xB31F3C8C),
-    focus = Color(0xFF2F5FE0),
+    focus = Color(0xFFB6BDC9),
 )
 
 /**

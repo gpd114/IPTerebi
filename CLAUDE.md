@@ -292,6 +292,37 @@ focus fill underneath. The library chips did, so the chip the remote was on
 looked like any other; they are transparent while focused now. Anything that
 fills itself and sits inside a `TvRow` needs the same.
 
+**On a television the blocks are grey, and it is better than the blue was.**
+The owner's verdict after everything else had settled: *"I dont like the blue
+in the focus and whats toggled in settings, not sure what to replace it
+with"*, and then *"the only thing I can think of working is grey"*.
+
+The interesting part is that grey is not a compromise here, it is louder — but
+only after **inverting the focus block**. A grey of the same weight as the
+blue measures 1.66 against the pill it covers, against the blue's 2.25, because
+grey has no hue to carry the difference. Turned the other way it is
+transformed: a *pale* grey block on the dark page is **6.53** against the pill
+and 9.10 against the page, where the blue managed 2.25. On the light palette
+the block goes dark instead, 2.66 against the pill.
+
+What makes that possible is `Night.inkOn`, which was already there: a pale
+fill takes dark ink and a dark fill takes white, so the same role can sit at
+either end. The one place it had to be taught was the Home row heading, which
+is the only spot on that screen where text sits *on* the fill — the rows below
+it are pictures, where the fill is a frame. It takes `rememberFocusFill` now.
+
+`cobalt` and `chosen` go grey with it, which is the toggle in Settings and the
+section the rail is on. That turned up a real inconsistency: `RailItem` filled
+the selected tile with `accent` while colouring its ink with `onChosen` — two
+different roles for one block, which nothing noticed while both were the same
+blue and which left a single blue tile on an otherwise grey rail the moment
+they were not. The fill is `chosen` now, and the name of the section you are on
+is said at full strength rather than in a colour.
+
+`accent` is **still blue**, deliberately: it is small text — the `ON NOW` and
+`FAVOURITES` tags — rather than a block, and nothing was said about it. The
+phone's `Dark` and `Light` are untouched.
+
 **Cards and panels carry a one-pixel rim**, and that is the one qualification
 to the rule below. The owner felt it before it could be named: after the dark
 palette was brought in line, *"its better, but feel like there is something
