@@ -129,7 +129,11 @@ fun PrimaryButton(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
-        val ink = if (enabled) focus.ink(Color.White) else Night.inkSoft
+        // Whatever reads on the fill, rather than white always. Tried a pale
+        // accent while looking for more contrast and the label vanished into
+        // it: white on a mid grey is unreadable, and nothing here had any way
+        // to know that. inkOn does.
+        val ink = if (enabled) focus.ink(Night.inkOn(fill)) else Night.inkSoft
         CompositionLocalProvider(LocalContentColor provides ink) {
             content()
         }
@@ -247,7 +251,8 @@ fun <T> ChoiceRow(
                 Text(
                     label,
                     style = MaterialTheme.typography.labelMedium.copy(fontSize = 13.sp),
-                    color = focus.ink(if (on) Color.White else Night.quietText),
+                    // As PrimaryButton: what reads on the accent, not white.
+                    color = focus.ink(if (on) Night.inkOn(Night.cobalt) else Night.quietText),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
