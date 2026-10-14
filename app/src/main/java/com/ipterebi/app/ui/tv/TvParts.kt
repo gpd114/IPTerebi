@@ -253,7 +253,12 @@ internal fun RailItem(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(if (selected && !focused) TvAccent else Color.Transparent),
+                    // [Night.chosen], not the accent. The ink on it has always
+                    // been `onChosen`, so the fill and its ink were coming from
+                    // two different roles — which nothing noticed while both
+                    // were the same blue, and which left one blue tile on an
+                    // otherwise grey rail the moment they were not.
+                    .background(if (selected && !focused) Night.chosen else Color.Transparent),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -267,7 +272,9 @@ internal fun RailItem(
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
-            color = if (focusedHere) TvInk else if (selected) TvAccent else TvInkSoft,
+            // The section you are on is said by the solid tile and by the name
+            // at full strength, rather than by colouring the name.
+            color = if (focusedHere || selected) TvInk else TvInkSoft,
             maxLines = 1,
             modifier = Modifier.padding(top = 4.dp),
         )

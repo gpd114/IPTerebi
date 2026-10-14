@@ -46,6 +46,7 @@ import coil.compose.AsyncImage
 import com.ipterebi.app.AppContainer
 import com.ipterebi.app.ui.SectionTopBar
 import com.ipterebi.app.ui.focusFill
+import com.ipterebi.app.ui.rememberFocusFill
 import com.ipterebi.app.ui.nightCard
 import com.ipterebi.app.ui.channels.tileColour
 import com.ipterebi.app.ui.theme.Corners
@@ -343,29 +344,40 @@ private fun RowHeading(
     onOpen: (() -> Unit)? = null,
     row: FocusRequester? = null,
 ) {
+    // The one place on this screen where text sits *on* the focus fill — the
+    // rows below it are pictures, where the fill is only a frame. So its ink
+    // has to follow the fill rather than assume it: the focus block is a pale
+    // grey on the dark theme and a dark one on the light, and `Night.ink`
+    // would be invisible on one of them. See rememberFocusFill.
+    val focus = rememberFocusFill(Color.Transparent)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp)
             .clip(Corners.control)
             .then(if (row != null) Modifier.focusProperties { down = row } else Modifier)
-            .then(if (onOpen != null) Modifier.focusFill(Corners.control) else Modifier)
+            .then(if (onOpen != null) Modifier.background(focus.fill, Corners.control) else Modifier)
+            .then(if (onOpen != null) focus.watch else Modifier)
             .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
             .padding(start = 8.dp, end = 8.dp, top = 16.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = Night.ink)
+        Text(title, style = MaterialTheme.typography.titleLarge, color = focus.ink(Night.ink))
         if (tag.isNotBlank()) {
-            Text(tag.uppercase(), style = MaterialTheme.typography.labelSmall, color = Night.accent)
+            Text(
+                tag.uppercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = focus.ink(Night.accent),
+            )
         }
         Box(Modifier.weight(1f))
         if (onOpen != null) {
-            Text("All", style = MaterialTheme.typography.bodySmall, color = Night.inkSoft)
+            Text("All", style = MaterialTheme.typography.bodySmall, color = focus.ink(Night.inkSoft))
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                tint = Night.inkSoft,
+                tint = focus.ink(Night.inkSoft),
                 modifier = Modifier.size(18.dp),
             )
         }
