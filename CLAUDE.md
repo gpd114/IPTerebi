@@ -1450,11 +1450,31 @@ with it (4.7 on a card before it was lifted to `#A0A6B8`, against Light's
 reason: the phone's `Dark` is the app's default on a screen held at arm's
 length with no HDR doing this to it.
 
-Verified on the box by sampling the screenshot rather than looking at it —
-page `#181B24`, cards `#242834`, pills `#2E3448`, exactly as written. Worth
-doing: a near-black page and a slightly-less-near-black page are not
+Verified on the box by sampling the screenshot rather than looking at it.
+Worth doing: a near-black page and a slightly-less-near-black page are not
 distinguishable by eye in a photograph of a television, and "it is applied" is
 precisely the thing that would otherwise be assumed.
+
+**The ground was blue too, and that was most of "too much blue".** Once the
+accent came back as a lighter blue the owner put their finger on what was left:
+*"the background being blue makes the whole thing have too much blue, but at
+the same time i dont like it when its full on black."* Measured, they were
+right — the ground ran **+12 blue over red** and the quiet pill **+26**, so the
+accent was not a colour on the screen, it was more of the same.
+
+So the backgrounds and the inks are **mostly desaturated, at exactly the same
+luminance**. That last part is what makes it safe: luminance is all a contrast
+ratio sees, so every figure above survives the change untouched — nothing had
+to be re-measured, only re-looked-at.
+
+How far to take it was the owner's eye, over three builds on the box: neutral
+(`#1B1B1B`), half the tint (`#1A1B20`), and a **quarter** (`#1A1B1D`), which is
+where it sits. +3 blue over red: enough that the page does not read as a system
+grey, not enough to echo the accent. The dial runs 0 to 12 if it ever wants
+moving again.
+
+**`LightTv` keeps its tint**, deliberately — the owner's verdict on the light
+theme was that it "looks nice", and nothing was reported against it.
 
 ## Focus cannot show up on itself
 
