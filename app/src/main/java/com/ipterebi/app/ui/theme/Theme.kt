@@ -216,12 +216,12 @@ val Dark = Palette(
  */
 val DarkTv = Palette(
     dark = true,
-    ground = Color(0xFF181B24), veil = Color(0xFF242834), edge = Color(0xFF3A3F4C),
-    hairline = Color(0x14FFFFFF), quiet = Color(0xFF2E3448), quietText = Color(0xFFDADDE6),
-    glass = Color(0xFF2E3448), glassIcon = Color(0xFFE6E9F2), field = Color(0xFF1C1F28),
+    ground = Color(0xFF1A1B1D), veil = Color(0xFF27282B), edge = Color(0xFF3E3F42),
+    hairline = Color(0x14FFFFFF), quiet = Color(0xFF33353A), quietText = Color(0xFFDCDDDF),
+    glass = Color(0xFF33353A), glassIcon = Color(0xFFE8E9EB), field = Color(0xFF1E1F21),
     cobalt = Color(0xFF4E6494), accent = Color(0xFF9DB5FF),
-    chosen = Color(0xFF4E6494), onChosen = Color(0xFFE6E9F2),
-    ink = Color(0xFFCCD1DD), inkSoft = Color(0xFFA0A6B8),
+    chosen = Color(0xFF4E6494), onChosen = Color(0xFFE8E9EB),
+    ink = Color(0xFFD0D1D4), inkSoft = Color(0xFFA5A6AB),
     pink = Color(0xFFFF8FA3), badge = Color(0xB31F3C8C),
     focus = Color(0xFFA9C2F5),
 )
