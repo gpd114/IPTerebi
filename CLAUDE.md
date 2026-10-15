@@ -1094,6 +1094,41 @@ built first and taken back out; it is in the history if it is ever wanted.
   caused all this came from the provider's own guide, which is exactly the one
   that cannot be measured from here.
 
+- **A fixture is an evening, not a programme**, and grouping it by title split
+  it five ways. Found on the owner's box on 13 October 2026: Arsenal v Lille in
+  the Champions League, the row saying nothing useful while the match was on.
+  The guide had it — the database sieve answered **102 programmes** for
+  "Arsenal" in the window, nine of them that fixture — and `showings()` made
+  **five separate events** of those nine, because broadcasters wrap a match in
+  build-up of different lengths (18:00, 18:30, 18:45, 18:55 and 19:00) and
+  title it however they like. The widest of the five then won, so the row
+  announced the match on **Virgin Media Two** and **beIN Sports 3 Singapore**,
+  which is not where anyone in England was going to watch it.
+
+  **And the one feed that mattered could never join.** TNT Sports titles it
+  `Live UEFA Champions League` and names the sides only in the description, and
+  `showings()` compares titles. That is the lesson this file already carries
+  for *matching* — five of the seven feeds of Croatia v England said only
+  "Nations League" — met again in the grouping. Third time the same thing has
+  been missed one layer down; `WhatsOn.kt` says it twice already.
+
+  So `carriedAlsoBy` widens the chosen match: every showing that overlaps it in
+  time is folded in, because they all came from a search for the team and so
+  all mention them. Only the channel list grows — title, start and the fixture
+  ranking are untouched, so the row still says the most specific name anybody
+  gave it. `showings()` itself is deliberately left alone: the error card and
+  the sport list depend on it and it was measured against a different question.
+  Pinned by `ArsenalNightTest`, which is that evening's real titles.
+
+- **The row had no voice, and that cost more than the bug did.** Everything in
+  `findTeam` ran inside one `runCatching { }.getOrNull()`, so a guide that held
+  nothing, a grouping that chose nothing and a failed channel-list request all
+  came out as the same empty row. Diagnosing it meant pulling the guide
+  database off the box and running the app's own SQL by hand. It now logs what
+  it found under `IPTerebiApi` — how many showings, what was chosen, how many
+  of its guide channels turned into something playable, and the failure when
+  there is one.
+
 Type the name the way the guide writes it. "Man Utd" and "Manchester
 United" are not the same thing to a provider, and nothing here second-
 guesses that on the viewer's behalf.
