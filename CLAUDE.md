@@ -1473,8 +1473,20 @@ where it sits. +3 blue over red: enough that the page does not read as a system
 grey, not enough to echo the accent. The dial runs 0 to 12 if it ever wants
 moving again.
 
-**`LightTv` keeps its tint**, deliberately — the owner's verdict on the light
-theme was that it "looks nice", and nothing was reported against it.
+**`LightTv` is desaturated too, and that took a second ask.** It kept its tint
+at first, deliberately — the owner's verdict on the light theme was that it
+"looks nice", and nothing had been reported against it. What that left was the
+two themes disagreeing on the one point: dark a neutral grey, light still
+faintly blue. Asked to match them up, so the same quarter-tint is applied —
+every background and ink to a quarter of the blue it carried, at the same
+luminance. Its page ran **+22 blue over red**, further than the dark one's +12,
+and is +6 now.
+
+Checked rather than assumed, because the whole reason this is safe is that
+luminance is all a contrast ratio sees: ink on the page measures **9.66:1**
+against 9.61 before, on a card 11.54 against 11.49, muted ink 7.05 against
+7.01, and a card still stands off the page at 1.19. Nothing in the figures
+above had to move.
 
 ## Focus cannot show up on itself
 

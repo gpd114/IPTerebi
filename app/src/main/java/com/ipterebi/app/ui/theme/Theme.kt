@@ -118,7 +118,7 @@ val Light = Palette(
  * can do is stop asking for peak.
  *
  * So the page drops from 90% luminance to **50%** and the cards from 100% to
- * **60%**, and [Light]'s white `veil` and `field` become a mid blue-grey. The
+ * **60%**, and [Light]'s white `veil` and `field` become a mid grey. The
  * ink goes *down* to keep up: measured, ink on the page is 9.6:1 and on a card
  * 11.5:1. Nothing here is a guess — every pair was computed before it was
  * written.
@@ -146,18 +146,31 @@ val Light = Palette(
  * [Dark], which is one press away and is the right answer for anyone who wants
  * the screen darker still.
  *
+ * **And its greys are neutral, as [DarkTv]'s are.** The dark palette had its
+ * blue tint taken out at the owner's word — *"the background being blue makes
+ * the whole thing have too much blue"* — and this one was left alone, because
+ * their verdict on it was that it "looks nice". That left the pair disagreeing
+ * on the one point, so the same quarter-tint is applied here: every background
+ * and ink desaturated to a quarter of the blue it carried, at exactly the same
+ * luminance. The page ran **+22 blue over red** and is +6 now.
+ *
+ * Luminance is all a contrast ratio sees, so every figure above survives
+ * untouched, and that was checked rather than assumed: ink on the page is
+ * **9.66:1** against 9.61 before, on a card 11.54 against 11.49, muted ink
+ * 7.05 against 7.01, and the card still stands off the page at 1.19.
+ *
  * Only on a television, and chosen by [Appearance.lightFor] rather than by a
  * setting: a phone is held at arm's length in a lit room and wants [Light]'s
  * brightness, which the owner asked to keep.
  */
 val LightTv = Palette(
     dark = false,
-    ground = Color(0xFFB4BBCA), veil = Color(0xFFC6CCD8), edge = Color(0xFF99A2B5),
-    hairline = Color(0xFFA7AFC0), quiet = Color(0xFFBEC5D2), quietText = Color(0xFF181E2D),
-    glass = Color(0xFFBEC5D2), glassIcon = Color(0xFF13224F), field = Color(0xFFC6CCD8),
+    ground = Color(0xFFB9BBBF), veil = Color(0xFFCACCCF), edge = Color(0xFFA0A2A7),
+    hairline = Color(0xFFADAFB3), quiet = Color(0xFFC3C5C8), quietText = Color(0xFF1D1E23),
+    glass = Color(0xFFC3C5C8), glassIcon = Color(0xFF212433), field = Color(0xFFCACCCF),
     cobalt = Color(0xFF2E3F66), accent = Color(0xFF13224F),
-    chosen = Color(0xFF2E3F66), onChosen = Color(0xFFC6CCD8),
-    ink = Color(0xFF0F1320), inkSoft = Color(0xFF313A52),
+    chosen = Color(0xFF2E3F66), onChosen = Color(0xFFCACCCF),
+    ink = Color(0xFF121317), inkSoft = Color(0xFF383A41),
     pink = Color(0xFF741A36), badge = Color(0xB3142A66),
     focus = Color(0xFF55709F),
 )
