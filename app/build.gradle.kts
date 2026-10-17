@@ -21,16 +21,38 @@ android {
         minSdk = 26
         targetSdk = 34
 
-        // Raise this for every build that leaves this machine. Android compares
-        // versionCode when deciding whether one APK may replace another, and it
-        // is the only way to tell two installed builds apart.
-        versionCode = 1
-        // Taken from the tag when CI is building one, so a published APK can
-        // never report a version that disagrees with its own tag.
+        // The version is the tag, and both halves of it are, so a published
+        // APK can never report a version that disagrees with its own name.
         // TV releases are tagged tv-v*, to keep them apart from the phone's v*.
-        versionName = (System.getenv("RELEASE_TAG")?.removePrefix("tv-v"))
+        val releaseName = System.getenv("RELEASE_TAG")
+            ?.removePrefix("tv-v")
             ?.takeIf { it.isNotBlank() }
-            ?: "0.1.0"
+
+        // **Android decides whether one APK may replace another by versionCode
+        // and nothing else**, so a second release carrying the same number
+        // cannot update the first -- and this was hardcoded to 1, which is
+        // fine exactly once. It is derived from the tag instead: tv-v0.1.0 is
+        // 100, tv-v1.2.3 is 10203, two digits each for minor and patch.
+        //
+        // A tag that will not parse stops the build rather than falling back
+        // to 1. A release numbered 1 for the second time is an APK nobody can
+        // upgrade to, and nothing reveals that until somebody tries.
+        versionCode = releaseName?.let { name ->
+            val parts = name.split(".").map {
+                it.toIntOrNull() ?: throw GradleException(
+                    "RELEASE_TAG '$name' is not major.minor.patch"
+                )
+            }
+            if (parts.size != 3) {
+                throw GradleException("RELEASE_TAG '$name' is not major.minor.patch")
+            }
+            val (major, minor, patch) = parts
+            if (minor > 99 || patch > 99) {
+                throw GradleException("minor and patch must be under 100 in '$name'")
+            }
+            major * 10000 + minor * 100 + patch
+        } ?: 1
+        versionName = releaseName ?: "0.1.0"
     }
 
     signingConfigs {
