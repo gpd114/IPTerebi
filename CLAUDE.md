@@ -474,31 +474,81 @@ report to find anywhere else.
 It is worth doing for its own sake too: **4.4 MB against 23.9 MB**, which is
 most of a fifth, and the box has had as little as 235 MB free.
 
-**Signable, and not yet signed.** A release key is the owner's to make and
-keep, so nothing here holds one. The build was proved by signing it with the local debug key by hand and
-driving it on the `googletv34` emulator: it signed in, fetched and parsed
-`get_live_streams`, downloaded `xmltv.php`, opened a stream and asked for
-`get_short_epg` — the whole decode path, under R8, with the debug logging
-gone. That is the test that matters; distribution is a separate question and
-nothing is tagged yet.
+**Signed, and now released by pushing a tag.** This said "signable, and not
+yet signed" for a long time, because a release key is the owner's to make and
+keep. They made it on 17 October: `make-keystore.yml`, run by hand from the
+Actions tab, which generates the key, hands it back once as an artifact and
+has nothing further to do with it. The password is typed into the dispatch box
+and never written down anywhere; the only copies that persist are the ones the
+owner makes, and they have backed up both the `.jks` and its base64.
+
+**Proved by reading the certificate back out, not by the step going green.**
+The signing block falls back to the debug key when `KEYSTORE_PATH` is unset,
+so a typo in the restore step produces a green build and an APK that looks
+perfectly healthy until nobody can update it. `apksigner verify --print-certs`
+on the APK CI actually built says `CN=IPTerebi`, RSA 2048, SHA-256
+`d5136763c0da087347e5cd5253d172cb0a89a2665438cd96538e51420189e3f9`, against
+the debug build from the same run saying `CN=Android Debug`. The release
+workflow now does that check itself and refuses to publish either a
+debug-signed APK or an unexpected certificate.
+
+**R8 itself was proved separately, and earlier.** Before any key existed the
+release build was signed with the local debug key by hand and driven on the
+`googletv34` emulator: it signed in, fetched and parsed `get_live_streams`,
+downloaded `xmltv.php`, opened a stream and asked for `get_short_epg` — the
+whole decode path, under R8, with the debug logging gone. That is the test
+that matters for minification; signing is a separate question and this is the
+answer to it.
+
+Only v2 signing, which is right rather than missing: v1 JAR signing is needed
+below API 24 and `minSdk` is 26, so Gradle skips it deliberately.
 
 The wiring is here and the key is not, which is the same shape as the owner's
 other app (`../Debritsu`). `signingConfigs` reads four environment variables
 — `KEYSTORE_PATH`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` — and CI
 sets them by decoding a `KEYSTORE_BASE64` secret into the *runner's temporary
-directory*, never into the workspace, which is what gets uploaded. Absent
-those, the release falls back to the debug key: a build that cannot be made
-without a secret is a build nobody else can check, and R8 is precisely the
-thing worth checking. `.github/workflows/make-keystore.yml` makes the key
-once, by hand from the Actions tab, and hands it back as an artifact to be
-copied into secrets and then deleted.
+directory*, never into the workspace, which is what gets uploaded. Only two
+secrets exist: the alias is `ipterebi` in the workflow and the key password is
+the store password. Absent the secrets, the ordinary build falls back to the
+debug key, because a build that cannot be made without a secret is a build
+nobody else can check and R8 is precisely the thing worth checking. The
+*release* workflow does the opposite and stops: a debug-signed APK that
+someone installs can never be replaced by a properly signed one, so
+publishing it once would poison the name.
 
-One consequence worth knowing: the release output is now
+One consequence worth knowing: the release output is
 `app-release.apk` rather than `app-release-unsigned.apk`, so it installs
-directly. Signed with the debug key it is still only good for proving R8 —
-and **losing the real key is not recoverable**, because Android identifies an
-app by its signature and an update signed with a different one is a different
-app.
+directly. And **losing the real key is not recoverable**, because Android
+identifies an app by its signature and an update signed with a different one
+is a different app.
+
+### Cutting one
+
+`.github/workflows/release.yml`, on `tags: ['tv-v*']`. Push a tag and it
+tests `core/`, restores the key, builds release, checks the certificate,
+renames the APK after the tag and attaches it to a GitHub Release whose notes
+are the tag's own message. Nothing is assembled by hand, because a release put
+together by hand is one whose provenance is whatever the person who did it
+remembers.
+
+**The version is the tag, both halves of it**, and the second half is the one
+that mattered. `versionName` already came from `RELEASE_TAG`; `versionCode`
+was hardcoded to **1**, which is fine exactly once — Android decides whether
+one APK may replace another by `versionCode` and nothing else, so a second
+release numbered 1 cannot update the first. It is derived now: `tv-v0.1.0` is
+100, `tv-v1.2.3` is 10203, two digits each for minor and patch. A tag that
+will not parse **stops the build** rather than falling back to 1, because an
+APK nobody can upgrade to is not discoverable until somebody tries.
+
+Driven locally before it went anywhere: `tv-v1.2.3` gave
+`versionCode="10203" versionName="1.2.3"`, `tv-v0.1.0` gave 100 and 0.1.0, no
+tag at all gave 1 and 0.1.0, and `tv-v0.1` failed with "RELEASE_TAG '0.1' is
+not major.minor.patch".
+
+`tv-v0.1.0` was tagged on 17 October, before any of this existed, so it
+built nothing. Re-pointing or re-pushing that tag is how it gets its release,
+and the version it reports is the same either way — which is exactly the
+coincidence that would have hidden the `versionCode` fault until `tv-v0.2.0`.
 
 **CI builds both branches, and tries every change against the TV one.** A
 change can be green on main and break the box: they share `core/` and nearly
