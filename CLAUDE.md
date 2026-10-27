@@ -14,9 +14,14 @@ change that alters the tablet layout.
   for a change in here going untested.
 - `app/` — Compose UI and the Media3 player. Nothing in here can be checked
   without a device.
+- `desktop/` — the Windows application. Compose for Desktop and libvlc,
+  depending on `:core` and on nothing in `:app`. See "A Windows version"
+  below.
 
 Keep that line where it is. Anything that could be decided without an Android
-class belongs in `core/`, because that is the half that can be proven.
+class belongs in `core/`, because that is the half that can be proven — and
+the Windows build is what that rule has been quietly paying for all along:
+`:core` came across whole, unchanged, on the first attempt.
 
 ## The look
 
@@ -188,6 +193,139 @@ since it was created. Those are taken the TV branch's way and the build goes
 ahead. That rule was learnt immediately: the first version failed on any
 conflict outside `tools/`, and the pull request that introduced it failed on
 its own workflow file.
+
+## A Windows version
+
+Asked for in those words, and it is a **third target rather than a port**:
+`:core` comes across whole and only the screen and the player are written
+again.
+
+That is the dividend on the rule at the top of this file. 5,049 lines of
+`core/` — the URL parsing, the flexible serialisers, every panel quirk, the
+diagnostics, the guide rules — compiled against a desktop module **unchanged,
+on the first attempt**, because it never had an Android class in it. The
+17,753 lines of `app/` could not come at all: Compose for Android and Media3
+are both Android-only.
+
+### What plays it, and why not anything in the JDK
+
+**libvlc, through vlcj.** The JDK has no media support worth the name and
+JavaFX's player handles a short list of containers that does not include
+MPEG-TS over HTTP — which is what a live Xtream channel *is*. A real line also
+serves films as mp4, mkv and avi from the same account. VLC takes all of it,
+and it is what the rest of the world points IPTV at, so a stream that plays in
+VLC and not here is a bug on this side. That makes a report easy to read
+instead of a mystery.
+
+**It needs the 64-bit VLC installed**, and that is this build's one awkward
+dependency. `NativeDiscovery` finds it in Program Files without being told
+where. The architectures must match: a 32-bit VLC against a 64-bit JVM fails
+at the `libvlc.dll` load with a message about the image format, which reads
+like a corrupt download rather than the wrong build. Missing VLC is **a
+sentence on the screen, not a crash** — sign-in still works and the player
+area says what to install. Carrying libvlc inside the installer is the obvious
+next step if asking people to install VLC first turns out to be what stops
+them; it is about 50 MB and legal, VLC being LGPL.
+
+**The video is a Swing island inside Compose.** libvlc draws into a native
+component, so it goes in a `SwingPanel` and *nothing Compose draws can sit on
+top of it*. That is why the state line ("Opening Test News HD…", "Playing")
+is in the bar above rather than over the picture, where the Android build puts
+it. Overlays would need `CallbackMediaPlayerComponent`, which copies every
+frame into a `BufferedImage` for Compose to draw — a real cost at 1080p, and
+not worth paying before something actually needs to be drawn over video.
+
+### What is in it
+
+Live television: sign in, the provider's groups, a group's channels, a
+picture. Two rules from the Android build came with it because they are about
+the line rather than the platform:
+
+- **One category at a time.** `get_live_streams` with no category is 7.8 MB on
+  the owner's line, so the whole line is never pulled to draw a list.
+- **One player, stopped before the next stream is asked for.** A paused player
+  keeps its socket and so keeps the single connection a line usually allows,
+  which is why `PlayerScreen` stops on `ON_STOP`. Here it matters when the
+  window closes or the viewer picks another channel.
+
+The catch-up mark is on the channel row, as it is on the phone: on a real line
+one copy of BBC One keeps seven days and the identical one beside it keeps
+nothing, and without the mark there is nothing on screen to say which.
+
+### What is not, and the honest reason
+
+The guide, films, series, catch-up, recording, favourites, hidden channels,
+own lists and the team row. **The rules for all of them are in `:core` and
+reusable; the storage underneath every one of them is Android.** `GuideStore`
+is SQLite through `SQLiteOpenHelper`, the lists are DataStore, the recorder is
+a foreground service driven by an exact alarm. Each needs a desktop
+equivalent — SQLite over JDBC and a JSON file would do for the first two —
+and that is the work, not the logic above them.
+
+So this is the first floor of the same building rather than a demonstration.
+The order to build in is the order the TV app was built in, and for the same
+reason: the guide is what everything else leans on.
+
+### Proving it
+
+`gradle :desktop:test` holds one test, and it is the only thing about this
+module that `core/`'s tests cannot answer: **whether libvlc loads and will
+take a stream from a panel.** It walks the whole path — sign in, a category,
+its channels, the stream URL the app builds — and waits for libvlc to say it
+is playing.
+
+**It skips rather than fails when it cannot run**, because CI has no VLC and
+the fake panel is started by hand. A test that is red on every machine but one
+is a test people learn to ignore.
+
+Driven against `tools/fakepanel` on 27 October, and the panel's own log is the
+proof — one `get_live_categories`, **one** `get_live_streams`, then
+`LIVE 101.ts`, every line of it carrying `ua=VLC/3.0.20 LibVLC/3.0.20`:
+
+```
+API (sign-in)              ua=VLC/3.0.20 LibVLC/3.0.20
+API get_live_categories    ua=VLC/3.0.20 LibVLC/3.0.20
+API get_live_streams 1     ua=VLC/3.0.20 LibVLC/3.0.20
+LIVE 101.ts                ua=VLC/3.0.20 LibVLC/3.0.20
+```
+
+The user agent on that last line is worth more than it looks: it is a *media*
+option on libvlc rather than a global setting, which is the only way it can
+stay per account. A default user agent is refused by a meaningful share of
+panels, and the tell is a 403 on the stream while every API call succeeds.
+
+### Building and packaging it
+
+```
+gradle :desktop:run                      # straight from source
+gradle :desktop:packageMsi               # an installer in desktop/build/compose/binaries
+```
+
+`packageMsi` goes through `jpackage`, which bundles a cut-down JRE, so the
+installed app needs no Java on the machine — only VLC. Two things it insists
+on: a **major version above 0**, so `packageVersion` is its own number and
+cannot follow the `tv-v0.1.0` tags the way the APK's `versionName` does; and
+a fixed `upgradeUuid`, or an upgrade stands a second copy beside the first
+instead of replacing it. Never change that uuid for this product.
+
+Not signed. An unsigned Windows installer draws SmartScreen's blue warning on
+first run, which is a different problem from the Android key and wants an
+Authenticode certificate — a paid, identity-checked thing, and the owner's
+call whether it is worth it.
+
+### Two things to keep in step by hand
+
+**The palette is copied, not shared.** `Ink` in `desktop/.../Theme.kt` holds
+the same hex values as `Dark` in `app/.../ui/theme/Theme.kt`, because the real
+one lives behind `Night` as Android Compose state. If a light theme is ever
+wanted here the honest fix is to move `Palette` itself into `:core`, where
+both can read it — it is only data and has no business being anywhere else.
+
+**The stored password is in clear.** `%APPDATA%\IPTerebi\account.json`. The
+Android app is no better, but there the sandbox is doing the work and on
+Windows there is none: any process running as this user can read it. It cannot
+be avoided by holding a token instead, because every Xtream request puts the
+password in the URL path. Windows' own DPAPI is the fix when it matters.
 
 ## Debugging on device
 
