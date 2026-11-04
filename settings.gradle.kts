@@ -25,3 +25,8 @@ include(":core")
 // The Android application: Compose UI and the Media3 player. Depends on :core
 // and holds nothing that could be tested without a device.
 include(":app")
+
+// The Windows desktop application: Compose for Desktop and libvlc. Depends on
+// :core and on nothing in :app -- Media3 is Android-only, so the player is the
+// one part that had to be written again rather than shared.
+include(":desktop")
