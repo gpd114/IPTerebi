@@ -545,6 +545,17 @@ Driven locally before it went anywhere: `tv-v1.2.3` gave
 tag at all gave 1 and 0.1.0, and `tv-v0.1` failed with "RELEASE_TAG '0.1' is
 not major.minor.patch".
 
+**The parsing strips both prefixes, and the lines that do it are deliberately
+identical to main's.** They were not: main stripped `v` and this branch
+stripped `tv-v`, two characters of difference sitting in `app/build.gradle.kts`
+— which is inside `app/`, so it conflicted there on every merge of main into
+tv and *failed the tv job by design* rather than being waved through like a
+conflict in this file or in a workflow. Found the moment main grew a release
+workflow of its own. Each branch's workflow fires only on its own prefix, so
+nothing here needs to know which branch it is compiled on; keep those lines
+the same on both sides and the conflict cannot come back. Checked after:
+`tv-v0.1.0` still gives 100, and a `v0.4.2` would give 402.
+
 `tv-v0.1.0` was tagged on 17 October, before any of this existed, so it
 built nothing. Re-pointing or re-pushing that tag is how it gets its release,
 and the version it reports is the same either way — which is exactly the
