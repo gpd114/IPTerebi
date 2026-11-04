@@ -18,17 +18,26 @@ android {
 
         // The version is the tag, and both halves of it are, so a published
         // APK can never report a version that disagrees with its own name.
-        // The phone is tagged v*; the TV build on the tv branch is tv-v*, to
-        // keep the two apart.
+        //
+        // **Both prefixes, and this text is deliberately identical on main and
+        // on tv.** The phone is tagged `v*` and the television `tv-v*`, and
+        // each branch's release workflow fires only on its own prefix, so
+        // which one arrives is never in doubt and this does not need to know
+        // which branch it is compiled on. It used to: main stripped `v` and tv
+        // stripped `tv-v`, two characters of difference that conflicted in
+        // `app/` on every merge of main into tv — which is precisely the kind
+        // of conflict that stops that build rather than being waved through.
+        // Keep these lines the same on both sides.
         val releaseName = System.getenv("RELEASE_TAG")
+            ?.removePrefix("tv-")
             ?.removePrefix("v")
             ?.takeIf { it.isNotBlank() }
 
         // **Android decides whether one APK may replace another by versionCode
         // and nothing else**, so a second release carrying the same number
         // cannot update the first -- and this was hardcoded to 1, which is
-        // fine exactly once. It is derived from the tag instead: v0.1.0 is
-        // 100, v1.2.3 is 10203, two digits each for minor and patch.
+        // fine exactly once. It is derived from the tag instead: 0.1.0 is 100
+        // and 1.2.3 is 10203, two digits each for minor and patch.
         //
         // A tag that will not parse stops the build rather than falling back
         // to 1. A release numbered 1 for the second time is an APK nobody can

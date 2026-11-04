@@ -224,6 +224,16 @@ Driven locally before it went anywhere: `v1.2.3` gave `versionCode="10203"
 versionName="1.2.3"`, `v0.1.0` gave 100 and 0.1.0, no tag at all gave 1 and
 0.1.0, and `v0.1` failed with "RELEASE_TAG '0.1' is not major.minor.patch".
 
+**The parsing strips both prefixes, and the lines that do it are deliberately
+identical to the tv branch's.** They were not at first: here `v` and there
+`tv-v`, two characters of difference sitting in `app/build.gradle.kts` — which
+is inside `app/`, so it conflicted there when this change was tried against
+tv and *failed that job by design* rather than being waved through like a
+conflict in this file or in a workflow. Each branch's workflow fires only on
+its own prefix, so nothing in the build file needs to know which branch it is
+compiled on; keep those lines the same on both sides and the conflict cannot
+come back.
+
 Note the coincidence that would otherwise hide the second half: `v0.1.0`
 reports `versionName = "0.1.0"` either way, from the tag or from the
 fallback. The `versionCode` fault would not have shown up until `v0.2.0`.
